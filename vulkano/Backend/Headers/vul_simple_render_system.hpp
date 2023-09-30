@@ -1,0 +1,34 @@
+#pragma once
+
+#include"vul_camera.hpp"
+#include"vul_device.hpp"
+#include"vul_pipeline.hpp"
+#include"vul_object.hpp"
+
+#include<memory>
+
+namespace vul{
+
+class SimpleRenderSystem{
+    public:
+        SimpleRenderSystem(VulDevice &device);
+        ~SimpleRenderSystem();
+
+        void init(VkRenderPass renderPass, VkDescriptorSetLayout globalSetLayout, const std::string &shadersFolder);
+
+        /* These 2 lines remove the copy constructor and operator from SimpleRenderSystem class.
+        Because I'm using a pointer to stuff and that stuff is initialized by constructor and removed by destructor,
+        copying the pointer and then removing the original pointer leaves me with pointer pointing to nothing, possibly leading to VERY nasty bugs */
+        SimpleRenderSystem(const SimpleRenderSystem &) = delete;
+        SimpleRenderSystem &operator=(const SimpleRenderSystem &) = delete;
+        
+        void renderObjects(VulObject::Map &objects, VkDescriptorSet &descriptorSet, VkCommandBuffer &commandBuffer, int maxLights);
+    private:
+        void createPipelineLayout(VkDescriptorSetLayout globalSetLayout);
+        void createPipeline(VkRenderPass renderPass, const std::string &shadersFolder);
+
+        VulDevice &vulDevice;
+        std::unique_ptr<VulPipeline> vulPipeline;
+        VkPipelineLayout pipelineLayout;
+};
+}

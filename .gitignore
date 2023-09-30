@@ -1,0 +1,5 @@
+/main
+/mainWithDebug
+/imgui.ini
+*.spv
+*.obj
