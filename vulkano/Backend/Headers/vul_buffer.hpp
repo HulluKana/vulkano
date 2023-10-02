@@ -2,7 +2,7 @@
  
 #include "vul_device.hpp"
  
-namespace vul {
+namespace vulB {
  
 class VulBuffer {
  public:

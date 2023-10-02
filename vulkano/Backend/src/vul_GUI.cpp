@@ -6,7 +6,7 @@
 #include<imgui_impl_vulkan.h>
 #include<imgui_impl_glfw.h>
 
-namespace vul{
+namespace vulB{
 
 static void check_vk_result(VkResult err)
 {

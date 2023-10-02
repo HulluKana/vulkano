@@ -4,7 +4,7 @@
 #include <cassert>
 #include <stdexcept>
  
-namespace vul {
+namespace vulB {
  
 // *************** Descriptor Set Layout Builder *********************
  

@@ -9,7 +9,7 @@
 #include<stdexcept>
 #include<iostream>
 
-namespace vul{
+namespace vulB{
 
 VulRenderer::VulRenderer(VulWindow &window, VulDevice &device) : vulWindow{window}, vulDevice{device}
 {

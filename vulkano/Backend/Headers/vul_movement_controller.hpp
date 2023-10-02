@@ -3,7 +3,7 @@
 #include"vul_object.hpp"
 #include"vul_window.hpp"
 
-namespace vul{
+namespace vulB{
 
 class MovementController{
     public:

@@ -4,7 +4,7 @@
 #include<string>
 #include<vector>
 
-namespace vul{
+namespace vulB{
 
 struct PipelineConfigInfo {
     VkPipelineViewportStateCreateInfo viewportInfo;

@@ -10,7 +10,7 @@
 #include <string>
 #include <vector>
 
-namespace vul {
+namespace vulB {
 
 class VulSwapChain {
  public:

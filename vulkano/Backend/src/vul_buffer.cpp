@@ -11,7 +11,7 @@
 #include <cassert>
 #include <cstring>
  
-namespace vul {
+namespace vulB {
  
 /**
  * Returns the minimum instance size required to be compatible with devices minOffsetAlignment

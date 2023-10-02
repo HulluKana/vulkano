@@ -12,17 +12,17 @@
 
 namespace std {
 template <>
-struct hash<vul::VulModel::Vertex> {
-    size_t operator()(vul::VulModel::Vertex const &vertex) const {
+struct hash<vulB::VulModel::Vertex> {
+    size_t operator()(vulB::VulModel::Vertex const &vertex) const {
         size_t seed = 0;
-        vul::hashCombine(seed, vertex.pos, vertex.normal, vertex.uv);
+        vulB::hashCombine(seed, vertex.pos, vertex.normal, vertex.uv);
         return seed;
     }
 };
 
 }
 
-namespace vul {
+namespace vulB {
 
 VulModel::VulModel(VulDevice &device, const VulModel::Builder &builder) : vulDevice{device} 
 {

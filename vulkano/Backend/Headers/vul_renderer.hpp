@@ -7,7 +7,7 @@
 #include<cassert>
 #include<memory>
 
-namespace vul{
+namespace vulB{
 
 class VulRenderer{
     public:

@@ -9,7 +9,7 @@
 #include <set>
 #include <stdexcept>
 
-namespace vul {
+namespace vulB {
 
 VulSwapChain::VulSwapChain(VulDevice &deviceRef, VkExtent2D extent)
     : device{deviceRef}, windowExtent{extent} {

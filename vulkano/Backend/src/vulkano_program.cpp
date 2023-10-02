@@ -16,6 +16,7 @@
 
 #define MAX_LIGHTS 10
 
+using namespace vulB;
 namespace vul{
 
 struct GlobalUbo {
@@ -98,22 +99,16 @@ VkCommandBuffer Vulkano::startFrame()
     if (VkCommandBuffer commandBuffer = m_vulRenderer.beginFrame()){
         int frameIndex = m_vulRenderer.getFrameIndex();
 
-        std::cout << m_cameraObject.transform.rotation.x << "  " << m_cameraObject.transform.rotation.y << "  " << m_cameraObject.transform.rotation.z << "\n";
-
         GlobalUbo ubo{};
         ubo.projectionView = m_camera.getProjection() * m_camera.getView();
         ubo.camerePosition = glm::vec4(m_cameraObject.transform.posOffset, 0.0f);
 
         int lightIndex = 0;
-        if (m_objectIDs.size() > 0){
-            for (auto &kv : m_objects){
-                VulObject &obj = kv.second;
-                
-                if (obj.isLight && lightIndex < MAX_LIGHTS){
-                    ubo.lightPosition[lightIndex] = glm::vec4(obj.transform.posOffset, 1.0f);
-                    ubo.lightColor[lightIndex] = glm::vec4(obj.lightColor, obj.lightIntensity);
-                    lightIndex++;
-                }
+        for (VulObject &obj : m_objects){
+            if (obj.isLight && lightIndex < MAX_LIGHTS){
+                ubo.lightPosition[lightIndex] = glm::vec4(obj.transform.posOffset, 1.0f);
+                ubo.lightColor[lightIndex] = glm::vec4(obj.lightColor, obj.lightIntensity);
+                lightIndex++;
             }
         }
         ubo.numLights = lightIndex;
@@ -121,6 +116,7 @@ VkCommandBuffer Vulkano::startFrame()
         m_uboBuffers[frameIndex]->writeToBuffer(&ubo);
 
         m_vulRenderer.beginSwapChainRenderPass(commandBuffer);
+        m_vulGUI.startFrame();
 
         return commandBuffer;
     }
@@ -130,7 +126,8 @@ VkCommandBuffer Vulkano::startFrame()
 
 bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 {
-    if (m_objectIDs.size() > 0) m_simpleRenderSystem.renderObjects(m_objects, m_globalDescriptorSets[m_vulRenderer.getFrameIndex()], commandBuffer, MAX_LIGHTS);
+    if (m_objects.size() > 0) m_simpleRenderSystem.renderObjects(m_objects, m_globalDescriptorSets[m_vulRenderer.getFrameIndex()], commandBuffer, MAX_LIGHTS);
+    m_vulGUI.endFrame(commandBuffer);
     m_vulRenderer.endSwapChainRenderPass(commandBuffer);
     m_vulRenderer.endFrame();
 
@@ -144,14 +141,13 @@ void Vulkano::loadObject(std::string file)
     std::string filePath = "Models/" + file + ".obj";
     std::shared_ptr<VulModel> vulModel = VulModel::createModelFromFile(m_vulDevice, filePath);
 
-    VulObject object = VulObject::createObject();
+    VulObject object;
     object.model = vulModel;
     object.transform.posOffset = {0.0f, 0.0f, 0.0f};
     object.transform.scale = {1.0f, 1.0f, 1.0f};
     object.color = {1.0f, 1.0f, 1.0f};
 
-    m_objects.emplace(object.getId(), std::move(object));
-    m_objectIDs.push_back(object.getId());
+    m_objects.push_back(std::move(object));
 }
         
 }

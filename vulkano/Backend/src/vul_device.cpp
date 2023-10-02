@@ -6,7 +6,7 @@
 #include <set>
 #include <unordered_set>
 
-namespace vul {
+namespace vulB {
 
 // local callback functions
 static VKAPI_ATTR VkBool32 VKAPI_CALL debugCallback(
@@ -47,7 +47,7 @@ void DestroyDebugUtilsMessengerEXT(
 }
 
 // class member functions
-VulDevice::VulDevice(vul::VulWindow &window) : window{window} {
+VulDevice::VulDevice(vulB::VulWindow &window) : window{window} {
   createInstance();
   setupDebugMessenger();
   createSurface();

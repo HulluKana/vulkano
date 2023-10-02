@@ -5,7 +5,7 @@
 #include<stdexcept>
 #include<iostream>
 
-namespace vul{
+namespace vulB{
 
 VulPipeline::VulPipeline(VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo) : vulDevice(device)
 {

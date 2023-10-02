@@ -8,7 +8,7 @@
 #include<stdexcept>
 #include<iostream>
 
-namespace vul{
+namespace vulB{
 
 struct simplePushConstantData {
     glm::mat4 modelMatrix{1.0f};
@@ -71,16 +71,14 @@ void SimpleRenderSystem::createPipeline(VkRenderPass renderPass, const std::stri
     vulPipeline = std::make_unique<VulPipeline>(vulDevice, vertShader, fragShader, pipelineConfig);
 }
 
-void SimpleRenderSystem::renderObjects(VulObject::Map &objects, VkDescriptorSet &descriptorSet, VkCommandBuffer &commandBuffer, int maxLights)
+void SimpleRenderSystem::renderObjects(std::vector<VulObject> &objects, VkDescriptorSet &descriptorSet, VkCommandBuffer &commandBuffer, int maxLights)
 {
     vulPipeline->bind(commandBuffer);
 
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
 
     int lightIndex = 0;
-    for (auto &kv : objects){
-        VulObject &obj = kv.second;
-
+    for (VulObject &obj : objects){
         simplePushConstantData push{};
         push.normalMatrix = obj.transform.normalMatrix();
         push.modelMatrix = obj.transform.transformMat();

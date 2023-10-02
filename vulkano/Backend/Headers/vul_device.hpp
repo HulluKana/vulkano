@@ -6,7 +6,7 @@
 #include <string>
 #include <vector>
 
-namespace vul {
+namespace vulB {
 
 struct SwapChainSupportDetails {
   VkSurfaceCapabilitiesKHR capabilities;
@@ -30,7 +30,7 @@ class VulDevice {
   const bool enableValidationLayers = true;
 #endif
 
-  VulDevice(vul::VulWindow &window);
+  VulDevice(vulB::VulWindow &window);
   ~VulDevice();
 
   // Not copyable or movable
@@ -95,7 +95,7 @@ class VulDevice {
   VkInstance instance;
   VkDebugUtilsMessengerEXT debugMessenger;
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
-  vul::VulWindow &window;
+  vulB::VulWindow &window;
   VkCommandPool commandPool;
 
   VkDevice device_;

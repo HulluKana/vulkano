@@ -7,7 +7,7 @@
 
 #include<memory>
 
-namespace vul{
+namespace vulB{
 
 class SimpleRenderSystem{
     public:
@@ -22,7 +22,7 @@ class SimpleRenderSystem{
         SimpleRenderSystem(const SimpleRenderSystem &) = delete;
         SimpleRenderSystem &operator=(const SimpleRenderSystem &) = delete;
         
-        void renderObjects(VulObject::Map &objects, VkDescriptorSet &descriptorSet, VkCommandBuffer &commandBuffer, int maxLights);
+        void renderObjects(std::vector<VulObject> &objects, VkDescriptorSet &descriptorSet, VkCommandBuffer &commandBuffer, int maxLights);
     private:
         void createPipelineLayout(VkDescriptorSetLayout globalSetLayout);
         void createPipeline(VkRenderPass renderPass, const std::string &shadersFolder);

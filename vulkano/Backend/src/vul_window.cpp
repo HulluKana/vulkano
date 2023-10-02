@@ -1,7 +1,7 @@
 #include"../Headers/vul_window.hpp"
 #include<stdexcept>
 
-namespace vul{
+namespace vulB{
 
 VulWindow::VulWindow(int width, int height, std::string name) : width{width}, height{height}, windowName{name}
 {

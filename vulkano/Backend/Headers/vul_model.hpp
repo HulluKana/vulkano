@@ -10,7 +10,7 @@
 #include<memory>
 #include<vector>
 
-namespace vul {
+namespace vulB {
 
 class VulModel{
     public:

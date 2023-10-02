@@ -7,7 +7,7 @@
 #include<memory>
 #include<unordered_map>
 
-namespace vul{
+namespace vulB{
 
 struct transformComponent{
     glm::vec3 posOffset{};
@@ -20,15 +20,7 @@ struct transformComponent{
 
 class VulObject{
     public:
-        using id_t = unsigned int;
-        using Map = std::unordered_map<id_t, VulObject>;
-
-        static VulObject createObject(){
-            static id_t currentId = 0;
-            return VulObject{currentId++};
-        }
-
-        const id_t getId() {return id;}
+        VulObject();
 
         std::shared_ptr<VulModel> model{};
         glm::vec3 color{};
@@ -45,10 +37,6 @@ class VulObject{
         // Make the move operator (I think) default, for some reason
         VulObject(VulObject &&) = default;
         VulObject &operator=(VulObject &&) = default;
-    private:
-        VulObject(id_t objId) : id{objId} {}
-
-        id_t id;
 };
 
 }

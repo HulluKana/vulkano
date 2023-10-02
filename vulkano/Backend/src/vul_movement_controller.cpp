@@ -2,7 +2,7 @@
 
 #include<iostream>
 
-namespace vul{
+namespace vulB{
 
 MovementController::MovementController()
 {

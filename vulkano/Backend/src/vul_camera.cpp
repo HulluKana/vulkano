@@ -3,7 +3,7 @@
 #include<cassert>
 #include<limits>
 
-namespace vul{
+namespace vulB{
 
 void VulCamera::setOrthographicProjection(float left, float right, float top, float bottom, float near, float far) 
 {

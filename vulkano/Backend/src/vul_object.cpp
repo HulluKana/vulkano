@@ -1,6 +1,11 @@
 #include"../Headers/vul_object.hpp"
 
-namespace vul{
+namespace vulB{
+
+VulObject::VulObject()
+{
+
+}
 
 glm::mat4 transformComponent::transformMat()
 {

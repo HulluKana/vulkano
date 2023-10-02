@@ -7,7 +7,7 @@
 #include <unordered_map>
 #include <vector>
  
-namespace vul {
+namespace vulB {
  
 class VulDescriptorSetLayout {
  public:

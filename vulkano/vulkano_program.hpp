@@ -28,26 +28,26 @@ class Vulkano{
         bool endFrame(VkCommandBuffer commandBuffer);
         
         void loadObject(std::string file);
+        size_t getObjCount() {return m_objects.size();}
+        vulB::VulObject *getObjectsPointer() {return m_objects.data();}
     private:
         double m_maxFps;
         double m_currentTime;
 
-        VulWindow m_vulWindow{WIDTH, HEIGHT, "Vulkano"};
-        VulDevice m_vulDevice{m_vulWindow};
-        VulRenderer m_vulRenderer{m_vulWindow, m_vulDevice};
-        VulGUI m_vulGUI;
+        vulB::VulWindow m_vulWindow{WIDTH, HEIGHT, "Vulkano"};
+        vulB::VulDevice m_vulDevice{m_vulWindow};
+        vulB::VulRenderer m_vulRenderer{m_vulWindow, m_vulDevice};
+        vulB::VulGUI m_vulGUI;
 
-        // Please note: ORDER OF DECLARATION MATTERS
-        std::unique_ptr<VulDescriptorPool> m_globalPool{};
-        std::vector<VulObject::id_t> m_objectIDs;
-        VulObject::Map m_objects;
+        std::unique_ptr<vulB::VulDescriptorPool> m_globalPool{};
+        std::vector<vulB::VulObject> m_objects;
 
-        std::vector<std::unique_ptr<VulBuffer>> m_uboBuffers;
+        std::vector<std::unique_ptr<vulB::VulBuffer>> m_uboBuffers;
         std::vector<VkDescriptorSet> m_globalDescriptorSets;
-        SimpleRenderSystem m_simpleRenderSystem{m_vulDevice};
+        vulB::SimpleRenderSystem m_simpleRenderSystem{m_vulDevice};
 
-        VulCamera m_camera{};
-        VulObject m_cameraObject = VulObject::createObject();
-        MovementController m_cameraController;
+        vulB::VulCamera m_camera{};
+        vulB::VulObject m_cameraObject;
+        vulB::MovementController m_cameraController;
 };
 }
