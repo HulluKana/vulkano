@@ -30,6 +30,8 @@ class Vulkano{
         void loadObject(std::string file);
         size_t getObjCount() {return m_objects.size();}
         vulB::VulObject *getObjectsPointer() {return m_objects.data();}
+        
+        vulB::VulDevice &getVulDevice() {return m_vulDevice;}
     private:
         double m_maxFps;
         double m_currentTime;

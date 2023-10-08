@@ -1,7 +1,7 @@
 include .env
 
 CODE = main.cpp vulkano/Backend/src/*.cpp $(IMGUI)/*.cpp
-HEADERS = vulkano/vulkano_program.hpp vulkano/Backend/Headers/*.hpp
+HEADERS = vulkano/*.hpp vulkano/Backend/Headers/*.hpp
 
 vertSources = $(shell find ./vulkano/Backend/Shaders -type f -name "*.vert")
 fragSources = $(shell find ./vulkano/Backend/Shaders -type f -name "*.frag")
@@ -9,7 +9,7 @@ vertObjFiles = $(patsubst %.vert, %.vert.spv, $(vertSources))
 fragObjFiles = $(patsubst %.frag, %.frag.spv, $(fragSources))
 
 COMPILER_FLAGS = -O2 -Wall
-LINKER_FLAGS = -I$(TINY_OBJ_LOADER) -I$(IMGUI) -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi
+LINKER_FLAGS = -I$(TINY_OBJ_LOADER) -I$(IMGUI) -I$(STB_IMAGE) -lglfw -lvulkan -ldl -lpthread -lX11 -lXxf86vm -lXrandr -lXi
 
 .PHONY: run clean shaders
 
