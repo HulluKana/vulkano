@@ -1,7 +1,6 @@
 #pragma once
 
 #include"Backend/Headers/vul_buffer.hpp"
-#include"Backend/Headers/vul_texture_sampler.hpp"
 
 #include<string>
 
@@ -17,6 +16,8 @@ class VulImage
 
         uint32_t getWidth() const {return m_width;}
         uint32_t getHeight() const {return m_height;}
+
+        VkImageView getImageView() const {return m_imageView;}
 
         std::string texturesPath = "Textures/";
     private:

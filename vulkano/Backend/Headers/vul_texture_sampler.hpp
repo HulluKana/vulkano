@@ -10,6 +10,8 @@ class VulTexSampler{
         ~VulTexSampler();
 
         void createTextureSampler();
+
+        VkSampler getTextureSampler() const {return m_textureSampler;}
     private:
         VkSampler m_textureSampler;
 

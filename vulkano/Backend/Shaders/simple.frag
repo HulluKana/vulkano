@@ -2,6 +2,7 @@
 
 layout (location = 0) in vec3 fragPosWorld;
 layout (location = 1) in vec3 fragNormalWorld;
+layout (location = 2) in vec2 fragTexCoord;
 
 layout (location = 0) out vec4 FragColor;
 
@@ -15,6 +16,8 @@ layout (set = 0, binding = 0) uniform GlobalUbo {
     int numLights;
 } ubo;
 
+layout (set = 0, binding = 1) uniform sampler2D texSampler;
+
 layout (push_constant) uniform Push{
     mat4 modelMatrix;
     mat4 normalMatrix;
@@ -26,6 +29,7 @@ layout (push_constant) uniform Push{
 
 void main()
 {
+    /*
     vec3 diffuseLight = ubo.ambientLightColor.xyz * ubo.ambientLightColor.w;
     vec3 specularLight = vec3(0.0);
     vec3 surfaceNormal = normalize(fragNormalWorld);
@@ -56,4 +60,7 @@ void main()
     FragColor = vec4(color, 1.0);
 
     if (push.isLight == 1) FragColor += vec4(ubo.lightColors[push.lightIndex].xyz * ubo.lightColors[push.lightIndex].w, 0.0);
+    */
+
+    FragColor = texture(texSampler, fragTexCoord);
 }

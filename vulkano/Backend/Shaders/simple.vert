@@ -6,6 +6,7 @@ layout (location = 2) in vec2 uv;
 
 layout (location = 0) out vec3 fragPosWorld;
 layout (location = 1) out vec3 fragNormalWorld;
+layout (location = 2) out vec2 fragTexCoord;
 
 const int maxLights = 10;
 layout (set = 0, binding = 0) uniform GlobalUbo {
@@ -31,4 +32,5 @@ void main()
     gl_Position = ubo.projectionViewMatrix * push.modelMatrix * vec4(position, 1.0f);
     fragNormalWorld = normalize(mat3(push.normalMatrix) * normal);
     fragPosWorld = worldPosition.xyz;
+    fragTexCoord = uv;
 }

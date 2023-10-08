@@ -30,8 +30,17 @@ struct GlobalUbo {
     int numLights = 0;
 };
 
-
 Vulkano::Vulkano()
+{
+
+}
+
+Vulkano::~Vulkano()
+{
+    m_vulGUI.destroyImGui();
+}
+
+void Vulkano::initVulkano(VulImage &vulImage, VulTexSampler &vulTexSampler)
 {
     m_globalPool = VulDescriptorPool::Builder(m_vulDevice)
         .setMaxSets(VulSwapChain::MAX_FRAMES_IN_FLIGHT * 2)
@@ -51,13 +60,21 @@ Vulkano::Vulkano()
 
     std::unique_ptr<VulDescriptorSetLayout> globalSetLayout = VulDescriptorSetLayout::Builder(m_vulDevice)
         .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+        .addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
         .build();
     
     for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
         VkDescriptorSet descriptorSet;
         VkDescriptorBufferInfo bufferInfo = m_uboBuffers[i]->descriptorInfo();
+
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = vulImage.getImageView();
+        imageInfo.sampler = vulTexSampler.getTextureSampler();
+
         VulDescriptorWriter(*globalSetLayout, *m_globalPool)
             .writeBuffer(0, &bufferInfo)
+            .writeImage(1, &imageInfo)
             .build(descriptorSet);
         m_globalDescriptorSets.push_back(descriptorSet);
     }
@@ -68,11 +85,6 @@ Vulkano::Vulkano()
 
     m_currentTime = glfwGetTime();
     m_maxFps = 144.0;
-}
-
-Vulkano::~Vulkano()
-{
-    m_vulGUI.destroyImGui();
 }
 
 VkCommandBuffer Vulkano::startFrame()
