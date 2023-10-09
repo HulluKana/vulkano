@@ -29,7 +29,9 @@ layout (push_constant) uniform Push{
 
 void main()
 {
-    /*
+    float epsilon = 0.0001;
+    vec3 rawColor = texture(texSampler, fragTexCoord).xyz;
+
     vec3 diffuseLight = ubo.ambientLightColor.xyz * ubo.ambientLightColor.w;
     vec3 specularLight = vec3(0.0);
     vec3 surfaceNormal = normalize(fragNormalWorld);
@@ -44,23 +46,21 @@ void main()
         float attenuation = 1.0 / dot(directionToLight, directionToLight);
         directionToLight = normalize(directionToLight);
 
-        float cosAngleIncidence = max(dot(surfaceNormal, directionToLight), 0);
-        vec3 intensity = lightColor.xyz * lightColor.w * attenuation;
-        diffuseLight += intensity * cosAngleIncidence;
+        float cosAngleIncidence = dot(surfaceNormal, directionToLight);
+        if (cosAngleIncidence > epsilon){
+            vec3 intensity = lightColor.xyz * lightColor.w * attenuation;
+            diffuseLight += intensity * cosAngleIncidence;
 
-        vec3 halfAngle = normalize(directionToLight + viewDirection);
-        float blinnTerm = dot(surfaceNormal, halfAngle);
-        blinnTerm = clamp(blinnTerm, 0, 1);
-        blinnTerm = pow(blinnTerm, push.specularExponent);
-        specularLight += intensity * blinnTerm;
+            vec3 halfAngle = normalize(directionToLight + viewDirection);
+            float blinnTerm = dot(surfaceNormal, halfAngle);
+            blinnTerm = clamp(blinnTerm, 0, 1);
+            blinnTerm = pow(blinnTerm, push.specularExponent);
+            specularLight += intensity * blinnTerm;
+        }
     }
 
-
-    vec3 color = diffuseLight * push.color + specularLight * push.color;
+    vec3 color = diffuseLight * rawColor + specularLight * rawColor;
     FragColor = vec4(color, 1.0);
 
     if (push.isLight == 1) FragColor += vec4(ubo.lightColors[push.lightIndex].xyz * ubo.lightColors[push.lightIndex].w, 0.0);
-    */
-
-    FragColor = texture(texSampler, fragTexCoord);
 }

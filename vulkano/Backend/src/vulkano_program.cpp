@@ -79,7 +79,7 @@ void Vulkano::initVulkano(VulImage &vulImage, VulTexSampler &vulTexSampler)
         m_globalDescriptorSets.push_back(descriptorSet);
     }
 
-    m_cameraObject.transform.rotation = glm::vec3(0.0f, 0.0f, glm::radians(180.0f));
+    m_cameraObject.transform.rotation = glm::vec3(0.0f, 0.0f, M_PI);
 
     m_simpleRenderSystem.init(m_vulRenderer.getSwapChainRenderPass(), globalSetLayout->getDescriptorSetLayout(), "vulkano/Backend/Shaders");
 

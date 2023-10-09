@@ -25,7 +25,7 @@ class VulObject{
         std::shared_ptr<VulModel> model{};
         glm::vec3 color{};
         transformComponent transform{};
-        float specularExponent = 0.0f;
+        float specularExponent = 1.0f;
 
         bool isLight = false;
         glm::vec3 lightColor{0.0f};

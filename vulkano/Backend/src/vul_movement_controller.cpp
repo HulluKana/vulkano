@@ -24,7 +24,7 @@ void MovementController::modifyValues(GLFWwindow *window, float dt, VulObject &o
 
     if (glfwGetKey(window, keys.resetAll) == GLFW_PRESS){
         object.transform.posOffset = glm::vec3(0.0f, 0.0f, 0.0f);
-        object.transform.rotation = glm::vec3(0.0f, 0.0f, 0.0f);
+        object.transform.rotation = glm::vec3(0.0f, 0.0f, M_PI);
     }
 }
 
