@@ -3,6 +3,7 @@
 #include"vul_buffer.hpp"
 
 #include<string>
+#include<memory>
 
 namespace vul{
 
@@ -10,7 +11,13 @@ class VulImage
 {
     public:
         VulImage(vulB::VulDevice &vulDevice);
-        void destroy();
+        ~VulImage();
+
+        static std::unique_ptr<VulImage> createAsUniquePtr(vulB::VulDevice &vulDevice)
+        {
+            std::unique_ptr<VulImage> vulImage{new VulImage(vulDevice)};
+            return vulImage;
+        }
 
         void createTextureImage(std::string fileName);
 
@@ -18,8 +25,9 @@ class VulImage
         uint32_t getHeight() const {return m_height;}
 
         VkImageView getImageView() const {return m_imageView;}
+        VkSampler getTextureSampler() const {return m_textureSampler;}
 
-        std::string texturesPath = "Textures/";
+        std::string texturesPath{"Textures/"};
 
         // Do I even need to explain this at this point?
         VulImage(const VulImage &) = delete;
@@ -33,12 +41,14 @@ class VulImage
         void copyBufferToImage(VkBuffer buffer);
 
         void createTextureImageView();
+        void createTextureSampler();
 
         uint32_t m_width, m_height;
 
         VkImage m_image;
         VkDeviceMemory m_imageMemory;
         VkImageView m_imageView;
+        VkSampler m_textureSampler;
 
         vulB::VulDevice &m_vulDevice;
 };

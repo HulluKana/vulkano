@@ -5,7 +5,6 @@
 #include"Backend/Headers/vul_GUI.hpp"
 #include"Backend/Headers/vul_simple_render_system.hpp"
 #include"Backend/Headers/vul_movement_controller.hpp"
-#include"Backend/Headers/vul_texture_sampler.hpp"
 #include"Backend/Headers/vul_image.hpp"
 
 #include<memory>
@@ -20,7 +19,7 @@ class Vulkano{
         Vulkano();
         ~Vulkano();
 
-        void initVulkano(std::vector<VulImage> &vulImages, std::vector<vulB::VulTexSampler> &vulTexSamplers);
+        void initVulkano(std::vector<std::unique_ptr<VulImage>> &vulImages);
 
         /* These 2 lines remove the copy constructor and operator from Vulkano class.
         Because I'm using a pointer to stuff and that stuff is initialized by constructor and removed by destructor,
@@ -34,6 +33,8 @@ class Vulkano{
         void loadObject(std::string file);
         size_t getObjCount() {return m_objects.size();}
         vulB::VulObject *getObjectsPointer() {return m_objects.data();}
+
+        std::unique_ptr<VulImage> *getImagesPointer() {return m_images.data();}
         
         vulB::VulDevice &getVulDevice() {return m_vulDevice;}
     private:
@@ -47,6 +48,7 @@ class Vulkano{
 
         std::unique_ptr<vulB::VulDescriptorPool> m_globalPool{};
         std::vector<vulB::VulObject> m_objects;
+        std::vector<std::unique_ptr<VulImage>> m_images;
 
         std::vector<std::unique_ptr<vulB::VulBuffer>> m_uboBuffers;
         std::vector<VkDescriptorSet> m_globalDescriptorSets;

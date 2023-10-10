@@ -40,7 +40,7 @@ Vulkano::~Vulkano()
     m_vulGUI.destroyImGui();
 }
 
-void Vulkano::initVulkano(std::vector<VulImage> &vulImages, std::vector<VulTexSampler> &vulTexSamplers)
+void Vulkano::initVulkano(std::vector<std::unique_ptr<VulImage>> &vulImages)
 {
     m_globalPool = VulDescriptorPool::Builder(m_vulDevice)
         .setMaxSets(VulSwapChain::MAX_FRAMES_IN_FLIGHT * 2)
@@ -72,9 +72,10 @@ void Vulkano::initVulkano(std::vector<VulImage> &vulImages, std::vector<VulTexSa
 
         VkDescriptorImageInfo imageInfo[vulImages.size()];
         for (size_t j = 0; j < vulImages.size(); j++){
+            m_images.push_back(std::move(vulImages[j]));
             imageInfo[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo[j].imageView = vulImages[j].getImageView();
-            imageInfo[j].sampler = vulTexSamplers[j].getTextureSampler();
+            imageInfo[j].imageView = m_images[j]->getImageView();
+            imageInfo[j].sampler = m_images[j]->getTextureSampler();
             descriptorWriter.writeImage(j + 1, &imageInfo[j]);
         }
 

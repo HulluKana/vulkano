@@ -6,6 +6,7 @@
 
 #include<stdexcept>
 #include<iostream>
+#include<memory>
 
 namespace vul{
 
@@ -14,10 +15,11 @@ VulImage::VulImage(vulB::VulDevice &vulDevice) : m_vulDevice{vulDevice}
 
 }
 
-void VulImage::destroy()
+VulImage::~VulImage()
 {
     vkDestroyImageView(m_vulDevice.device(), m_imageView, nullptr);
     vkDestroyImage(m_vulDevice.device(), m_image, nullptr);
+    vkDestroySampler(m_vulDevice.device(), m_textureSampler, nullptr);
     vkFreeMemory(m_vulDevice.device(), m_imageMemory, nullptr);
 }
 
@@ -43,6 +45,7 @@ void VulImage::createTextureImage(std::string fileName)
     transitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     createTextureImageView();
+    createTextureSampler();
 }
 
 void VulImage::createTextureImageView()
@@ -60,6 +63,31 @@ void VulImage::createTextureImageView()
 
     if (vkCreateImageView(m_vulDevice.device(), &viewInfo, nullptr, &m_imageView) != VK_SUCCESS) {
         throw std::runtime_error("failed to create texture image view in vulkano_image.cpp");
+    }
+}
+
+void VulImage::createTextureSampler()
+{
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy = m_vulDevice.properties.limits.maxSamplerAnisotropy;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    if (vkCreateSampler(m_vulDevice.device(), &samplerInfo, nullptr, &m_textureSampler) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create texture sampler in vul_texture_sampler.cpp");
     }
 }
 

@@ -9,23 +9,16 @@ int main()
 {
     vul::Vulkano vulkano{};
 
-    vulB::VulTexSampler vulTexSampler(vulkano.getVulDevice());
-    vulTexSampler.createTextureSampler();
-    vulB::VulTexSampler vulTexSampler2(vulkano.getVulDevice());
-    vulTexSampler2.createTextureSampler();
-    vul::VulImage vulImage(vulkano.getVulDevice());
-    vulImage.createTextureImage("texture.jpg");
-    vul::VulImage vulImage2(vulkano.getVulDevice());
-    vulImage2.createTextureImage("greenEye.jpg");
+    std::unique_ptr<vul::VulImage> vulImage = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
+    std::unique_ptr<vul::VulImage> vulImage2 = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
+    vulImage->createTextureImage("texture.jpg");
+    vulImage2->createTextureImage("kana.jpg");
 
-    std::vector<vul::VulImage> vulImages;
-    std::vector<vulB::VulTexSampler> vulTexSamplers;
+    std::vector<std::unique_ptr<vul::VulImage>> vulImages;
     vulImages.push_back(std::move(vulImage));
     vulImages.push_back(std::move(vulImage2));
-    vulTexSamplers.push_back(vulTexSampler);
-    vulTexSamplers.push_back(vulTexSampler2);
 
-    vulkano.initVulkano(vulImages, vulTexSamplers);
+    vulkano.initVulkano(vulImages);
 
     bool stop = false;
     bool addObject = false;
@@ -58,7 +51,6 @@ int main()
                 vul::GUI::DragFloat3("Light color", obj[objIndex].lightColor, 1.0f, 0.0f, 0.005f);
                 ImGui::DragFloat("Light intensity", &obj[objIndex].lightIntensity, (sqrt(obj[objIndex].lightIntensity) + 0.1f) / 10.0f, 0.0f, 1'000'000.0f);
             }
-
         }
         ImGui::End(); 
 
@@ -70,10 +62,6 @@ int main()
 
         stop = vulkano.endFrame(commandBuffer);
     }
-    
-    vulImage.destroy();
-    vulImage2.destroy();
-    vulTexSampler.destroy();
-    vulTexSampler2.destroy();
+
     return 0;
 }
