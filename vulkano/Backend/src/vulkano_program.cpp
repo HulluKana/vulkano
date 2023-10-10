@@ -40,13 +40,13 @@ Vulkano::~Vulkano()
     m_vulGUI.destroyImGui();
 }
 
-void Vulkano::initVulkano(VulImage &vulImage, VulTexSampler &vulTexSampler)
+void Vulkano::initVulkano(std::vector<VulImage> &vulImages, std::vector<VulTexSampler> &vulTexSamplers)
 {
     m_globalPool = VulDescriptorPool::Builder(m_vulDevice)
         .setMaxSets(VulSwapChain::MAX_FRAMES_IN_FLIGHT * 2)
         .setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
         .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VulSwapChain::MAX_FRAMES_IN_FLIGHT)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * 2)
+        .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * (vulImages.size() + 1))
         .build();
     vkDeviceWaitIdle(m_vulDevice.device());
     m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), m_vulRenderer, m_vulDevice);
@@ -58,24 +58,28 @@ void Vulkano::initVulkano(VulImage &vulImage, VulTexSampler &vulTexSampler)
         m_uboBuffers.push_back(std::move(vulBuffer));
     }
 
-    std::unique_ptr<VulDescriptorSetLayout> globalSetLayout = VulDescriptorSetLayout::Builder(m_vulDevice)
-        .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-        .addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-        .build();
+    VulDescriptorSetLayout::Builder globalSetLayoutBuilder = VulDescriptorSetLayout::Builder(m_vulDevice)
+        .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+    for (size_t i = 0; i < vulImages.size(); i++){
+        globalSetLayoutBuilder.addBinding(i + 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+    }
+    std::unique_ptr<VulDescriptorSetLayout> globalSetLayout = globalSetLayoutBuilder.build();
     
     for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-        VkDescriptorSet descriptorSet;
         VkDescriptorBufferInfo bufferInfo = m_uboBuffers[i]->descriptorInfo();
+        VulDescriptorWriter descriptorWriter(*globalSetLayout, *m_globalPool);
+        descriptorWriter.writeBuffer(0, &bufferInfo);
 
-        VkDescriptorImageInfo imageInfo{};
-        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        imageInfo.imageView = vulImage.getImageView();
-        imageInfo.sampler = vulTexSampler.getTextureSampler();
+        VkDescriptorImageInfo imageInfo[vulImages.size()];
+        for (size_t j = 0; j < vulImages.size(); j++){
+            imageInfo[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo[j].imageView = vulImages[j].getImageView();
+            imageInfo[j].sampler = vulTexSamplers[j].getTextureSampler();
+            descriptorWriter.writeImage(j + 1, &imageInfo[j]);
+        }
 
-        VulDescriptorWriter(*globalSetLayout, *m_globalPool)
-            .writeBuffer(0, &bufferInfo)
-            .writeImage(1, &imageInfo)
-            .build(descriptorSet);
+        VkDescriptorSet descriptorSet;
+        descriptorWriter.build(descriptorSet);
         m_globalDescriptorSets.push_back(descriptorSet);
     }
 

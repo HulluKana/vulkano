@@ -1,4 +1,4 @@
-#include"../../vulkano_image.hpp"
+#include"../Headers/vul_image.hpp"
 
 #define STB_IMAGE_IMPLEMENTATION
 #include<stb_image.h>
@@ -14,7 +14,7 @@ VulImage::VulImage(vulB::VulDevice &vulDevice) : m_vulDevice{vulDevice}
 
 }
 
-VulImage::~VulImage()
+void VulImage::destroy()
 {
     vkDestroyImageView(m_vulDevice.device(), m_imageView, nullptr);
     vkDestroyImage(m_vulDevice.device(), m_image, nullptr);

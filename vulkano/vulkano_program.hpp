@@ -5,9 +5,8 @@
 #include"Backend/Headers/vul_GUI.hpp"
 #include"Backend/Headers/vul_simple_render_system.hpp"
 #include"Backend/Headers/vul_movement_controller.hpp"
-
 #include"Backend/Headers/vul_texture_sampler.hpp"
-#include"vulkano_image.hpp"
+#include"Backend/Headers/vul_image.hpp"
 
 #include<memory>
 
@@ -21,7 +20,7 @@ class Vulkano{
         Vulkano();
         ~Vulkano();
 
-        void initVulkano(VulImage &vulImage, vulB::VulTexSampler &vulTexSampler);
+        void initVulkano(std::vector<VulImage> &vulImages, std::vector<vulB::VulTexSampler> &vulTexSamplers);
 
         /* These 2 lines remove the copy constructor and operator from Vulkano class.
         Because I'm using a pointer to stuff and that stuff is initialized by constructor and removed by destructor,

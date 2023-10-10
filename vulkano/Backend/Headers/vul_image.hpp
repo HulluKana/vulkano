@@ -1,6 +1,6 @@
 #pragma once
 
-#include"Backend/Headers/vul_buffer.hpp"
+#include"vul_buffer.hpp"
 
 #include<string>
 
@@ -10,7 +10,7 @@ class VulImage
 {
     public:
         VulImage(vulB::VulDevice &vulDevice);
-        ~VulImage();
+        void destroy();
 
         void createTextureImage(std::string fileName);
 
@@ -20,6 +20,13 @@ class VulImage
         VkImageView getImageView() const {return m_imageView;}
 
         std::string texturesPath = "Textures/";
+
+        // Do I even need to explain this at this point?
+        VulImage(const VulImage &) = delete;
+        VulImage &operator=(const VulImage &) = delete;
+        // Move instead of reference, you know the deal
+        VulImage(VulImage &&) = default;
+        VulImage &operator=(VulImage &&) = default;
     private:
         void createImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties);
         void transitionImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);

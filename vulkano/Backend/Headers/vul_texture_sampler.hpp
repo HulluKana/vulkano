@@ -7,7 +7,7 @@ namespace vulB{
 class VulTexSampler{
     public:
         VulTexSampler(VulDevice &vulDevice);
-        ~VulTexSampler();
+        void destroy();
 
         void createTextureSampler();
 

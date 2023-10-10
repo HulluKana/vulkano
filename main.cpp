@@ -1,6 +1,5 @@
 #include"vulkano/vulkano_program.hpp"
 #include"vulkano/vulkano_GUI_tools.hpp"
-#include"vulkano/vulkano_image.hpp"
 
 #include<imgui.h>
 
@@ -12,10 +11,21 @@ int main()
 
     vulB::VulTexSampler vulTexSampler(vulkano.getVulDevice());
     vulTexSampler.createTextureSampler();
+    vulB::VulTexSampler vulTexSampler2(vulkano.getVulDevice());
+    vulTexSampler2.createTextureSampler();
     vul::VulImage vulImage(vulkano.getVulDevice());
     vulImage.createTextureImage("texture.jpg");
+    vul::VulImage vulImage2(vulkano.getVulDevice());
+    vulImage2.createTextureImage("greenEye.jpg");
 
-    vulkano.initVulkano(vulImage, vulTexSampler);
+    std::vector<vul::VulImage> vulImages;
+    std::vector<vulB::VulTexSampler> vulTexSamplers;
+    vulImages.push_back(std::move(vulImage));
+    vulImages.push_back(std::move(vulImage2));
+    vulTexSamplers.push_back(vulTexSampler);
+    vulTexSamplers.push_back(vulTexSampler2);
+
+    vulkano.initVulkano(vulImages, vulTexSamplers);
 
     bool stop = false;
     bool addObject = false;
@@ -23,9 +33,10 @@ int main()
 
     int modelFileNameLen = 25;
     char *modelFileName = new char[modelFileNameLen];
-    for (int i = 0; i < modelFileNameLen; i++){
+    for (int i = 0; i < modelFileNameLen - 1; i++){
         modelFileName[i] = '0';
     }
+    modelFileName[modelFileNameLen - 2] = '\0';
 
     while (!stop){
         VkCommandBuffer commandBuffer = vulkano.startFrame();
@@ -60,5 +71,9 @@ int main()
         stop = vulkano.endFrame(commandBuffer);
     }
     
+    vulImage.destroy();
+    vulImage2.destroy();
+    vulTexSampler.destroy();
+    vulTexSampler2.destroy();
     return 0;
 }

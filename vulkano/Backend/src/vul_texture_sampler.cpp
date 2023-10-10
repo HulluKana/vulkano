@@ -9,7 +9,7 @@ VulTexSampler::VulTexSampler(VulDevice &VulDevice) : m_vulDevice{VulDevice}
 
 }
 
-VulTexSampler::~VulTexSampler()
+void VulTexSampler::destroy()
 {
     vkDestroySampler(m_vulDevice.device(), m_textureSampler, nullptr);
 }
