@@ -31,6 +31,9 @@ class VulObject{
         glm::vec3 lightColor{0.0f};
         float lightIntensity = 0.0f;
 
+        bool hasTexture = false;
+        uint32_t textureIndex = 0;
+
         // Delete the to copy operator from VulObject, you know why
         VulObject(const VulObject &) = delete;
         VulObject &operator=(const VulObject &) = delete;

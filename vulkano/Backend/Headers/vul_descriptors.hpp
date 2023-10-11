@@ -91,7 +91,7 @@ class VulDescriptorWriter {
   VulDescriptorWriter(VulDescriptorSetLayout &setLayout, VulDescriptorPool &pool);
  
   VulDescriptorWriter &writeBuffer(uint32_t binding, VkDescriptorBufferInfo *bufferInfo);
-  VulDescriptorWriter &writeImage(uint32_t binding, VkDescriptorImageInfo *imageInfo);
+  VulDescriptorWriter &writeImage(uint32_t binding, VkDescriptorImageInfo *imageInfo, uint32_t descriptorCount = 1);
  
   bool build(VkDescriptorSet &set);
   void overwrite(VkDescriptorSet &set);

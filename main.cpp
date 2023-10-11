@@ -11,12 +11,15 @@ int main()
 
     std::unique_ptr<vul::VulImage> vulImage = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
     std::unique_ptr<vul::VulImage> vulImage2 = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
+    std::unique_ptr<vul::VulImage> vulImage3 = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
     vulImage->createTextureImage("texture.jpg");
     vulImage2->createTextureImage("kana.jpg");
+    vulImage3->createTextureImage("rainbow.jpeg");
 
     std::vector<std::unique_ptr<vul::VulImage>> vulImages;
     vulImages.push_back(std::move(vulImage));
     vulImages.push_back(std::move(vulImage2));
+    vulImages.push_back(std::move(vulImage3));
 
     vulkano.initVulkano(vulImages);
 
@@ -51,6 +54,9 @@ int main()
                 vul::GUI::DragFloat3("Light color", obj[objIndex].lightColor, 1.0f, 0.0f, 0.005f);
                 ImGui::DragFloat("Light intensity", &obj[objIndex].lightIntensity, (sqrt(obj[objIndex].lightIntensity) + 0.1f) / 10.0f, 0.0f, 1'000'000.0f);
             }
+
+            ImGui::Checkbox("Obj has texture", &obj[objIndex].hasTexture);
+            if (obj[objIndex].hasTexture) ImGui::SliderInt("Texture index", (int *)&obj[objIndex].textureIndex, 0, vulImages.size() - 1);
         }
         ImGui::End(); 
 

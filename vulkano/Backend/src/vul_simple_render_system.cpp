@@ -17,6 +17,7 @@ struct simplePushConstantData {
     int isLight;
     int lightIndex;
     float specularExponent = 0.0f;
+    int texIndex;
 };
 
 SimpleRenderSystem::SimpleRenderSystem(VulDevice &device) : vulDevice{device}
@@ -87,6 +88,7 @@ void SimpleRenderSystem::renderObjects(std::vector<VulObject> &objects, VkDescri
         push.lightIndex = lightIndex;
         if (obj.isLight && lightIndex < maxLights - 1) lightIndex++;
         push.specularExponent = obj.specularExponent;
+        push.texIndex = (obj.hasTexture) ? (int)obj.textureIndex : -1;
 
         vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0,  sizeof(simplePushConstantData), &push);
 

@@ -15,6 +15,7 @@
 #include<iostream>
 
 #define MAX_LIGHTS 10
+#define MAX_TEXTURES 10
 
 using namespace vulB;
 namespace vul{
@@ -46,7 +47,7 @@ void Vulkano::initVulkano(std::vector<std::unique_ptr<VulImage>> &vulImages)
         .setMaxSets(VulSwapChain::MAX_FRAMES_IN_FLIGHT * 2)
         .setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
         .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VulSwapChain::MAX_FRAMES_IN_FLIGHT)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * (vulImages.size() + 1))
+        .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * (MAX_TEXTURES + 1))
         .build();
     vkDeviceWaitIdle(m_vulDevice.device());
     m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), m_vulRenderer, m_vulDevice);
@@ -58,29 +59,29 @@ void Vulkano::initVulkano(std::vector<std::unique_ptr<VulImage>> &vulImages)
         m_uboBuffers.push_back(std::move(vulBuffer));
     }
 
-    VulDescriptorSetLayout::Builder globalSetLayoutBuilder = VulDescriptorSetLayout::Builder(m_vulDevice)
-        .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
-    for (size_t i = 0; i < vulImages.size(); i++){
-        globalSetLayoutBuilder.addBinding(i + 1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-    }
-    std::unique_ptr<VulDescriptorSetLayout> globalSetLayout = globalSetLayoutBuilder.build();
+    std::unique_ptr<VulDescriptorSetLayout> globalSetLayout = VulDescriptorSetLayout::Builder(m_vulDevice)
+        .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
+        .addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, MAX_TEXTURES)
+        .build();
     
     for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
         VkDescriptorBufferInfo bufferInfo = m_uboBuffers[i]->descriptorInfo();
-        VulDescriptorWriter descriptorWriter(*globalSetLayout, *m_globalPool);
-        descriptorWriter.writeBuffer(0, &bufferInfo);
 
-        VkDescriptorImageInfo imageInfo[vulImages.size()];
-        for (size_t j = 0; j < vulImages.size(); j++){
-            m_images.push_back(std::move(vulImages[j]));
+        VkDescriptorImageInfo imageInfo[MAX_TEXTURES];
+        for (size_t j = 0; j < MAX_TEXTURES; j++){
+            int imageIndex = glm::min(j, vulImages.size() - 1);
+            if ((size_t)imageIndex == j) m_images.push_back(std::move(vulImages[j]));
             imageInfo[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo[j].imageView = m_images[j]->getImageView();
-            imageInfo[j].sampler = m_images[j]->getTextureSampler();
-            descriptorWriter.writeImage(j + 1, &imageInfo[j]);
+            imageInfo[j].imageView = m_images[imageIndex]->getImageView();
+            imageInfo[j].sampler = m_images[imageIndex]->getTextureSampler();
         }
-
+        
         VkDescriptorSet descriptorSet;
-        descriptorWriter.build(descriptorSet);
+        VulDescriptorWriter(*globalSetLayout, *m_globalPool)
+            .writeBuffer(0, &bufferInfo)
+            .writeImage(1, imageInfo, MAX_TEXTURES)
+            .build(descriptorSet);
+
         m_globalDescriptorSets.push_back(descriptorSet);
     }
 
