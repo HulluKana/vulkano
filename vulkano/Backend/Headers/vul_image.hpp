@@ -19,7 +19,8 @@ class VulImage
             return vulImage;
         }
 
-        void createTextureImage(std::string fileName);
+        void createTextureFromFile(std::string fileName);
+        void createTextureFromData(uint8_t* data, uint32_t width, uint32_t height);
 
         uint32_t getWidth() const {return m_width;}
         uint32_t getHeight() const {return m_height;}
@@ -36,6 +37,7 @@ class VulImage
         VulImage(VulImage &&) = default;
         VulImage &operator=(VulImage &&) = default;
     private:
+        void createTextureImage(uint8_t* pixels);
         void createImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties);
         void transitionImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
         void copyBufferToImage(VkBuffer buffer);

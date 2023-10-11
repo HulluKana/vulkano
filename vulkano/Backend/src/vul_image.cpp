@@ -23,29 +23,22 @@ VulImage::~VulImage()
     vkFreeMemory(m_vulDevice.device(), m_imageMemory, nullptr);
 }
 
-void VulImage::createTextureImage(std::string fileName)
+void VulImage::createTextureFromFile(std::string fileName)
 {
     int texChannels;
     stbi_uc* pixels = stbi_load((texturesPath + fileName).c_str(), (int *)&m_width, (int *)&m_height, &texChannels, STBI_rgb_alpha);
-    VkDeviceSize imageSize = m_width * m_height * 4;
 
     if (!pixels) {
         throw std::runtime_error("failed to load texture image!");
     }
+    createTextureImage(pixels);
+}
 
-    vulB::VulBuffer stagingBuffer(m_vulDevice, imageSize, 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); 
-    stagingBuffer.map(imageSize);
-    memcpy(stagingBuffer.getMappedMemory(), pixels, static_cast<size_t>(imageSize));
-    stagingBuffer.unmap();
-    stbi_image_free(pixels);
-
-    createImage(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    transitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-    copyBufferToImage(stagingBuffer.getBuffer());
-    transitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-
-    createTextureImageView();
-    createTextureSampler();
+void VulImage::createTextureFromData(uint8_t* data, uint32_t width, uint32_t height)
+{
+    m_width = width;
+    m_height = height;
+    createTextureImage(data);
 }
 
 void VulImage::createTextureImageView()
@@ -89,6 +82,24 @@ void VulImage::createTextureSampler()
     if (vkCreateSampler(m_vulDevice.device(), &samplerInfo, nullptr, &m_textureSampler) != VK_SUCCESS) {
         throw std::runtime_error("failed to create texture sampler in vul_texture_sampler.cpp");
     }
+}
+
+void VulImage::createTextureImage(uint8_t* pixels)
+{
+    VkDeviceSize imageSize = m_width * m_height * 4;
+    vulB::VulBuffer stagingBuffer(m_vulDevice, imageSize, 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); 
+    stagingBuffer.map(imageSize);
+    memcpy(stagingBuffer.getMappedMemory(), pixels, static_cast<size_t>(imageSize));
+    stagingBuffer.unmap();
+    stbi_image_free(pixels);
+
+    createImage(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
+    transitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+    copyBufferToImage(stagingBuffer.getBuffer());
+    transitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    createTextureImageView();
+    createTextureSampler();
 }
 
 void VulImage::createImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties)

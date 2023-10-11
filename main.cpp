@@ -1,5 +1,6 @@
 #include"vulkano/vulkano_program.hpp"
 #include"vulkano/vulkano_GUI_tools.hpp"
+#include"vulkano/vulkano_random.hpp"
 
 #include<imgui.h>
 
@@ -9,17 +10,19 @@ int main()
 {
     vul::Vulkano vulkano{};
 
+    uint32_t width = 1000;
+    uint32_t height = 1000;
+    uint8_t* data = new uint8_t[width * height * 4];
+    uint32_t total = 0;
+    for (uint32_t i = 0; i < height * height * 4; i++){
+        data[i] = vul::random::uint32(0, 255);
+        total += data[i];
+    }
     std::unique_ptr<vul::VulImage> vulImage = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
-    std::unique_ptr<vul::VulImage> vulImage2 = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
-    std::unique_ptr<vul::VulImage> vulImage3 = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
-    vulImage->createTextureImage("texture.jpg");
-    vulImage2->createTextureImage("kana.jpg");
-    vulImage3->createTextureImage("rainbow.jpeg");
+    vulImage->createTextureFromData(data, width, height);
 
     std::vector<std::unique_ptr<vul::VulImage>> vulImages;
     vulImages.push_back(std::move(vulImage));
-    vulImages.push_back(std::move(vulImage2));
-    vulImages.push_back(std::move(vulImage3));
 
     vulkano.initVulkano(vulImages);
 

@@ -63,7 +63,9 @@ VulBuffer::~VulBuffer() {
  */
 VkResult VulBuffer::map(VkDeviceSize size, VkDeviceSize offset) {
   assert(buffer && memory && "Called map on buffer before create");
-  return vkMapMemory(vulDevice.device(), memory, offset, size, 0, &mapped);
+  VkResult result = vkMapMemory(vulDevice.device(), memory, offset, size, 0, &mapped);
+  if (result != 0) fprintf(stderr, "Mapping memory to buffer failed in vul_buffer.cpp");
+  return result;
 }
  
 /**
