@@ -13,16 +13,14 @@ int main()
     uint32_t width = 1000;
     uint32_t height = 1000;
     uint8_t* data = new uint8_t[width * height * 4];
-    uint32_t total = 0;
-    for (uint32_t i = 0; i < height * height * 4; i++){
-        data[i] = vul::random::uint32(0, 255);
-        total += data[i];
-    }
     std::unique_ptr<vul::VulImage> vulImage = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
-    vulImage->createTextureFromData(data, width, height);
+    std::unique_ptr<vul::VulImage> vulImage2 = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
+    vulImage->createTextureFromData(data, width, height, true);
+    vulImage2->createTextureFromData(data, width, height, true);
 
     std::vector<std::unique_ptr<vul::VulImage>> vulImages;
     vulImages.push_back(std::move(vulImage));
+    vulImages.push_back(std::move(vulImage2));
 
     vulkano.initVulkano(vulImages);
 
@@ -37,10 +35,34 @@ int main()
     }
     modelFileName[modelFileNameLen - 2] = '\0';
 
+    vulkano.setMaxFps(5'000.0f);
+    uint32_t frame = 0;
     while (!stop){
+        if (frame > 255) frame = 0;
+        for (uint32_t i = 0; i < height; i++){
+            for (uint32_t j = 0; j < width; j++){
+                for (uint32_t k = 0; k < 4; k++){
+                    uint32_t index = (i * width + j) * 4 + k;
+                    data[index] = ((j + frame) * (k + 1)) % 256;
+                }
+            }
+        }
+        auto images = vulkano.getImagesPointer();
+        images[0]->modifyTextureImage(data);
+        for (uint32_t i = 0; i < height; i++){
+            for (uint32_t j = 0; j < width; j++){
+                for (uint32_t k = 0; k < 4; k++){
+                    uint32_t index = (i * width + j) * 4 + k;
+                    data[index] = ((j + frame * 3) * (k + 1)) % 256;
+                }
+            }
+        }
+        images[1]->modifyTextureImage(data);
+        frame++;
         VkCommandBuffer commandBuffer = vulkano.startFrame();
         
         ImGui::Begin("Test");
+        ImGui::Text((std::string("Fps: ") + std::to_string(1.0f / vulkano.getFrameTime())).c_str());
         ImGui::Checkbox("Add object", &addObject);
         ImGui::InputText("File name", modelFileName, modelFileNameLen);
         if (vulkano.getObjCount() > 0){

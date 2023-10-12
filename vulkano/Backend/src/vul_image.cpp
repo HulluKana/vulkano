@@ -23,22 +23,36 @@ VulImage::~VulImage()
     vkFreeMemory(m_vulDevice.device(), m_imageMemory, nullptr);
 }
 
-void VulImage::createTextureFromFile(std::string fileName)
+void VulImage::createTextureFromFile(std::string fileName, bool modifyLater)
 {
+    m_modifiable = modifyLater;
     int texChannels;
     stbi_uc* pixels = stbi_load((texturesPath + fileName).c_str(), (int *)&m_width, (int *)&m_height, &texChannels, STBI_rgb_alpha);
 
     if (!pixels) {
         throw std::runtime_error("failed to load texture image!");
     }
-    createTextureImage(pixels);
+    if (!modifyLater) createTextureImage(pixels);
+    else createModifiableTextureImage(pixels);
 }
 
-void VulImage::createTextureFromData(uint8_t* data, uint32_t width, uint32_t height)
+void VulImage::createTextureFromData(uint8_t* pixels, uint32_t width, uint32_t height, bool modifyLater)
 {
     m_width = width;
     m_height = height;
-    createTextureImage(data);
+    m_modifiable = modifyLater;
+    if (!modifyLater) createTextureImage(pixels);
+    else createModifiableTextureImage(pixels);
+}
+
+void VulImage::modifyTextureImage(uint8_t *pixels)
+{
+    assert(m_modifiable && "Texture must be modifiable to modify it");
+
+    VkDeviceSize imageSize = m_width * m_height * 4;
+    transitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL);
+    memcpy(m_mappedMemory, pixels, (size_t)imageSize);
+    transitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 }
 
 void VulImage::createTextureImageView()
@@ -102,6 +116,22 @@ void VulImage::createTextureImage(uint8_t* pixels)
     createTextureSampler();
 }
 
+void VulImage::createModifiableTextureImage(uint8_t* pixels)
+{
+    VkDeviceSize imageSize = m_width * m_height * 4;
+
+    createImage(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_LINEAR, VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT);
+    transitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+
+    vkMapMemory(m_vulDevice.device(), m_imageMemory, 0, imageSize, 0, &m_mappedMemory);
+    memcpy(m_mappedMemory, pixels, (size_t)imageSize);
+
+    transitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    createTextureImageView();
+    createTextureSampler();
+}
+
 void VulImage::createImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties)
 {
     VkImageCreateInfo imageInfo{};
@@ -159,21 +189,30 @@ void VulImage::transitionImageLayout(VkFormat format, VkImageLayout oldLayout, V
     VkPipelineStageFlags sourceStage;
     VkPipelineStageFlags destinationStage;
 
-    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED){
         barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
         sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+    } else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL){
         barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
         sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_GENERAL){
+        barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+        sourceStage = VK_PIPELINE_STAGE_HOST_BIT;
+    } else if (oldLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
+        sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    } else throw std::invalid_argument("unsupported old layout transition in vulkano_image.cpp file!");
+
+    if (newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    } else if (newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
         destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-    } else {
-        throw std::invalid_argument("unsupported layout transition in vulkano_image.cpp file!");
-    }
+    } else if (newLayout == VK_IMAGE_LAYOUT_GENERAL){
+        barrier.dstAccessMask = VK_ACCESS_HOST_WRITE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_HOST_BIT; 
+    } else throw std::invalid_argument("unsupported new layout transition in vulkano_image.cpp file!");
 
     vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 

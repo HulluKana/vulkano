@@ -90,7 +90,7 @@ void Vulkano::initVulkano(std::vector<std::unique_ptr<VulImage>> &vulImages)
     m_simpleRenderSystem.init(m_vulRenderer.getSwapChainRenderPass(), globalSetLayout->getDescriptorSetLayout(), "vulkano/Backend/Shaders");
 
     m_currentTime = glfwGetTime();
-    m_maxFps = 144.0;
+    m_maxFps = 60.0f;
 }
 
 VkCommandBuffer Vulkano::startFrame()
@@ -102,13 +102,13 @@ VkCommandBuffer Vulkano::startFrame()
         if (1.0 / (newTime - m_currentTime) < m_maxFps) break;
         newTime = glfwGetTime();
     }
-    float frameTime = newTime - m_currentTime;
+    m_frameTime = newTime - m_currentTime;
     m_currentTime = newTime;
 
     ImGuiIO &io = ImGui::GetIO(); (void)io;
-    if (!io.WantCaptureKeyboard) m_cameraController.modifyValues(m_vulWindow.getGLFWwindow(), frameTime, m_cameraObject);
-    if (!io.WantCaptureMouse && !io.WantCaptureKeyboard) m_cameraController.rotate(m_vulWindow.getGLFWwindow(), frameTime, m_cameraObject, m_vulRenderer.getSwapChainExtent().width, m_vulRenderer.getSwapChainExtent().height);
-    if (!io.WantCaptureKeyboard) m_cameraController.move(m_vulWindow.getGLFWwindow(), frameTime, m_cameraObject);
+    if (!io.WantCaptureKeyboard) m_cameraController.modifyValues(m_vulWindow.getGLFWwindow(), m_frameTime, m_cameraObject);
+    if (!io.WantCaptureMouse && !io.WantCaptureKeyboard) m_cameraController.rotate(m_vulWindow.getGLFWwindow(), m_frameTime, m_cameraObject, m_vulRenderer.getSwapChainExtent().width, m_vulRenderer.getSwapChainExtent().height);
+    if (!io.WantCaptureKeyboard) m_cameraController.move(m_vulWindow.getGLFWwindow(), m_frameTime, m_cameraObject);
 
     float aspect = m_vulRenderer.getAspectRatio();
     m_camera.setPerspectiveProjection(80.0f, aspect, 0.1f, 100.0f);

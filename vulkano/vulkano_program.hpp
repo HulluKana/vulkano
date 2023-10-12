@@ -29,6 +29,9 @@ class Vulkano{
 
         VkCommandBuffer startFrame();
         bool endFrame(VkCommandBuffer commandBuffer);
+
+        void setMaxFps(float maxFps) {m_maxFps = maxFps;}
+        float getFrameTime() const {return m_frameTime;}
         
         void loadObject(std::string file);
         size_t getObjCount() {return m_objects.size();}
@@ -40,6 +43,7 @@ class Vulkano{
     private:
         double m_maxFps;
         double m_currentTime;
+        float m_frameTime;
 
         vulB::VulWindow m_vulWindow{WIDTH, HEIGHT, "Vulkano"};
         vulB::VulDevice m_vulDevice{m_vulWindow};
