@@ -24,9 +24,9 @@ SimpleRenderSystem::SimpleRenderSystem(VulDevice &device) : vulDevice{device}
 {
 }
 
-void SimpleRenderSystem::init(VkRenderPass renderpass, VkDescriptorSetLayout globalSetLayout, const std::string &shadersFolder)
+void SimpleRenderSystem::init(VkRenderPass renderpass, std::vector<VkDescriptorSetLayout> setLayouts, const std::string &shadersFolder)
 {
-    createPipelineLayout(globalSetLayout);
+    createPipelineLayout(setLayouts);
     createPipeline(renderpass, shadersFolder);
 }
 
@@ -35,19 +35,17 @@ SimpleRenderSystem::~SimpleRenderSystem()
     vkDestroyPipelineLayout(vulDevice.device(), pipelineLayout, nullptr);
 }
 
-void SimpleRenderSystem::createPipelineLayout(VkDescriptorSetLayout globalSetLayout)
+void SimpleRenderSystem::createPipelineLayout(std::vector<VkDescriptorSetLayout> setLayouts)
 {
     VkPushConstantRange pushConstantRange{};
     pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pushConstantRange.offset = 0;
     pushConstantRange.size = vulDevice.properties.limits.maxPushConstantsSize; 
 
-    std::vector<VkDescriptorSetLayout> descriptorSetLayouts{globalSetLayout};
-
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(descriptorSetLayouts.size());
-    pipelineLayoutInfo.pSetLayouts = descriptorSetLayouts.data();
+    pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+    pipelineLayoutInfo.pSetLayouts = setLayouts.data();
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
     if (vkCreatePipelineLayout(vulDevice.device(), &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS){
@@ -72,11 +70,11 @@ void SimpleRenderSystem::createPipeline(VkRenderPass renderPass, const std::stri
     vulPipeline = std::make_unique<VulPipeline>(vulDevice, vertShader, fragShader, pipelineConfig);
 }
 
-void SimpleRenderSystem::renderObjects(std::vector<VulObject> &objects, VkDescriptorSet &descriptorSet, VkCommandBuffer &commandBuffer, int maxLights)
+void SimpleRenderSystem::renderObjects(std::vector<VulObject> &objects, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer, int maxLights)
 {
     vulPipeline->bind(commandBuffer);
 
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
     int lightIndex = 0;
     for (VulObject &obj : objects){

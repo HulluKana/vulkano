@@ -10,8 +10,8 @@ int main()
 {
     vul::Vulkano vulkano{};
 
-    uint32_t width = 1000;
-    uint32_t height = 1000;
+    uint32_t width = 400;
+    uint32_t height = 400;
     uint8_t* data = new uint8_t[width * height * 4];
     std::unique_ptr<vul::VulImage> vulImage = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
     std::unique_ptr<vul::VulImage> vulImage2 = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
@@ -84,6 +84,10 @@ int main()
             if (obj[objIndex].hasTexture) ImGui::SliderInt("Texture index", (int *)&obj[objIndex].textureIndex, 0, vulImages.size() - 1);
         }
         ImGui::End(); 
+
+        ImGui::Begin("Image");
+        ImGui::Image(images[0]->getImGuiTextureID(), ImVec2(images[0]->getWidth(), images[0]->getHeight()));
+        ImGui::End();
 
         if (addObject){
             std::string modelFileNameStr(modelFileName);

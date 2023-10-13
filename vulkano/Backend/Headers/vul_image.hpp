@@ -29,6 +29,9 @@ class VulImage
 
         VkImageView getImageView() const {return m_imageView;}
         VkSampler getTextureSampler() const {return m_textureSampler;}
+        VkDescriptorSet getImGuiTextureID() const {return m_descriptorSet;}
+
+        void setDescriptorSet(VkDescriptorSet descriptorSet) {m_descriptorSet = descriptorSet;}
 
         std::string texturesPath{"Textures/"};
 
@@ -56,6 +59,7 @@ class VulImage
         VkDeviceMemory m_imageMemory;
         VkImageView m_imageView;
         VkSampler m_textureSampler;
+        VkDescriptorSet m_descriptorSet;
 
         vulB::VulDevice &m_vulDevice;
 };

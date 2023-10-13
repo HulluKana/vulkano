@@ -9,7 +9,7 @@ layout (location = 2) in vec2 fragTexCoord;
 
 layout (location = 0) out vec4 FragColor;
 
-layout (set = 0, binding = 0) uniform GlobalUbo {
+layout (set = 1, binding = 0) uniform GlobalUbo {
     mat4 projectionViewMatrix;
     vec4 cameraPosition;
     vec4 ambientLightColor;
@@ -18,7 +18,7 @@ layout (set = 0, binding = 0) uniform GlobalUbo {
     int numLights;
 } ubo;
 
-layout (set = 0, binding = 1) uniform sampler2D texSampler[texCount];
+layout (set = 1, binding = 1) uniform sampler2D texSampler[texCount];
 
 layout (push_constant) uniform Push{
     mat4 modelMatrix;
