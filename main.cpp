@@ -17,6 +17,8 @@ int main()
     std::unique_ptr<vul::VulImage> vulImage2 = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
     vulImage->createTextureFromData(data, width, height, true);
     vulImage2->createTextureFromData(data, width, height, true);
+    vulImage->usableByImGui = true;
+    vulImage2->usableByImGui = true;
 
     std::vector<std::unique_ptr<vul::VulImage>> vulImages;
     vulImages.push_back(std::move(vulImage));
@@ -87,6 +89,7 @@ int main()
 
         ImGui::Begin("Image");
         ImGui::Image(images[0]->getImGuiTextureID(), ImVec2(images[0]->getWidth(), images[0]->getHeight()));
+        ImGui::Image(images[1]->getImGuiTextureID(), ImVec2(images[1]->getWidth(), images[1]->getHeight()));
         ImGui::End();
 
         if (addObject){

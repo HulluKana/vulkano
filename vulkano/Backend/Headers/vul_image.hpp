@@ -34,6 +34,7 @@ class VulImage
         void setDescriptorSet(VkDescriptorSet descriptorSet) {m_descriptorSet = descriptorSet;}
 
         std::string texturesPath{"Textures/"};
+        bool usableByImGui{false};
 
         // Do I even need to explain this at this point?
         VulImage(const VulImage &) = delete;

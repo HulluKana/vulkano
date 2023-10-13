@@ -9,7 +9,7 @@ layout (location = 1) out vec3 fragNormalWorld;
 layout (location = 2) out vec2 fragTexCoord;
 
 const int maxLights = 10;
-layout (set = 1, binding = 0) uniform GlobalUbo {
+layout (set = 0, binding = 0) uniform GlobalUbo {
     mat4 projectionViewMatrix;
     vec4 cameraPosition;
     vec4 ambientLightColor;

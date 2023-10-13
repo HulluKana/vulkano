@@ -43,11 +43,17 @@ Vulkano::~Vulkano()
 
 void Vulkano::initVulkano(std::vector<std::unique_ptr<VulImage>> &vulImages)
 {
+    std::vector<size_t> ImGuiImages;
+    for (size_t i = 0; i < vulImages.size(); i++){
+        if (vulImages[i]->usableByImGui) ImGuiImages.push_back(i);
+    }
+    if (ImGuiImages.size() > 4) fprintf(stderr, "WARNING! You have %ld images enabled for ImGui. This causes a creation of quite few descriptorsets, maybe a litte too many. You may want to reduce their amount.", ImGuiImages.size());
+
     m_globalPool = VulDescriptorPool::Builder(m_vulDevice)
-        .setMaxSets(VulSwapChain::MAX_FRAMES_IN_FLIGHT * 3)
+        .setMaxSets(VulSwapChain::MAX_FRAMES_IN_FLIGHT * (ImGuiImages.size() + 2))
         .setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
         .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VulSwapChain::MAX_FRAMES_IN_FLIGHT)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * (MAX_TEXTURES + 1 + 1))
+        .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * (MAX_TEXTURES + ImGuiImages.size() + 1))
         .build();
     vkDeviceWaitIdle(m_vulDevice.device());
     m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), m_vulRenderer, m_vulDevice);
@@ -68,13 +74,14 @@ void Vulkano::initVulkano(std::vector<std::unique_ptr<VulImage>> &vulImages)
         .addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
         .build();
     
+    for (size_t i = 0; i < vulImages.size(); i++){
+        m_images.push_back(std::move(vulImages[i]));
+    }
     for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
         VkDescriptorBufferInfo bufferInfo = m_uboBuffers[i]->descriptorInfo();
-
         VkDescriptorImageInfo imageInfo[MAX_TEXTURES];
         for (size_t j = 0; j < MAX_TEXTURES; j++){
-            int imageIndex = glm::min(j, vulImages.size() - 1);
-            if ((size_t)imageIndex == j) m_images.push_back(std::move(vulImages[j]));
+            int imageIndex = glm::min(j, m_images.size() - 1);
             imageInfo[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             imageInfo[j].imageView = m_images[imageIndex]->getImageView();
             imageInfo[j].sampler = m_images[imageIndex]->getTextureSampler();
@@ -85,25 +92,28 @@ void Vulkano::initVulkano(std::vector<std::unique_ptr<VulImage>> &vulImages)
             .writeBuffer(0, &bufferInfo)
             .writeImage(1, imageInfo, MAX_TEXTURES)
             .build(descriptorSet);
-
         m_globalDescriptorSets.push_back(descriptorSet);
 
-        VkDescriptorImageInfo ImGuiImageInfo;
-        ImGuiImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        ImGuiImageInfo.imageView = m_images[0]->getImageView();
-        ImGuiImageInfo.sampler = m_images[0]->getTextureSampler();
-        VkDescriptorSet ImGuiImageDescriptorSet;
-        VulDescriptorWriter(*ImGuiImagesSetLayout, *m_globalPool)
-            .writeImage(0, &ImGuiImageInfo)
-            .build(ImGuiImageDescriptorSet);
+        for (size_t j : ImGuiImages){
+            VkDescriptorImageInfo ImGuiImageInfo;
+            ImGuiImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            ImGuiImageInfo.imageView = m_images[j]->getImageView();
+            ImGuiImageInfo.sampler = m_images[j]->getTextureSampler();
+            VkDescriptorSet ImGuiImageDescriptorSet;
+            VulDescriptorWriter(*ImGuiImagesSetLayout, *m_globalPool)
+                .writeImage(0, &ImGuiImageInfo)
+                .build(ImGuiImageDescriptorSet);
 
-        m_images[0]->setDescriptorSet(ImGuiImageDescriptorSet);
-        m_globalDescriptorSets.push_back(ImGuiImageDescriptorSet); 
+            m_images[j]->setDescriptorSet(ImGuiImageDescriptorSet);
+            m_globalDescriptorSets.push_back(ImGuiImageDescriptorSet); 
+        }
     }
-
     m_cameraObject.transform.rotation = glm::vec3(0.0f, 0.0f, M_PI);
 
-    std::vector<VkDescriptorSetLayout> setLayouts{ImGuiImagesSetLayout->getDescriptorSetLayout(), globalSetLayout->getDescriptorSetLayout()};
+    std::vector<VkDescriptorSetLayout> setLayouts{globalSetLayout->getDescriptorSetLayout()};
+    for (size_t i = 0; i < ImGuiImages.size(); i++){
+        setLayouts.push_back(ImGuiImagesSetLayout->getDescriptorSetLayout());
+    }
     m_simpleRenderSystem.init(m_vulRenderer.getSwapChainRenderPass(), setLayouts, "vulkano/Backend/Shaders");
 
     m_currentTime = glfwGetTime();
@@ -161,10 +171,13 @@ VkCommandBuffer Vulkano::startFrame()
 
 bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 {
-    std::vector<VkDescriptorSet> descriptorSets;
-    descriptorSets.push_back(m_globalDescriptorSets[VulSwapChain::MAX_FRAMES_IN_FLIGHT * m_vulRenderer.getFrameIndex() + 1]);
-    descriptorSets.push_back(m_globalDescriptorSets[VulSwapChain::MAX_FRAMES_IN_FLIGHT * m_vulRenderer.getFrameIndex()]);
-    if (m_objects.size() > 0) m_simpleRenderSystem.renderObjects(m_objects, descriptorSets, commandBuffer, MAX_LIGHTS);
+    if (m_objects.size() > 0){
+        std::vector<VkDescriptorSet> descriptorSets;
+        for (size_t i = (size_t)m_vulRenderer.getFrameIndex() * (m_globalDescriptorSets.size() / VulSwapChain::MAX_FRAMES_IN_FLIGHT); i < m_globalDescriptorSets.size() * (1 + m_vulRenderer.getFrameIndex()) / VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
+            descriptorSets.push_back(m_globalDescriptorSets[i]);
+        }
+        m_simpleRenderSystem.renderObjects(m_objects, descriptorSets, commandBuffer, MAX_LIGHTS);
+    }
     m_vulGUI.endFrame(commandBuffer);
     m_vulRenderer.endSwapChainRenderPass(commandBuffer);
     m_vulRenderer.endFrame();
