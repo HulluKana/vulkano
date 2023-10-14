@@ -41,11 +41,24 @@ Vulkano::~Vulkano()
     m_vulGUI.destroyImGui();
 }
 
-void Vulkano::initVulkano(std::vector<std::unique_ptr<VulImage>> &vulImages)
+void Vulkano::addImages(std::vector<std::unique_ptr<VulImage>> &vulImages)
 {
-    std::vector<size_t> ImGuiImages;
     for (size_t i = 0; i < vulImages.size(); i++){
-        if (vulImages[i]->usableByImGui) ImGuiImages.push_back(i);
+        m_images.push_back(std::move(vulImages[i]));
+    }
+}
+
+void Vulkano::initVulkano()
+{
+    if (m_images.size() == 0){
+        uint8_t *data = new uint8_t[4]{255, 255, 255, 255};
+        std::unique_ptr<VulImage> emptyImage = VulImage::createAsUniquePtr(m_vulDevice);
+        emptyImage->createTextureFromData(data, 1, 1);
+        m_images.push_back(std::move(emptyImage));
+    }
+    std::vector<size_t> ImGuiImages;
+    for (size_t i = 0; i < m_images.size(); i++){
+        if (m_images[i]->usableByImGui) ImGuiImages.push_back(i);
     }
     if (ImGuiImages.size() > 4) fprintf(stderr, "WARNING! You have %ld images enabled for ImGui. This causes a creation of quite few descriptorsets, maybe a litte too many. You may want to reduce their amount.", ImGuiImages.size());
 
@@ -74,9 +87,6 @@ void Vulkano::initVulkano(std::vector<std::unique_ptr<VulImage>> &vulImages)
         .addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
         .build();
     
-    for (size_t i = 0; i < vulImages.size(); i++){
-        m_images.push_back(std::move(vulImages[i]));
-    }
     for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
         VkDescriptorBufferInfo bufferInfo = m_uboBuffers[i]->descriptorInfo();
         VkDescriptorImageInfo imageInfo[MAX_TEXTURES];

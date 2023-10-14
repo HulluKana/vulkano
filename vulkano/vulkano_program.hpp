@@ -19,7 +19,8 @@ class Vulkano{
         Vulkano();
         ~Vulkano();
 
-        void initVulkano(std::vector<std::unique_ptr<VulImage>> &vulImages);
+        void addImages(std::vector<std::unique_ptr<VulImage>> &vulImages);
+        void initVulkano();
 
         /* These 2 lines remove the copy constructor and operator from Vulkano class.
         Because I'm using a pointer to stuff and that stuff is initialized by constructor and removed by destructor,
