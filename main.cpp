@@ -8,7 +8,8 @@
 
 int main()
 {
-    vul::Vulkano vulkano{};
+    std::string name("Vulkano");
+    vul::Vulkano vulkano(1000, 800, name);
 
     vulkano.initVulkano();
 
@@ -24,7 +25,6 @@ int main()
     modelFileName[modelFileNameLen - 2] = '\0';
 
     vulkano.setMaxFps(5'000.0f);
-    uint32_t frame = 0;
     while (!stop){
         VkCommandBuffer commandBuffer = vulkano.startFrame();
         

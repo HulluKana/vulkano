@@ -3,4 +3,10 @@
 /imgui.ini
 /Models/
 /Textures/
+/build/CMakeFiles
+/build/cmake_install.cmake
+/build/CMakeCache.txt
+/build/Makefile
+/build/vulkano
+/build/libImGui.a
 *.spv

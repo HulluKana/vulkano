@@ -13,10 +13,7 @@ namespace vul{
 
 class Vulkano{
     public:
-        static constexpr int WIDTH = 1000;
-        static constexpr int HEIGHT = 800;
-
-        Vulkano();
+        Vulkano(uint32_t width, uint32_t height, std::string &name);
         ~Vulkano();
 
         void addImages(std::vector<std::unique_ptr<VulImage>> &vulImages);
@@ -46,7 +43,7 @@ class Vulkano{
         double m_currentTime;
         float m_frameTime;
 
-        vulB::VulWindow m_vulWindow{WIDTH, HEIGHT, "Vulkano"};
+        vulB::VulWindow m_vulWindow;
         vulB::VulDevice m_vulDevice{m_vulWindow};
         vulB::VulRenderer m_vulRenderer{m_vulWindow, m_vulDevice};
         vulB::VulGUI m_vulGUI;
