@@ -31,7 +31,7 @@ struct GlobalUbo {
     int numLights = 0;
 };
 
-Vulkano::Vulkano(uint32_t width, uint32_t height, std::string &name) : m_vulWindow{width, height, name}
+Vulkano::Vulkano(uint32_t width, uint32_t height, std::string &name) : m_vulWindow{(int)width, (int)height, name}
 {
 
 }

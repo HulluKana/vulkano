@@ -70,8 +70,15 @@ void VulPipeline::createGraphicsPipeline(const std::string& vertFile, const std:
     vertexInputInfo.pVertexAttributeDescriptions = attributeDescription.data();
     vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
 
+    VkFormat format = VK_FORMAT_R8G8B8A8_SINT;
+    VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
+    pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    pipelineRenderingInfo.colorAttachmentCount = 1;
+    pipelineRenderingInfo.pColorAttachmentFormats = &format;
+
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.pNext = &pipelineRenderingInfo;
     pipelineInfo.stageCount = 2;
     pipelineInfo.pStages = shaderStages;
     pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -84,7 +91,7 @@ void VulPipeline::createGraphicsPipeline(const std::string& vertFile, const std:
     pipelineInfo.pDynamicState = &configInfo.dynamicStateInfo;
 
     pipelineInfo.layout = configInfo.pipelineLayout;
-    pipelineInfo.renderPass = configInfo.renderPass;
+    pipelineInfo.renderPass = nullptr;
     pipelineInfo.subpass = configInfo.subpass;
 
     pipelineInfo.basePipelineIndex = -1;
