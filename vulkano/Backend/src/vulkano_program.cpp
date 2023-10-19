@@ -122,7 +122,7 @@ void Vulkano::initVulkano()
     for (size_t i = 0; i < ImGuiImages.size(); i++){
         setLayouts.push_back(ImGuiImagesSetLayout->getDescriptorSetLayout());
     }
-    m_simpleRenderSystem.init(m_vulRenderer.getSwapChainRenderPass(), setLayouts, "../vulkano/Backend/Shaders");
+    m_simpleRenderSystem.init(m_vulRenderer.getSwapChainRenderPass(), setLayouts, "../vulkano/Backend/Shaders", m_vulRenderer.getSwapChainColorFormat());
 
     vkDeviceWaitIdle(m_vulDevice.device());
     m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), m_vulRenderer, m_vulDevice);

@@ -23,6 +23,7 @@ class VulRenderer{
         VkRenderPass getSwapChainRenderPass() const {return vulSwapChain->getRenderPass();}
         float getAspectRatio() const {return vulSwapChain->extentAspectRatio();}
         VkExtent2D getSwapChainExtent() const {return vulSwapChain->getSwapChainExtent();}
+        VkFormat getSwapChainColorFormat() const {return vulSwapChain->getSwapChainImageFormat();}
         bool isFrameInProgress() const {return isFrameStarted;}
 
         VkCommandBuffer getCurrentCommandBuffer() const {

@@ -119,14 +119,14 @@ void VulRenderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer)
     assert(isFrameStarted && "Can't call beginSwapChainRenderPass if the frame hasn't been started either");
     assert(commandBuffer == getCurrentCommandBuffer() && "Can't begin a render pass on a command buffer from a different frame");
 
-    VkImageSubresourceRange subResourceRange;
+    VkImageSubresourceRange subResourceRange{};
     subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     subResourceRange.baseMipLevel = 0;
     subResourceRange.levelCount = 1;
     subResourceRange.baseArrayLayer = 0;
     subResourceRange.layerCount = 1;
 
-    VkImageMemoryBarrier imageMemoryBarrier;
+    VkImageMemoryBarrier imageMemoryBarrier{};
     imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -136,7 +136,7 @@ void VulRenderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer)
 
     vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
 
-    VkRenderingAttachmentInfo colorAttachmentInfo;
+    VkRenderingAttachmentInfo colorAttachmentInfo{};
     colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
     colorAttachmentInfo.imageView = vulSwapChain->getImageView(currentImageIndex);
     colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
@@ -144,31 +144,13 @@ void VulRenderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer)
     colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachmentInfo.clearValue = {0.0f, 0.0f, 0.0f, 1.0f};
 
-    VkRenderingAttachmentInfo depthAttachmentInfo;
-    depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    depthAttachmentInfo.imageView = vulSwapChain->getImageView(currentImageIndex);
-    depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
-    depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachmentInfo.clearValue = {1.0f};
-
-    VkRenderingAttachmentInfo stencilAttachmentInfo;
-    stencilAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    stencilAttachmentInfo.imageView = vulSwapChain->getImageView(currentImageIndex);
-    stencilAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
-    stencilAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-    stencilAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    stencilAttachmentInfo.clearValue = {0};
-
-    VkRenderingInfo renderingInfo;
+    VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea.offset = {0, 0};
     renderingInfo.renderArea.extent = vulSwapChain->getSwapChainExtent();
     renderingInfo.layerCount = 1;
     renderingInfo.colorAttachmentCount = 1;
     renderingInfo.pColorAttachments = &colorAttachmentInfo;
-    renderingInfo.pDepthAttachment = &depthAttachmentInfo;
-    renderingInfo.pStencilAttachment = &stencilAttachmentInfo;
 
     /* VkRenderPassBeginInfo renderPassInfo{};
     renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
@@ -210,14 +192,14 @@ void VulRenderer::endSwapChainRenderPass(VkCommandBuffer commandBuffer)
     // vkCmdEndRenderPass(commandBuffer);
     vkCmdEndRendering(commandBuffer);
 
-    VkImageSubresourceRange subResourceRange;
+    VkImageSubresourceRange subResourceRange{};
     subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     subResourceRange.baseMipLevel = 0;
     subResourceRange.levelCount = 1;
     subResourceRange.baseArrayLayer = 0;
     subResourceRange.layerCount = 1;
 
-    VkImageMemoryBarrier imageMemoryBarrier;
+    VkImageMemoryBarrier imageMemoryBarrier{};
     imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
     imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
