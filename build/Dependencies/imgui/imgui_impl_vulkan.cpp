@@ -1007,8 +1007,7 @@ bool    ImGui_ImplVulkan_Init(ImGui_ImplVulkan_InitInfo* info, VkRenderPass rend
         IM_ASSERT(ImGuiImplVulkanFuncs_vkCmdBeginRenderingKHR != nullptr);
         IM_ASSERT(ImGuiImplVulkanFuncs_vkCmdEndRenderingKHR != nullptr);
 #else
-        fprintf(stderr, "Ayo, you wanna fix this little assert thing in imgui_impl_vulkan.cpp file in line 1011?\nYou know, look a bit more in this whole dynamic rendering thing?\nTheres some stuff at line 222 as well that you may wanna check out.\nDONT DELETE THIS BEFORE ADDRESSING THE ISSUE!!!!\n");
-        // IM_ASSERT(0 && "Can't use dynamic rendering when neither VK_VERSION_1_3 or VK_KHR_dynamic_rendering is defined.");
+        IM_ASSERT(0 && "Can't use dynamic rendering when neither VK_VERSION_1_3 or VK_KHR_dynamic_rendering is defined.");
 #endif
     }
 
