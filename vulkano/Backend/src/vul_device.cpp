@@ -75,17 +75,18 @@ void VulDevice::createInstance() {
 
   VkApplicationInfo appInfo = {};
   appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-  appInfo.pApplicationName = "LittleVulkanEngine App";
+  appInfo.pApplicationName = "Vulkano";
   appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-  appInfo.pEngineName = "No Engine";
+  appInfo.pEngineName = "Vulkano";
   appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-  appInfo.apiVersion = VK_API_VERSION_1_0;
+  appInfo.apiVersion = VK_API_VERSION_1_3;
 
   VkInstanceCreateInfo createInfo = {};
   createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
   createInfo.pApplicationInfo = &appInfo;
 
   auto extensions = getRequiredExtensions();
+
   createInfo.enabledExtensionCount = static_cast<uint32_t>(extensions.size());
   createInfo.ppEnabledExtensionNames = extensions.data();
 
@@ -152,8 +153,14 @@ void VulDevice::createLogicalDevice() {
   VkPhysicalDeviceFeatures deviceFeatures = {};
   deviceFeatures.samplerAnisotropy = VK_TRUE;
 
+ VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature {
+    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
+    .dynamicRendering = VK_TRUE,
+  };
+
   VkDeviceCreateInfo createInfo = {};
   createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+  createInfo.pNext = &dynamic_rendering_feature;
 
   createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
   createInfo.pQueueCreateInfos = queueCreateInfos.data();
@@ -266,6 +273,8 @@ std::vector<const char *> VulDevice::getRequiredExtensions() {
   glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
 
   std::vector<const char *> extensions(glfwExtensions, glfwExtensions + glfwExtensionCount);
+  // Required by imguis dynamic rendering
+  extensions.push_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 
   if (enableValidationLayers) {
     extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);

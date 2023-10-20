@@ -114,26 +114,54 @@ void VulRenderer::endFrame()
     currentFrameIndex = (currentFrameIndex + 1) % VulSwapChain::MAX_FRAMES_IN_FLIGHT;
 }
 
-void VulRenderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer)
+void VulRenderer::beginRendering(VkCommandBuffer commandBuffer)
 {
-    assert(isFrameStarted && "Can't call beginSwapChainRenderPass if the frame hasn't been started either");
-    assert(commandBuffer == getCurrentCommandBuffer() && "Can't begin a render pass on a command buffer from a different frame");
+    assert(isFrameStarted && "Can't call beginRendering if the frame hasn't been started either");
+    assert(commandBuffer == getCurrentCommandBuffer() && "Can't begin rendering on a command buffer from a different frame");
 
-    VkRenderPassBeginInfo renderPassInfo{};
-    renderPassInfo.sType = VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO;
-    renderPassInfo.renderPass = vulSwapChain->getRenderPass();
-    renderPassInfo.framebuffer = vulSwapChain->getFrameBuffer(currentImageIndex);
+    VkImageSubresourceRange subResourceRange{};
+    subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subResourceRange.baseMipLevel = 0;
+    subResourceRange.levelCount = 1;
+    subResourceRange.baseArrayLayer = 0;
+    subResourceRange.layerCount = 1;
 
-    renderPassInfo.renderArea.offset = {0, 0};
-    renderPassInfo.renderArea.extent = vulSwapChain->getSwapChainExtent();
+    VkImageMemoryBarrier imageMemoryBarrier{};
+    imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    imageMemoryBarrier.image = vulSwapChain->getImage(currentImageIndex);
+    imageMemoryBarrier.subresourceRange = subResourceRange;
 
-    std::array<VkClearValue, 2> clearValues{};
-    clearValues[0].color = {0.0f, 0.0f, 0.0f, 1.0f};
-    clearValues[1].depthStencil = {1.0f, 0};
-    renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-    renderPassInfo.pClearValues = clearValues.data();
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
 
-    vkCmdBeginRenderPass(commandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+    VkRenderingAttachmentInfo colorAttachmentInfo{};
+    colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    colorAttachmentInfo.imageView = vulSwapChain->getImageView(currentImageIndex);
+    colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+    colorAttachmentInfo.clearValue = {0.0f, 0.0f, 0.0f, 1.0f};
+
+    VkRenderingAttachmentInfo depthAttachmentInfo{};
+    depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+    depthAttachmentInfo.imageView = vulSwapChain->getDepthImageView(currentImageIndex);
+    depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+    depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+    depthAttachmentInfo.clearValue = {1.0f};
+
+    VkRenderingInfo renderingInfo{};
+    renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    renderingInfo.renderArea.offset = {0, 0};
+    renderingInfo.renderArea.extent = vulSwapChain->getSwapChainExtent();
+    renderingInfo.layerCount = 1;
+    renderingInfo.colorAttachmentCount = 1;
+    renderingInfo.pColorAttachments = &colorAttachmentInfo;
+    renderingInfo.pDepthAttachment = &depthAttachmentInfo;
+
+    vkCmdBeginRendering(commandBuffer, &renderingInfo);
 
     VkViewport viewport{};
     viewport.x = 0.0f;
@@ -149,12 +177,29 @@ void VulRenderer::beginSwapChainRenderPass(VkCommandBuffer commandBuffer)
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 }
 
-void VulRenderer::endSwapChainRenderPass(VkCommandBuffer commandBuffer)
+void VulRenderer::stopRendering(VkCommandBuffer commandBuffer)
 {
-    assert(isFrameStarted && "Can't call endSwapChainRenderPass if the frame hasn't been started either");
+    assert(isFrameStarted && "Can't call stopRendering if the frame hasn't been started either");
     assert(commandBuffer == getCurrentCommandBuffer() && "Can't end a render pass on a command buffer from a different frame");
 
-    vkCmdEndRenderPass(commandBuffer);
+    vkCmdEndRendering(commandBuffer);
+
+    VkImageSubresourceRange subResourceRange{};
+    subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subResourceRange.baseMipLevel = 0;
+    subResourceRange.levelCount = 1;
+    subResourceRange.baseArrayLayer = 0;
+    subResourceRange.layerCount = 1;
+
+    VkImageMemoryBarrier imageMemoryBarrier{};
+    imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+    imageMemoryBarrier.image = vulSwapChain->getImage(currentImageIndex);
+    imageMemoryBarrier.subresourceRange = subResourceRange;
+
+    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
 }
 
 }

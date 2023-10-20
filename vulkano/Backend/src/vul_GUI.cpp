@@ -34,6 +34,9 @@ void VulGUI::initImGui(GLFWwindow *window, VkDescriptorPool &descriptorPool, Vul
     info.Allocator = nullptr;
     info.CheckVkResultFn = check_vk_result;
     info.PipelineCache = VK_NULL_HANDLE;
+    info.UseDynamicRendering = true;
+    info.ColorAttachmentFormat = vulRenderer.getSwapChainColorFormat();
+    info.DepthAttachmentFormat = vulRenderer.getSwapChainDepthFormat();
     ImGui_ImplVulkan_Init(&info, vulRenderer.getSwapChainRenderPass());
 
     VkCommandBuffer commandBuffer = vulDevice.beginSingleTimeCommands();

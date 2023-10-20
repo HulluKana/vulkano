@@ -23,7 +23,7 @@ struct PipelineConfigInfo {
 
 class VulPipeline{
     public:
-        VulPipeline(VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo);
+        VulPipeline(VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat);
         ~VulPipeline();
 
         /* These 2 lines remove the copy constructor and operator from VulPipeline class.
@@ -39,7 +39,7 @@ class VulPipeline{
     private:
         static std::vector<char> readFile(const std::string& filePath);
 
-        void createGraphicsPipeline(const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo);
+        void createGraphicsPipeline(const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat);
         void createShaderModule(const std::vector<char>& code, VkShaderModule* shaderModule);
 
         VulDevice& vulDevice;

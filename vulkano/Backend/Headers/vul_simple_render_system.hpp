@@ -14,7 +14,7 @@ class SimpleRenderSystem{
         SimpleRenderSystem(VulDevice &device);
         ~SimpleRenderSystem();
 
-        void init(VkRenderPass renderPass, std::vector<VkDescriptorSetLayout> setLayouts, const std::string &shadersFolder);
+        void init(VkRenderPass renderPass, std::vector<VkDescriptorSetLayout> setLayouts, const std::string &shadersFolder, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat);
 
         /* These 2 lines remove the copy constructor and operator from SimpleRenderSystem class.
         Because I'm using a pointer to stuff and that stuff is initialized by constructor and removed by destructor,
@@ -25,7 +25,7 @@ class SimpleRenderSystem{
         void renderObjects(std::vector<VulObject> &objects, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer, int maxLights);
     private:
         void createPipelineLayout(std::vector<VkDescriptorSetLayout> setLayouts);
-        void createPipeline(VkRenderPass renderPass, const std::string &shadersFolder);
+        void createPipeline(VkRenderPass renderPass, const std::string &shadersFolder, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat);
 
         VulDevice &vulDevice;
         std::unique_ptr<VulPipeline> vulPipeline;

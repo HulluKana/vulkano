@@ -8,8 +8,20 @@
 
 int main()
 {
-    vul::Vulkano vulkano{};
+    std::string name("Vulkano");
+    vul::Vulkano vulkano(1000, 800, name);
 
+    std::unique_ptr<vul::VulImage> image1 = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
+    std::unique_ptr<vul::VulImage> image2 = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
+    image1->createTextureFromFile("texture.jpg");
+    image2->createTextureFromFile("kana.jpg");
+    image2->usableByImGui = true;
+
+    std::vector<std::unique_ptr<vul::VulImage>> vulImages;
+    vulImages.push_back(std::move(image1));
+    vulImages.push_back(std::move(image2));
+
+    vulkano.addImages(vulImages);
     vulkano.initVulkano();
 
     bool stop = false;
@@ -24,8 +36,9 @@ int main()
     modelFileName[modelFileNameLen - 2] = '\0';
 
     vulkano.setMaxFps(5'000.0f);
-    uint32_t frame = 0;
     while (!stop){
+        std::unique_ptr<vul::VulImage> *images = vulkano.getImagesPointer();
+
         VkCommandBuffer commandBuffer = vulkano.startFrame();
         
         ImGui::Begin("Test");
@@ -46,8 +59,15 @@ int main()
                 vul::GUI::DragFloat3("Light color", obj[objIndex].lightColor, 1.0f, 0.0f, 0.005f);
                 ImGui::DragFloat("Light intensity", &obj[objIndex].lightIntensity, (sqrt(obj[objIndex].lightIntensity) + 0.1f) / 10.0f, 0.0f, 1'000'000.0f);
             }
+
+            ImGui::Checkbox("Obj has texture", &obj[objIndex].hasTexture);
+            if (obj[objIndex].hasTexture) ImGui::SliderInt("Tex index", reinterpret_cast<int *>(&obj[objIndex].textureIndex), 0, vulImages.size() - 1);
         }
         ImGui::End(); 
+
+        ImGui::Begin("Image");
+        ImGui::Image(images[1]->getImGuiTextureID(), ImVec2(images[1]->getWidth(), images[1]->getHeight()));
+        ImGui::End();
 
         if (addObject){
             std::string modelFileNameStr(modelFileName);

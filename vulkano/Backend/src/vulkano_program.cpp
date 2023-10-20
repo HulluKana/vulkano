@@ -31,7 +31,7 @@ struct GlobalUbo {
     int numLights = 0;
 };
 
-Vulkano::Vulkano()
+Vulkano::Vulkano(uint32_t width, uint32_t height, std::string &name) : m_vulWindow{(int)width, (int)height, name}
 {
 
 }
@@ -68,8 +68,6 @@ void Vulkano::initVulkano()
         .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VulSwapChain::MAX_FRAMES_IN_FLIGHT)
         .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * (MAX_TEXTURES + ImGuiImages.size() + 1))
         .build();
-    vkDeviceWaitIdle(m_vulDevice.device());
-    m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), m_vulRenderer, m_vulDevice);
 
     for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
         std::unique_ptr<VulBuffer> vulBuffer;
@@ -124,7 +122,10 @@ void Vulkano::initVulkano()
     for (size_t i = 0; i < ImGuiImages.size(); i++){
         setLayouts.push_back(ImGuiImagesSetLayout->getDescriptorSetLayout());
     }
-    m_simpleRenderSystem.init(m_vulRenderer.getSwapChainRenderPass(), setLayouts, "vulkano/Backend/Shaders");
+    m_simpleRenderSystem.init(m_vulRenderer.getSwapChainRenderPass(), setLayouts, "../vulkano/Backend/Shaders", m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getSwapChainDepthFormat());
+
+    vkDeviceWaitIdle(m_vulDevice.device());
+    m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), m_vulRenderer, m_vulDevice);
 
     m_currentTime = glfwGetTime();
     m_maxFps = 60.0f;
@@ -170,7 +171,7 @@ VkCommandBuffer Vulkano::startFrame()
 
         m_uboBuffers[frameIndex]->writeToBuffer(&ubo);
 
-        m_vulRenderer.beginSwapChainRenderPass(commandBuffer);
+        m_vulRenderer.beginRendering(commandBuffer);
         m_vulGUI.startFrame();
 
         return commandBuffer;
@@ -189,7 +190,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
         m_simpleRenderSystem.renderObjects(m_objects, descriptorSets, commandBuffer, MAX_LIGHTS);
     }
     m_vulGUI.endFrame(commandBuffer);
-    m_vulRenderer.endSwapChainRenderPass(commandBuffer);
+    m_vulRenderer.stopRendering(commandBuffer);
     m_vulRenderer.endFrame();
 
     vkDeviceWaitIdle(m_vulDevice.device());
@@ -199,7 +200,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 
 void Vulkano::loadObject(std::string file)
 {
-    std::string filePath = "Models/" + file + ".obj";
+    std::string filePath = "../Models/" + file + ".obj";
     std::shared_ptr<VulModel> vulModel = VulModel::createModelFromFile(m_vulDevice, filePath);
 
     VulObject object;

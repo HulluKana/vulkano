@@ -26,8 +26,11 @@ class VulSwapChain {
   VkFramebuffer getFrameBuffer(int index) { return swapChainFramebuffers[index]; }
   VkRenderPass getRenderPass() { return renderPass; }
   VkImageView getImageView(int index) { return swapChainImageViews[index]; }
+  VkImageView getDepthImageView(int index) {return depthImageViews[index];}
   size_t imageCount() { return swapChainImages.size(); }
+  VkImage getImage(uint32_t index) {return swapChainImages[index];}
   VkFormat getSwapChainImageFormat() { return swapChainImageFormat; }
+  VkFormat getSwapChainImageDepthFormat() {return swapChainDepthFormat;}
   VkExtent2D getSwapChainExtent() { return swapChainExtent; }
   uint32_t width() { return swapChainExtent.width; }
   uint32_t height() { return swapChainExtent.height; }

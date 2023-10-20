@@ -24,10 +24,10 @@ SimpleRenderSystem::SimpleRenderSystem(VulDevice &device) : vulDevice{device}
 {
 }
 
-void SimpleRenderSystem::init(VkRenderPass renderpass, std::vector<VkDescriptorSetLayout> setLayouts, const std::string &shadersFolder)
+void SimpleRenderSystem::init(VkRenderPass renderpass, std::vector<VkDescriptorSetLayout> setLayouts, const std::string &shadersFolder, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat)
 {
     createPipelineLayout(setLayouts);
-    createPipeline(renderpass, shadersFolder);
+    createPipeline(renderpass, shadersFolder, colorAttachmentFormat, depthAttachmentFormat);
 }
 
 SimpleRenderSystem::~SimpleRenderSystem()
@@ -53,7 +53,7 @@ void SimpleRenderSystem::createPipelineLayout(std::vector<VkDescriptorSetLayout>
     }
 }
 
-void SimpleRenderSystem::createPipeline(VkRenderPass renderPass, const std::string &shadersFolder)
+void SimpleRenderSystem::createPipeline(VkRenderPass renderPass, const std::string &shadersFolder, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat)
 {
     assert(pipelineLayout != nullptr && "Cannot create pipeline before pipeline layout");
 
@@ -67,7 +67,7 @@ void SimpleRenderSystem::createPipeline(VkRenderPass renderPass, const std::stri
 
     pipelineConfig.renderPass = renderPass; 
     pipelineConfig.pipelineLayout = pipelineLayout;
-    vulPipeline = std::make_unique<VulPipeline>(vulDevice, vertShader, fragShader, pipelineConfig);
+    vulPipeline = std::make_unique<VulPipeline>(vulDevice, vertShader, fragShader, pipelineConfig, colorAttachmentFormat, depthAttachmentFormat);
 }
 
 void SimpleRenderSystem::renderObjects(std::vector<VulObject> &objects, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer, int maxLights)

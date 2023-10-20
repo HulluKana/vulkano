@@ -7,9 +7,9 @@
 
 namespace vulB{
 
-VulPipeline::VulPipeline(VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo) : vulDevice(device)
+VulPipeline::VulPipeline(VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat) : vulDevice(device)
 {
-    createGraphicsPipeline(vertFile, fragFile, configInfo);
+    createGraphicsPipeline(vertFile, fragFile, configInfo,colorAttachmentFormat, depthAttachmentFormat);
 }
 
 VulPipeline::~VulPipeline() {
@@ -36,7 +36,7 @@ std::vector<char> VulPipeline::readFile(const std::string& filePath)
     return buffer;
 }
 
-void VulPipeline::createGraphicsPipeline(const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo)
+void VulPipeline::createGraphicsPipeline(const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat)
 {
     std::vector<char> vertCode = readFile(vertFile);
     std::vector<char> fragCode = readFile(fragFile);
@@ -44,7 +44,7 @@ void VulPipeline::createGraphicsPipeline(const std::string& vertFile, const std:
     createShaderModule(vertCode, &vertShaderModule);
     createShaderModule(fragCode, &fragShaderModule);
 
-    VkPipelineShaderStageCreateInfo shaderStages[2];
+    VkPipelineShaderStageCreateInfo shaderStages[2]{};
     shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
     shaderStages[0].module = vertShaderModule;
@@ -70,8 +70,15 @@ void VulPipeline::createGraphicsPipeline(const std::string& vertFile, const std:
     vertexInputInfo.pVertexAttributeDescriptions = attributeDescription.data();
     vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
 
+    VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
+    pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    pipelineRenderingInfo.colorAttachmentCount = 1;
+    pipelineRenderingInfo.pColorAttachmentFormats = &colorAttachmentFormat;
+    pipelineRenderingInfo.depthAttachmentFormat = depthAttachmentFormat;
+
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+    pipelineInfo.pNext = &pipelineRenderingInfo;
     pipelineInfo.stageCount = 2;
     pipelineInfo.pStages = shaderStages;
     pipelineInfo.pVertexInputState = &vertexInputInfo;
@@ -84,7 +91,7 @@ void VulPipeline::createGraphicsPipeline(const std::string& vertFile, const std:
     pipelineInfo.pDynamicState = &configInfo.dynamicStateInfo;
 
     pipelineInfo.layout = configInfo.pipelineLayout;
-    pipelineInfo.renderPass = configInfo.renderPass;
+    pipelineInfo.renderPass = nullptr;
     pipelineInfo.subpass = configInfo.subpass;
 
     pipelineInfo.basePipelineIndex = -1;
