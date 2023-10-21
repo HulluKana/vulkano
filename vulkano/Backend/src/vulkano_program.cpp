@@ -116,7 +116,7 @@ void Vulkano::initVulkano()
             m_globalDescriptorSets.push_back(ImGuiImageDescriptorSet); 
         }
     }
-    m_cameraObject.transform.rotation = glm::vec3(0.0f, 0.0f, M_PI);
+    m_cameraObject.transform.rotation = glm::vec3(0.0f);
 
     std::vector<VkDescriptorSetLayout> setLayouts{globalSetLayout->getDescriptorSetLayout()};
     for (size_t i = 0; i < ImGuiImages.size(); i++){
@@ -128,7 +128,6 @@ void Vulkano::initVulkano()
     m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), m_vulRenderer, m_vulDevice);
 
     m_currentTime = glfwGetTime();
-    m_maxFps = 60.0f;
 }
 
 VkCommandBuffer Vulkano::startFrame()
@@ -136,20 +135,23 @@ VkCommandBuffer Vulkano::startFrame()
     glfwPollEvents();
         
     double newTime = glfwGetTime();
+    double idleStartTime = glfwGetTime();
     while (1){
-        if (1.0 / (newTime - m_currentTime) < m_maxFps) break;
+        if (1.0 / (newTime - m_currentTime) < maxFps) break;
         newTime = glfwGetTime();
     }
+    m_idleTime = glfwGetTime() - idleStartTime;
     m_frameTime = newTime - m_currentTime;
     m_currentTime = newTime;
+    double renderPreparationStartTime = glfwGetTime();
 
     ImGuiIO &io = ImGui::GetIO(); (void)io;
-    if (!io.WantCaptureKeyboard) m_cameraController.modifyValues(m_vulWindow.getGLFWwindow(), m_frameTime, m_cameraObject);
+    if (!io.WantCaptureKeyboard) m_cameraController.modifyValues(m_vulWindow.getGLFWwindow(), m_cameraObject);
     if (!io.WantCaptureMouse && !io.WantCaptureKeyboard) m_cameraController.rotate(m_vulWindow.getGLFWwindow(), m_frameTime, m_cameraObject, m_vulRenderer.getSwapChainExtent().width, m_vulRenderer.getSwapChainExtent().height);
     if (!io.WantCaptureKeyboard) m_cameraController.move(m_vulWindow.getGLFWwindow(), m_frameTime, m_cameraObject);
 
     float aspect = m_vulRenderer.getAspectRatio();
-    m_camera.setPerspectiveProjection(80.0f, aspect, 0.1f, 100.0f);
+    m_camera.setPerspectiveProjection(cameraProperties.fovY, aspect, cameraProperties.nearPlane, cameraProperties.farPlane);
     m_camera.setViewYXZ(m_cameraObject.transform.posOffset, m_cameraObject.transform.rotation);
 
     if (VkCommandBuffer commandBuffer = m_vulRenderer.beginFrame()){
@@ -172,8 +174,9 @@ VkCommandBuffer Vulkano::startFrame()
         m_uboBuffers[frameIndex]->writeToBuffer(&ubo);
 
         m_vulRenderer.beginRendering(commandBuffer);
-        m_vulGUI.startFrame();
+        if (!m_cameraController.hideGUI) m_vulGUI.startFrame();
 
+        m_renderPreparationTime = glfwGetTime() - renderPreparationStartTime;
         return commandBuffer;
     }
 
@@ -182,6 +185,7 @@ VkCommandBuffer Vulkano::startFrame()
 
 bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 {
+    double objRenderStartTime = glfwGetTime();
     if (m_objects.size() > 0){
         std::vector<VkDescriptorSet> descriptorSets;
         for (size_t i = (size_t)m_vulRenderer.getFrameIndex() * (m_globalDescriptorSets.size() / VulSwapChain::MAX_FRAMES_IN_FLIGHT); i < m_globalDescriptorSets.size() * (1 + m_vulRenderer.getFrameIndex()) / VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
@@ -189,11 +193,17 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
         }
         m_simpleRenderSystem.renderObjects(m_objects, descriptorSets, commandBuffer, MAX_LIGHTS);
     }
-    m_vulGUI.endFrame(commandBuffer);
+    m_objRenderTime = glfwGetTime() - objRenderStartTime;
+
+    double guiRenderStartTime = glfwGetTime();
+    if (!m_cameraController.hideGUI) m_vulGUI.endFrame(commandBuffer);
+    m_GuiRenderTime = glfwGetTime() - guiRenderStartTime;
+
+    double renderFinishStartTime = glfwGetTime();
     m_vulRenderer.stopRendering(commandBuffer);
     m_vulRenderer.endFrame();
-
     vkDeviceWaitIdle(m_vulDevice.device());
+    m_renderFinishingTime = glfwGetTime() - renderFinishStartTime;
 
     return m_vulWindow.shouldClose();
 }

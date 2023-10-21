@@ -16,6 +16,24 @@ class Vulkano{
         Vulkano(uint32_t width, uint32_t height, std::string &name);
         ~Vulkano();
 
+        float maxFps = 60.0f;
+        enum CameraDirectionController{
+            CAMERA_DIRECTION_CONTROLLER_YXZ,
+            CAMERA_DIRECTION_CONTROLLER_TARGET,
+            CAMERA_DIRECTION_CONTROLLER_DIRECTION
+        };
+        struct CameraProperties{
+            CameraDirectionController cameraDirectionController = CameraDirectionController::CAMERA_DIRECTION_CONTROLLER_YXZ;
+            bool hasPerspective = true;
+            float fovY = 80.0f * (M_PI * 2.0f / 360.0f);
+            float nearPlane = 0.1f;
+            float farPlane = 100.0f;
+            float leftPlane = -1.0f;
+            float rightPlane = 1.0f;
+            float topPlane = -1.0f;
+            float bottomPlane = 1.0f;
+        } cameraProperties;
+
         void addImages(std::vector<std::unique_ptr<VulImage>> &vulImages);
         void initVulkano();
 
@@ -28,8 +46,14 @@ class Vulkano{
         VkCommandBuffer startFrame();
         bool endFrame(VkCommandBuffer commandBuffer);
 
-        void setMaxFps(float maxFps) {m_maxFps = maxFps;}
         float getFrameTime() const {return m_frameTime;}
+        float getIdleTime() const {return m_idleTime;}
+        float getRenderPreparationTime() const {return m_renderPreparationTime;}
+        float getObjRenderTime() const {return m_objRenderTime;}
+        float getGuiRenderTime() const {return m_GuiRenderTime;}
+        float getRenderFinishingTime() const {return m_renderFinishingTime;}
+
+        bool shouldShowGUI() const {return !m_cameraController.hideGUI;}
         
         void loadObject(std::string file);
         size_t getObjCount() {return m_objects.size();}
@@ -39,9 +63,13 @@ class Vulkano{
         
         vulB::VulDevice &getVulDevice() {return m_vulDevice;}
     private:
-        double m_maxFps;
         double m_currentTime;
         float m_frameTime;
+        float m_idleTime;
+        float m_renderPreparationTime;
+        float m_objRenderTime;
+        float m_GuiRenderTime;
+        float m_renderFinishingTime;
 
         vulB::VulWindow m_vulWindow;
         vulB::VulDevice m_vulDevice{m_vulWindow};

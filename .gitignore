@@ -1,9 +1,9 @@
 /main
 /mainWithDebug
-/imgui.ini
 /Models/
 /Textures/
 /.vscode/
+/build/imgui.ini
 /build/CMakeFiles
 /build/cmake_install.cmake
 /build/CMakeCache.txt

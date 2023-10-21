@@ -28,11 +28,11 @@ class MovementController{
             int resetAll = GLFW_KEY_R;
         };
 
-        void modifyValues(GLFWwindow *window, float dt, VulObject &object);
+        void modifyValues(GLFWwindow *window, VulObject &object);
         void rotate(GLFWwindow *window, float dt, VulObject &object, int screenWidth, int screenHeight);
         void move(GLFWwindow *window, float dt, VulObject &object);
 
-        bool isGUIHidden() {return hideGUI;}
+        bool hideGUI = false;
 
         KeyMappings keys{};
         float baseMoveSpeed = 3.0f;
@@ -42,8 +42,6 @@ class MovementController{
 
     private:
         float moveSpeed = baseMoveSpeed;
-
-        bool hideGUI = false;
         bool hideGUIpressed = false;
 };
 
