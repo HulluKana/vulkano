@@ -6,6 +6,7 @@
 #include"Backend/Headers/vul_simple_render_system.hpp"
 #include"Backend/Headers/vul_movement_controller.hpp"
 #include"Backend/Headers/vul_image.hpp"
+#include"Backend/Headers/vul_settings.hpp"
 
 #include<memory>
 
@@ -15,24 +16,6 @@ class Vulkano{
     public:
         Vulkano(uint32_t width, uint32_t height, std::string &name);
         ~Vulkano();
-
-        float maxFps = 60.0f;
-        enum CameraDirectionController{
-            CAMERA_DIRECTION_CONTROLLER_YXZ,
-            CAMERA_DIRECTION_CONTROLLER_TARGET,
-            CAMERA_DIRECTION_CONTROLLER_DIRECTION
-        };
-        struct CameraProperties{
-            CameraDirectionController cameraDirectionController = CameraDirectionController::CAMERA_DIRECTION_CONTROLLER_YXZ;
-            bool hasPerspective = true;
-            float fovY = 80.0f * (M_PI * 2.0f / 360.0f);
-            float nearPlane = 0.1f;
-            float farPlane = 100.0f;
-            float leftPlane = -1.0f;
-            float rightPlane = 1.0f;
-            float topPlane = -1.0f;
-            float bottomPlane = 1.0f;
-        } cameraProperties;
 
         void addImages(std::vector<std::unique_ptr<VulImage>> &vulImages);
         void initVulkano();
@@ -57,7 +40,7 @@ class Vulkano{
         
         void loadObject(std::string file);
         size_t getObjCount() {return m_objects.size();}
-        vulB::VulObject *getObjectsPointer() {return m_objects.data();}
+        VulObject *getObjectsPointer() {return m_objects.data();}
 
         std::unique_ptr<VulImage> *getImagesPointer() {return m_images.data();}
         
@@ -77,7 +60,7 @@ class Vulkano{
         vulB::VulGUI m_vulGUI;
 
         std::unique_ptr<vulB::VulDescriptorPool> m_globalPool{};
-        std::vector<vulB::VulObject> m_objects;
+        std::vector<VulObject> m_objects;
         std::vector<std::unique_ptr<VulImage>> m_images;
 
         std::vector<std::unique_ptr<vulB::VulBuffer>> m_uboBuffers;
@@ -85,7 +68,7 @@ class Vulkano{
         vulB::SimpleRenderSystem m_simpleRenderSystem{m_vulDevice};
 
         vulB::VulCamera m_camera{};
-        vulB::VulObject m_cameraObject;
+        VulObject m_cameraObject;
         vulB::MovementController m_cameraController;
 };
 }

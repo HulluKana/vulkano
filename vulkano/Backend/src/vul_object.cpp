@@ -1,6 +1,6 @@
 #include"../Headers/vul_object.hpp"
 
-namespace vulB{
+namespace vul{
 
 VulObject::VulObject()
 {

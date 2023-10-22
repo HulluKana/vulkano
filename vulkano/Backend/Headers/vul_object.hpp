@@ -7,7 +7,7 @@
 #include<memory>
 #include<unordered_map>
 
-namespace vulB{
+namespace vul{
 
 struct transformComponent{
     glm::vec3 posOffset{};
@@ -22,7 +22,7 @@ class VulObject{
     public:
         VulObject();
 
-        std::shared_ptr<VulModel> model{};
+        std::shared_ptr<vulB::VulModel> model{};
         glm::vec3 color{};
         transformComponent transform{};
         float specularExponent = 1.0f;

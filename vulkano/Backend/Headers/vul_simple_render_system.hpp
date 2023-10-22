@@ -22,7 +22,7 @@ class SimpleRenderSystem{
         SimpleRenderSystem(const SimpleRenderSystem &) = delete;
         SimpleRenderSystem &operator=(const SimpleRenderSystem &) = delete;
         
-        void renderObjects(std::vector<VulObject> &objects, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer, int maxLights);
+        void renderObjects(std::vector<vul::VulObject> &objects, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer, int maxLights);
     private:
         void createPipelineLayout(std::vector<VkDescriptorSetLayout> setLayouts);
         void createPipeline(VkRenderPass renderPass, const std::string &shadersFolder, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat);

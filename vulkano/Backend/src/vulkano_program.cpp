@@ -137,7 +137,7 @@ VkCommandBuffer Vulkano::startFrame()
     double newTime = glfwGetTime();
     double idleStartTime = glfwGetTime();
     while (1){
-        if (1.0 / (newTime - m_currentTime) < maxFps) break;
+        if (1.0 / (newTime - m_currentTime) < settings::maxFps) break;
         newTime = glfwGetTime();
     }
     m_idleTime = glfwGetTime() - idleStartTime;
@@ -151,7 +151,9 @@ VkCommandBuffer Vulkano::startFrame()
     if (!io.WantCaptureKeyboard) m_cameraController.move(m_vulWindow.getGLFWwindow(), m_frameTime, m_cameraObject);
 
     float aspect = m_vulRenderer.getAspectRatio();
-    m_camera.setPerspectiveProjection(cameraProperties.fovY, aspect, cameraProperties.nearPlane, cameraProperties.farPlane);
+    if (settings::cameraProperties.hasPerspective) m_camera.setPerspectiveProjection(settings::cameraProperties.fovY, aspect, settings::cameraProperties.nearPlane, settings::cameraProperties.farPlane);
+    else m_camera.setOrthographicProjection(settings::cameraProperties.leftPlane, settings::cameraProperties.rightPlane, settings::cameraProperties.topPlane,
+                                            settings::cameraProperties.bottomPlane, settings::cameraProperties.nearPlane, settings::cameraProperties.farPlane);
     m_camera.setViewYXZ(m_cameraObject.transform.posOffset, m_cameraObject.transform.rotation);
 
     if (VkCommandBuffer commandBuffer = m_vulRenderer.beginFrame()){

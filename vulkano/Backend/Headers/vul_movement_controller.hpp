@@ -28,9 +28,9 @@ class MovementController{
             int resetAll = GLFW_KEY_R;
         };
 
-        void modifyValues(GLFWwindow *window, VulObject &object);
-        void rotate(GLFWwindow *window, float dt, VulObject &object, int screenWidth, int screenHeight);
-        void move(GLFWwindow *window, float dt, VulObject &object);
+        void modifyValues(GLFWwindow *window, vul::VulObject &object);
+        void rotate(GLFWwindow *window, float dt, vul::VulObject &object, int screenWidth, int screenHeight);
+        void move(GLFWwindow *window, float dt, vul::VulObject &object);
 
         bool hideGUI = false;
 

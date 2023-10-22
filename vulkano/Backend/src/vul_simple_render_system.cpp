@@ -8,6 +8,7 @@
 #include<stdexcept>
 #include<iostream>
 
+using namespace vul;
 namespace vulB{
 
 struct simplePushConstantData {

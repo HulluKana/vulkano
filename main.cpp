@@ -35,9 +35,16 @@ void GuiStuff(vul::Vulkano &vulkano, char *modelFileName, int modelFileNameLen, 
     ImGui::End(); 
 
     ImGui::Begin("Camera controller");
-    ImGui::DragFloat("FOV", &vulkano.cameraProperties.fovY, 0.017f, -2.0f * M_PI, 2.0f * M_PI);
-    ImGui::DragFloat("Near plane", &vulkano.cameraProperties.nearPlane, 0.001f, 0.001f, 10.0f);
-    ImGui::DragFloat("Far plane", &vulkano.cameraProperties.farPlane, 1.0f, 1.0f, 100'000.0f);
+    ImGui::Checkbox("Has perspective", &vul::settings::cameraProperties.hasPerspective);
+    if (vul::settings::cameraProperties.hasPerspective) ImGui::DragFloat("FOV", &vul::settings::cameraProperties.fovY, 0.017f, -2.0f * M_PI, 2.0f * M_PI);
+    ImGui::DragFloat("Near plane", &vul::settings::cameraProperties.nearPlane, 0.001f, 0.001f, 10.0f);
+    ImGui::DragFloat("Far plane", &vul::settings::cameraProperties.farPlane, 1.0f, 1.0f, 100'000.0f);
+    if (!vul::settings::cameraProperties.hasPerspective){
+        ImGui::DragFloat("Left plane", &vul::settings::cameraProperties.leftPlane, 0.2f, -1'000.0f, 1'000.0f);
+        ImGui::DragFloat("Right plane", &vul::settings::cameraProperties.rightPlane, 0.2f, -1'000.0f, 1'000.0f);
+        ImGui::DragFloat("Top plane", &vul::settings::cameraProperties.topPlane, 0.2f, -1'000.0f, 1'000.0f);
+        ImGui::DragFloat("Bottom plane", &vul::settings::cameraProperties.bottomPlane, 0.2f, -1'000.0f, 1'000.0f);
+    }
     ImGui::End();
 
     ImGui::Begin("Image");
@@ -45,7 +52,7 @@ void GuiStuff(vul::Vulkano &vulkano, char *modelFileName, int modelFileNameLen, 
     ImGui::End();
 
     ImGui::Begin("Performance");
-    ImGui::DragFloat("Max FPS", &vulkano.maxFps, vulkano.maxFps / 30.0f, 3.0f, 10'000.0f);
+    ImGui::DragFloat("Max FPS", &vul::settings::maxFps, vul::settings::maxFps / 30.0f, 3.0f, 10'000.0f);
     ImGui::Text("Fps: %f\nTotal frame time: %fms\nObject render time: %fms\nGUI render time: %fms\nRender preparation time: %fms\nRender finishing time: %fms\nIdle time %fms\nOwn stuff: %fms",
                 1.0f / vulkano.getFrameTime(), vulkano.getFrameTime() * 1000.0f, vulkano.getObjRenderTime() * 1000.0f, vulkano.getGuiRenderTime() * 1000.0f,
                 vulkano.getRenderPreparationTime() * 1000.0f, vulkano.getRenderFinishingTime() * 1000.0f, vulkano.getIdleTime() * 1000.0f, ownStuffTime * 1000.0f);
