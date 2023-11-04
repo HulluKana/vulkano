@@ -10,14 +10,21 @@
 
 #include<memory>
 
+#define MAX_LIGHTS 10
+#define MAX_TEXTURES 10
+#define MAX_UBOS 5
+
 namespace vul{
 
 class Vulkano{
+    private:
+        vulB::VulWindow m_vulWindow;
+        vulB::VulDevice m_vulDevice{m_vulWindow}; // vulDevice has to be at the top to prevent some vulkan validation layer errors
+
     public:
         Vulkano(uint32_t width, uint32_t height, std::string &name);
         ~Vulkano();
 
-        void addImages(std::vector<std::unique_ptr<VulImage>> &vulImages);
         void initVulkano();
 
         /* These 2 lines remove the copy constructor and operator from Vulkano class.
@@ -41,10 +48,13 @@ class Vulkano{
         void loadObject(std::string file);
         size_t getObjCount() {return m_objects.size();}
         VulObject *getObjectsPointer() {return m_objects.data();}
-
-        std::unique_ptr<VulImage> *getImagesPointer() {return m_images.data();}
         
         vulB::VulDevice &getVulDevice() {return m_vulDevice;}
+
+        void updateGlobalDescriptorSets();
+
+        std::array<std::shared_ptr<VulImage>, MAX_TEXTURES> images;
+        uint32_t imageCount = 0u;
     private:
         double m_currentTime;
         float m_frameTime;
@@ -54,17 +64,16 @@ class Vulkano{
         float m_GuiRenderTime;
         float m_renderFinishingTime;
 
-        vulB::VulWindow m_vulWindow;
-        vulB::VulDevice m_vulDevice{m_vulWindow};
         vulB::VulRenderer m_vulRenderer{m_vulWindow, m_vulDevice};
         vulB::VulGUI m_vulGUI;
 
         std::unique_ptr<vulB::VulDescriptorPool> m_globalPool{};
         std::vector<VulObject> m_objects;
-        std::vector<std::unique_ptr<VulImage>> m_images;
+        VulImage m_emptyImage{m_vulDevice};
 
         std::vector<std::unique_ptr<vulB::VulBuffer>> m_uboBuffers;
         std::vector<VkDescriptorSet> m_globalDescriptorSets;
+        std::unique_ptr<vulB::VulDescriptorSetLayout> m_globalSetLayout;
         vulB::SimpleRenderSystem m_simpleRenderSystem{m_vulDevice};
 
         vulB::VulCamera m_camera{};

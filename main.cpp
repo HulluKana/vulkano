@@ -6,10 +6,8 @@
 
 #include<iostream>
 
-void GuiStuff(vul::Vulkano &vulkano, char *modelFileName, int modelFileNameLen, int &objIndex, size_t texCount, float ownStuffTime)
+void GuiStuff(vul::Vulkano &vulkano, char *modelFileName, int modelFileNameLen, char *texFileName, int texFileNameLen, int &objIndex, float ownStuffTime)
 {
-    std::unique_ptr<vul::VulImage> *images = vulkano.getImagesPointer();
-
     bool addObject = false;
     ImGui::Begin("ObjManager");
     ImGui::Checkbox("Add object", &addObject);
@@ -28,11 +26,24 @@ void GuiStuff(vul::Vulkano &vulkano, char *modelFileName, int modelFileNameLen, 
             vul::GUI::DragFloat3("Light color", obj[objIndex].lightColor, 1.0f, 0.0f, 0.005f);
             ImGui::DragFloat("Light intensity", &obj[objIndex].lightIntensity, (sqrt(obj[objIndex].lightIntensity) + 0.1f) / 10.0f, 0.0f, 1'000'000.0f);
         }
-
+        
         ImGui::Checkbox("Obj has texture", &obj[objIndex].hasTexture);
-        if (obj[objIndex].hasTexture) ImGui::SliderInt("Tex index", reinterpret_cast<int *>(&obj[objIndex].textureIndex), 0, texCount - 1);
+        if (obj[objIndex].hasTexture) ImGui::SliderInt("Texture index", reinterpret_cast<int *>(&obj[objIndex].textureIndex), 0, glm::max(0, static_cast<int>(vulkano.imageCount) - 1));
     }
     ImGui::End(); 
+
+    bool addTexture = false;
+    ImGui::Begin("Texture manager");
+    ImGui::Checkbox("Add texture", &addTexture);
+    ImGui::InputText("Texture name", texFileName, texFileNameLen);
+    if (addTexture){
+        std::shared_ptr<vul::VulImage> image = std::make_shared<vul::VulImage>(vulkano.getVulDevice());
+        image->createTextureFromFile(texFileName);
+        vulkano.images[vulkano.imageCount] = image;
+        vulkano.imageCount++;
+        vulkano.updateGlobalDescriptorSets();
+    }
+    ImGui::End();
 
     ImGui::Begin("Camera controller");
     ImGui::Checkbox("Has perspective", &vul::settings::cameraProperties.hasPerspective);
@@ -45,10 +56,6 @@ void GuiStuff(vul::Vulkano &vulkano, char *modelFileName, int modelFileNameLen, 
         ImGui::DragFloat("Top plane", &vul::settings::cameraProperties.topPlane, 0.2f, -1'000.0f, 1'000.0f);
         ImGui::DragFloat("Bottom plane", &vul::settings::cameraProperties.bottomPlane, 0.2f, -1'000.0f, 1'000.0f);
     }
-    ImGui::End();
-
-    ImGui::Begin("Image");
-    ImGui::Image(images[1]->getImGuiTextureID(), ImVec2(images[1]->getWidth(), images[1]->getHeight()));
     ImGui::End();
 
     ImGui::Begin("Performance");
@@ -69,20 +76,9 @@ int main()
     std::string name("Vulkano");
     vul::Vulkano vulkano(1000, 800, name);
 
-    std::unique_ptr<vul::VulImage> image1 = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
-    std::unique_ptr<vul::VulImage> image2 = vul::VulImage::createAsUniquePtr(vulkano.getVulDevice());
-    image1->createTextureFromFile("texture.jpg");
-    image2->createTextureFromFile("kana.jpg");
-    image2->usableByImGui = true;
-
-    std::vector<std::unique_ptr<vul::VulImage>> vulImages;
-    vulImages.push_back(std::move(image1));
-    vulImages.push_back(std::move(image2));
-
-    vulkano.addImages(vulImages);
     vulkano.initVulkano();
 
-    bool stop = false;
+        bool stop = false;
     int objIndex = 0;
 
     int modelFileNameLen = 25;
@@ -92,13 +88,20 @@ int main()
     }
     modelFileName[modelFileNameLen - 2] = '\0';
 
+    int texFileNameLen = 25;
+    char *texFileName = new char[texFileNameLen];
+    for (int i = 0; i < texFileNameLen - 1; i++){
+        texFileName[i] = '0';
+    }
+    texFileName[texFileNameLen - 2] = '\0';
+
     float ownStuffTime = 0.0f;
     while (!stop){
 
         VkCommandBuffer commandBuffer = vulkano.startFrame();
         double ownStuffStartTime = glfwGetTime();
 
-        if (vulkano.shouldShowGUI()) GuiStuff(vulkano, modelFileName, modelFileNameLen, objIndex, vulImages.size(), ownStuffTime);
+        if (vulkano.shouldShowGUI()) GuiStuff(vulkano, modelFileName, modelFileNameLen, texFileName, texFileNameLen, objIndex, ownStuffTime);
         
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);

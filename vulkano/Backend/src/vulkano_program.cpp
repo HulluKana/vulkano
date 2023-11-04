@@ -14,9 +14,6 @@
 #include<stdexcept>
 #include<iostream>
 
-#define MAX_LIGHTS 10
-#define MAX_TEXTURES 10
-
 using namespace vulB;
 namespace vul{
 
@@ -41,32 +38,13 @@ Vulkano::~Vulkano()
     m_vulGUI.destroyImGui();
 }
 
-void Vulkano::addImages(std::vector<std::unique_ptr<VulImage>> &vulImages)
-{
-    for (size_t i = 0; i < vulImages.size(); i++){
-        m_images.push_back(std::move(vulImages[i]));
-    }
-}
-
 void Vulkano::initVulkano()
 {
-    if (m_images.size() == 0){
-        uint8_t *data = new uint8_t[4]{255, 255, 255, 255};
-        std::unique_ptr<VulImage> emptyImage = VulImage::createAsUniquePtr(m_vulDevice);
-        emptyImage->createTextureFromData(data, 1, 1);
-        m_images.push_back(std::move(emptyImage));
-    }
-    std::vector<size_t> ImGuiImages;
-    for (size_t i = 0; i < m_images.size(); i++){
-        if (m_images[i]->usableByImGui) ImGuiImages.push_back(i);
-    }
-    if (ImGuiImages.size() > 4) fprintf(stderr, "WARNING! You have %ld images enabled for ImGui. This causes a creation of quite few descriptorsets, maybe a litte too many. You may want to reduce their amount.", ImGuiImages.size());
-
     m_globalPool = VulDescriptorPool::Builder(m_vulDevice)
-        .setMaxSets(VulSwapChain::MAX_FRAMES_IN_FLIGHT * (ImGuiImages.size() + 2))
+        .setMaxSets(m_vulDevice.properties.limits.maxBoundDescriptorSets)
         .setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VulSwapChain::MAX_FRAMES_IN_FLIGHT)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * (MAX_TEXTURES + ImGuiImages.size() + 1))
+        .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * MAX_UBOS)
+        .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * MAX_TEXTURES)
         .build();
 
     for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
@@ -76,7 +54,10 @@ void Vulkano::initVulkano()
         m_uboBuffers.push_back(std::move(vulBuffer));
     }
 
-    std::unique_ptr<VulDescriptorSetLayout> globalSetLayout = VulDescriptorSetLayout::Builder(m_vulDevice)
+    uint8_t *data = new uint8_t[16]{255, 0, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 0, 255, 255};
+    m_emptyImage.createTextureFromData(data, 2, 2);
+
+    m_globalSetLayout = VulDescriptorSetLayout::Builder(m_vulDevice)
         .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
         .addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, MAX_TEXTURES)
         .build();
@@ -85,43 +66,11 @@ void Vulkano::initVulkano()
         .addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
         .build();
     
-    for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-        VkDescriptorBufferInfo bufferInfo = m_uboBuffers[i]->descriptorInfo();
-        VkDescriptorImageInfo imageInfo[MAX_TEXTURES];
-        for (size_t j = 0; j < MAX_TEXTURES; j++){
-            int imageIndex = glm::min(j, m_images.size() - 1);
-            imageInfo[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo[j].imageView = m_images[imageIndex]->getImageView();
-            imageInfo[j].sampler = m_images[imageIndex]->getTextureSampler();
-        }
-        
-        VkDescriptorSet descriptorSet;
-        VulDescriptorWriter(*globalSetLayout, *m_globalPool)
-            .writeBuffer(0, &bufferInfo)
-            .writeImage(1, imageInfo, MAX_TEXTURES)
-            .build(descriptorSet);
-        m_globalDescriptorSets.push_back(descriptorSet);
+    updateGlobalDescriptorSets();
 
-        for (size_t j : ImGuiImages){
-            VkDescriptorImageInfo ImGuiImageInfo;
-            ImGuiImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            ImGuiImageInfo.imageView = m_images[j]->getImageView();
-            ImGuiImageInfo.sampler = m_images[j]->getTextureSampler();
-            VkDescriptorSet ImGuiImageDescriptorSet;
-            VulDescriptorWriter(*ImGuiImagesSetLayout, *m_globalPool)
-                .writeImage(0, &ImGuiImageInfo)
-                .build(ImGuiImageDescriptorSet);
-
-            m_images[j]->setDescriptorSet(ImGuiImageDescriptorSet);
-            m_globalDescriptorSets.push_back(ImGuiImageDescriptorSet); 
-        }
-    }
     m_cameraObject.transform.rotation = glm::vec3(0.0f);
 
-    std::vector<VkDescriptorSetLayout> setLayouts{globalSetLayout->getDescriptorSetLayout()};
-    for (size_t i = 0; i < ImGuiImages.size(); i++){
-        setLayouts.push_back(ImGuiImagesSetLayout->getDescriptorSetLayout());
-    }
+    std::vector<VkDescriptorSetLayout> setLayouts{m_globalSetLayout->getDescriptorSetLayout()};
     m_simpleRenderSystem.init(m_vulRenderer.getSwapChainRenderPass(), setLayouts, "../Shaders/bin", m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getSwapChainDepthFormat());
 
     vkDeviceWaitIdle(m_vulDevice.device());
@@ -222,6 +171,31 @@ void Vulkano::loadObject(std::string file)
     object.color = {1.0f, 1.0f, 1.0f};
 
     m_objects.push_back(std::move(object));
+}
+
+void Vulkano::updateGlobalDescriptorSets()
+{
+    VkDescriptorImageInfo imageInfo[MAX_TEXTURES];
+    for (size_t j = 0; j < MAX_TEXTURES; j++){
+        imageInfo[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        if (j < imageCount){
+            imageInfo[j].imageView = images[j]->getImageView();
+            imageInfo[j].sampler = images[j]->getTextureSampler();
+        } else{
+            imageInfo[j].imageView = m_emptyImage.getImageView();
+            imageInfo[j].sampler = m_emptyImage.getTextureSampler();
+        }
+    }
+    for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
+        VkDescriptorBufferInfo bufferInfo = m_uboBuffers[i]->descriptorInfo();
+        VkDescriptorSet descriptorSet;
+        VulDescriptorWriter(*m_globalSetLayout, *m_globalPool)
+            .writeBuffer(0, &bufferInfo)
+            .writeImage(1, imageInfo, MAX_TEXTURES)
+            .build(descriptorSet);
+        if (m_globalDescriptorSets.size() > i) m_globalDescriptorSets[i] = descriptorSet;
+        else m_globalDescriptorSets.push_back(descriptorSet);
+    }
 }
         
 }

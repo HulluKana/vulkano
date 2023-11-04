@@ -1,5 +1,1 @@
-Problems:
-    In the imgui_impl_vulkan.cpp file in line 861 is this: "pipelineRenderingCreateInfo.depthAttachmentFormat = bd->VulkanInitInfo.DepthAttachmentFormat;"
-    It uses depth attachment added by me which isn't necessary for ImGui, but it stops some validation layer errors. See if you can get rid of it without causing errors. Also get rid of it in vulkanInitInfo as well.
-
-    Clean up code that is no longer used. This is always an issue.
+In the vul_image.hpp, the && operator is set as default explicitly, but it is implicitly deleted because member variable m_vulDevice is a reference. Fix this
