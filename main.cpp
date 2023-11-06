@@ -43,7 +43,40 @@ void GuiStuff(vul::Vulkano &vulkano, char *modelFileName, int modelFileNameLen, 
         vulkano.imageCount++;
         vulkano.updateGlobalDescriptorSets();
     }
+
+    if (vulkano.imageCount > 0){
+        static int textureIndex = 0;
+        ImGui::SliderInt("Texture index", &textureIndex, 0, static_cast<int>(vulkano.imageCount) - 1, 0);
+        bool enabledImguiTexture = false;
+        enabledImguiTexture = ImGui::Checkbox("Enable texture for ImGui", &vulkano.images[textureIndex]->usableByImGui);
+        if (enabledImguiTexture && vulkano.images[textureIndex]->usableByImGui){
+            vulkano.images[textureIndex]->usableByImGui = true;
+            vulkano.updateImGuiDescriptorSets();
+        }
+        if (enabledImguiTexture && !vulkano.images[textureIndex]->usableByImGui){
+            vulkano.images[textureIndex]->usableByImGui = false;
+            vulkano.updateImGuiDescriptorSets();
+        }
+    }
     ImGui::End();
+
+    if (vulkano.imageCount){
+        std::vector<uint32_t> validImageTextures;
+        bool validImageFound = false;
+        for (uint32_t i = 0; i < vulkano.imageCount; i++){
+            if (vulkano.images[i]->usableByImGui){
+                validImageTextures.push_back(i);
+                validImageFound = true;
+            }
+        }
+        static int imageIndex = 0;
+        if (validImageFound){
+            ImGui::Begin("Image");
+            ImGui::SliderInt("Image", &imageIndex, 0, static_cast<int>(validImageTextures.size() - 1));
+            ImGui::Image(vulkano.images[imageIndex]->getImGuiTextureID(), ImVec2(vulkano.images[imageIndex]->getWidth(), vulkano.images[imageIndex]->getHeight()));
+            ImGui::End();
+        }
+    }
 
     ImGui::Begin("Camera controller");
     ImGui::Checkbox("Has perspective", &vul::settings::cameraProperties.hasPerspective);
@@ -78,7 +111,7 @@ int main()
 
     vulkano.initVulkano();
 
-        bool stop = false;
+    bool stop = false;
     int objIndex = 0;
 
     int modelFileNameLen = 25;
@@ -97,12 +130,11 @@ int main()
 
     float ownStuffTime = 0.0f;
     while (!stop){
-
         VkCommandBuffer commandBuffer = vulkano.startFrame();
         double ownStuffStartTime = glfwGetTime();
 
         if (vulkano.shouldShowGUI()) GuiStuff(vulkano, modelFileName, modelFileNameLen, texFileName, texFileNameLen, objIndex, ownStuffTime);
-        
+
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);
     }

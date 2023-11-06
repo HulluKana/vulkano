@@ -44,7 +44,7 @@ void Vulkano::initVulkano()
         .setMaxSets(m_vulDevice.properties.limits.maxBoundDescriptorSets)
         .setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
         .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * MAX_UBOS)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * MAX_TEXTURES)
+        .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * MAX_TEXTURES * 2)
         .build();
 
     for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
@@ -61,16 +61,14 @@ void Vulkano::initVulkano()
         .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
         .addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, MAX_TEXTURES)
         .build();
-
-    std::unique_ptr<VulDescriptorSetLayout> ImGuiImagesSetLayout = VulDescriptorSetLayout::Builder(m_vulDevice)
-        .addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-        .build();
-    
     updateGlobalDescriptorSets();
 
-    m_cameraObject.transform.rotation = glm::vec3(0.0f);
+    m_imGuiSetLayout = VulDescriptorSetLayout::Builder(m_vulDevice)
+        .addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
+        .build();
+    updateImGuiDescriptorSets();
 
-    std::vector<VkDescriptorSetLayout> setLayouts{m_globalSetLayout->getDescriptorSetLayout()};
+    std::vector<VkDescriptorSetLayout> setLayouts{m_globalSetLayout->getDescriptorSetLayout(), m_imGuiSetLayout->getDescriptorSetLayout()};
     m_simpleRenderSystem.init(m_vulRenderer.getSwapChainRenderPass(), setLayouts, "../Shaders/bin", m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getSwapChainDepthFormat());
 
     vkDeviceWaitIdle(m_vulDevice.device());
@@ -139,9 +137,8 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
     double objRenderStartTime = glfwGetTime();
     if (m_objects.size() > 0){
         std::vector<VkDescriptorSet> descriptorSets;
-        for (size_t i = (size_t)m_vulRenderer.getFrameIndex() * (m_globalDescriptorSets.size() / VulSwapChain::MAX_FRAMES_IN_FLIGHT); i < m_globalDescriptorSets.size() * (1 + m_vulRenderer.getFrameIndex()) / VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-            descriptorSets.push_back(m_globalDescriptorSets[i]);
-        }
+        descriptorSets.push_back(m_globalDescriptorSets[m_vulRenderer.getFrameIndex()]);
+
         m_simpleRenderSystem.renderObjects(m_objects, descriptorSets, commandBuffer, MAX_LIGHTS);
     }
     m_objRenderTime = glfwGetTime() - objRenderStartTime;
@@ -195,6 +192,28 @@ void Vulkano::updateGlobalDescriptorSets()
             .build(descriptorSet);
         if (m_globalDescriptorSets.size() > i) m_globalDescriptorSets[i] = descriptorSet;
         else m_globalDescriptorSets.push_back(descriptorSet);
+    }
+}
+
+void Vulkano::updateImGuiDescriptorSets()
+{
+    m_imGuiDescriptorSets.clear();
+    for (uint32_t i = 0; i < imageCount; i++){
+        if (!images[i]->usableByImGui) continue;
+        for (int j = 0; j < VulSwapChain::MAX_FRAMES_IN_FLIGHT; j++){
+            VkDescriptorImageInfo imageInfo;
+            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            imageInfo.imageView = images[i]->getImageView();
+            imageInfo.sampler = images[i]->getTextureSampler();
+
+            VkDescriptorSet descriptorSet;
+            VulDescriptorWriter(*m_imGuiSetLayout, *m_globalPool)
+                .writeImage(0, &imageInfo)
+                .build(descriptorSet);
+            m_imGuiDescriptorSets.push_back(descriptorSet);
+
+            images[i]->setDescriptorSet(descriptorSet);
+        }
     }
 }
         

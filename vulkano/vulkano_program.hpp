@@ -52,6 +52,7 @@ class Vulkano{
         vulB::VulDevice &getVulDevice() {return m_vulDevice;}
 
         void updateGlobalDescriptorSets();
+        void updateImGuiDescriptorSets();
 
         std::array<std::shared_ptr<VulImage>, MAX_TEXTURES> images;
         uint32_t imageCount = 0u;
@@ -74,6 +75,13 @@ class Vulkano{
         std::vector<std::unique_ptr<vulB::VulBuffer>> m_uboBuffers;
         std::vector<VkDescriptorSet> m_globalDescriptorSets;
         std::unique_ptr<vulB::VulDescriptorSetLayout> m_globalSetLayout;
+
+        std::unique_ptr<vulB::VulDescriptorSetLayout> m_imGuiSetLayout;
+        // Descriptor set layout for maxFramesInFlight of 2 is:
+        // frame 0 image 0, frame 1 image 0, frame 0, image 1, frame 1, image 1
+        // So properly indexing into this vector is (imageIndex * maxFramesInFlight + currentFrameIndex)
+        std::vector<VkDescriptorSet> m_imGuiDescriptorSets;
+
         vulB::SimpleRenderSystem m_simpleRenderSystem{m_vulDevice};
 
         vulB::VulCamera m_camera{};
