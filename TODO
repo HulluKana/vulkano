@@ -1,1 +1,7 @@
-In the vul_image.hpp, the && operator is set as default explicitly, but it is implicitly deleted because member variable m_vulDevice is a reference. Fix this
+In the vul_image.hpp the && operator is set as default explicitly, but it is implicitly deleted because member variable m_vulDevice is a reference. Fix this
+
+The ImGuiImages always use the frameIndex 0 image, regardless of the current frameIndex. Figure out if that is a problem and change if so
+
+Actually, figure out if this whole 2 frames in flight thing is working at all.
+
+In the vulkano_program.cpp I always wait for the gpu to become idle after telling it to render. Figure out if this is necessary and if not, how much does it really slow down

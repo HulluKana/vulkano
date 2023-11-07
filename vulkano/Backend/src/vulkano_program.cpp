@@ -191,7 +191,7 @@ bool Vulkano::updateGlobalDescriptorSets()
             .writeBuffer(0, &bufferInfo)
             .writeImage(1, imageInfo, MAX_TEXTURES)
             .build(descriptorSet)){
-            fprintf(stderr, "Allocating globalDescriptorSets failed. DescriptorSets inside the vector remain unchanged\n");
+            fprintf(stderr, "Allocating globalDescriptorSets failed. Old descriptorSets remain in use and unchanged\n");
         }
         descriptorSets.push_back(descriptorSet);
     }
@@ -210,8 +210,10 @@ bool Vulkano::updateGlobalDescriptorSets()
 bool Vulkano::updateImGuiDescriptorSets()
 { 
     std::vector<VkDescriptorSet> descriptorSets;
+    std::vector<uint32_t> imguiImages;
     for (uint32_t i = 0; i < imageCount; i++){
         if (!images[i]->usableByImGui) continue;
+        imguiImages.push_back(i);
         for (int j = 0; j < VulSwapChain::MAX_FRAMES_IN_FLIGHT; j++){
             VkDescriptorImageInfo imageInfo;
             imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -222,22 +224,23 @@ bool Vulkano::updateImGuiDescriptorSets()
             if (!VulDescriptorWriter(*m_imGuiSetLayout, *m_globalPool)
                 .writeImage(0, &imageInfo)
                 .build(descriptorSet)){
-                fprintf(stderr, "Allocating descriptorSets for imGuiImages failed. DescriptorSets inside the vector remain unchanged\n");
+                fprintf(stderr, "Allocating descriptorSets for imGuiImages failed. Old descriptorSets remain in use and unchanged\n");
                 return false;
             }
             descriptorSets.push_back(descriptorSet);
-
-            images[i]->setDescriptorSet(descriptorSet);
         }
     }
 
     // I have to clear the previous sets after new sets have been created and not after, because allocating set could fail and clearing previous sets before that would leave the set vector empty
     if (m_imGuiDescriptorSets.size() > 0){
-        // vkFreeDescriptorSets(m_vulDevice.device(), m_globalPool->getDescriptorPoolReference(), static_cast<uint32_t>(m_imGuiDescriptorSets.size()), m_imGuiDescriptorSets.data());
+        vkFreeDescriptorSets(m_vulDevice.device(), m_globalPool->getDescriptorPoolReference(), static_cast<uint32_t>(m_imGuiDescriptorSets.size()), m_imGuiDescriptorSets.data());
         m_imGuiDescriptorSets.clear();
     }
-    for (VkDescriptorSet &set : descriptorSets)
-        m_imGuiDescriptorSets.push_back(set);
+    for (int i = 0; i < static_cast<int>(descriptorSets.size()); i++){
+        m_imGuiDescriptorSets.push_back(descriptorSets[i]);
+        if (i % VulSwapChain::MAX_FRAMES_IN_FLIGHT == 0)
+            images[i / VulSwapChain::MAX_FRAMES_IN_FLIGHT]->setDescriptorSet(descriptorSets[i]);
+    }
 
     return true;
 }
