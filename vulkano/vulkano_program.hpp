@@ -51,8 +51,8 @@ class Vulkano{
         
         vulB::VulDevice &getVulDevice() {return m_vulDevice;}
 
-        void updateGlobalDescriptorSets();
-        void updateImGuiDescriptorSets();
+        bool updateGlobalDescriptorSets();
+        bool updateImGuiDescriptorSets();
 
         std::array<std::shared_ptr<VulImage>, MAX_TEXTURES> images;
         uint32_t imageCount = 0u;

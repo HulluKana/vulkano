@@ -170,8 +170,9 @@ void Vulkano::loadObject(std::string file)
     m_objects.push_back(std::move(object));
 }
 
-void Vulkano::updateGlobalDescriptorSets()
+bool Vulkano::updateGlobalDescriptorSets()
 {
+    std::vector<VkDescriptorSet> descriptorSets;
     VkDescriptorImageInfo imageInfo[MAX_TEXTURES];
     for (size_t j = 0; j < MAX_TEXTURES; j++){
         imageInfo[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -186,18 +187,29 @@ void Vulkano::updateGlobalDescriptorSets()
     for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
         VkDescriptorBufferInfo bufferInfo = m_uboBuffers[i]->descriptorInfo();
         VkDescriptorSet descriptorSet;
-        VulDescriptorWriter(*m_globalSetLayout, *m_globalPool)
+        if (!VulDescriptorWriter(*m_globalSetLayout, *m_globalPool)
             .writeBuffer(0, &bufferInfo)
             .writeImage(1, imageInfo, MAX_TEXTURES)
-            .build(descriptorSet);
-        if (m_globalDescriptorSets.size() > i) m_globalDescriptorSets[i] = descriptorSet;
-        else m_globalDescriptorSets.push_back(descriptorSet);
+            .build(descriptorSet)){
+            fprintf(stderr, "Allocating globalDescriptorSets failed. DescriptorSets inside the vector remain unchanged\n");
+        }
+        descriptorSets.push_back(descriptorSet);
     }
+
+    // I have to clear the previous sets after new sets have been created and not after, because allocating set could fail and clearing previous sets before that would leave the set vector empty
+    if (m_globalDescriptorSets.size() > 0){
+        vkFreeDescriptorSets(m_vulDevice.device(), m_globalPool->getDescriptorPoolReference(), static_cast<uint32_t>(m_globalDescriptorSets.size()), m_globalDescriptorSets.data());
+        m_globalDescriptorSets.clear();
+    }
+    for (VkDescriptorSet &set : descriptorSets)
+        m_globalDescriptorSets.push_back(set);
+
+    return true;
 }
 
-void Vulkano::updateImGuiDescriptorSets()
-{
-    m_imGuiDescriptorSets.clear();
+bool Vulkano::updateImGuiDescriptorSets()
+{ 
+    std::vector<VkDescriptorSet> descriptorSets;
     for (uint32_t i = 0; i < imageCount; i++){
         if (!images[i]->usableByImGui) continue;
         for (int j = 0; j < VulSwapChain::MAX_FRAMES_IN_FLIGHT; j++){
@@ -207,14 +219,27 @@ void Vulkano::updateImGuiDescriptorSets()
             imageInfo.sampler = images[i]->getTextureSampler();
 
             VkDescriptorSet descriptorSet;
-            VulDescriptorWriter(*m_imGuiSetLayout, *m_globalPool)
+            if (!VulDescriptorWriter(*m_imGuiSetLayout, *m_globalPool)
                 .writeImage(0, &imageInfo)
-                .build(descriptorSet);
-            m_imGuiDescriptorSets.push_back(descriptorSet);
+                .build(descriptorSet)){
+                fprintf(stderr, "Allocating descriptorSets for imGuiImages failed. DescriptorSets inside the vector remain unchanged\n");
+                return false;
+            }
+            descriptorSets.push_back(descriptorSet);
 
             images[i]->setDescriptorSet(descriptorSet);
         }
     }
+
+    // I have to clear the previous sets after new sets have been created and not after, because allocating set could fail and clearing previous sets before that would leave the set vector empty
+    if (m_imGuiDescriptorSets.size() > 0){
+        // vkFreeDescriptorSets(m_vulDevice.device(), m_globalPool->getDescriptorPoolReference(), static_cast<uint32_t>(m_imGuiDescriptorSets.size()), m_imGuiDescriptorSets.data());
+        m_imGuiDescriptorSets.clear();
+    }
+    for (VkDescriptorSet &set : descriptorSets)
+        m_imGuiDescriptorSets.push_back(set);
+
+    return true;
 }
         
 }
