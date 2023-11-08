@@ -69,7 +69,7 @@ void Vulkano::initVulkano()
     updateImGuiDescriptorSets();
 
     std::vector<VkDescriptorSetLayout> setLayouts{m_globalSetLayout->getDescriptorSetLayout(), m_imGuiSetLayout->getDescriptorSetLayout()};
-    m_simpleRenderSystem.init(m_vulRenderer.getSwapChainRenderPass(), setLayouts, "../Shaders/bin", m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getSwapChainDepthFormat());
+    m_renderSystem.init(setLayouts, m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getSwapChainDepthFormat());
 
     vkDeviceWaitIdle(m_vulDevice.device());
     m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), m_vulRenderer, m_vulDevice);
@@ -139,7 +139,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
         std::vector<VkDescriptorSet> descriptorSets;
         descriptorSets.push_back(m_globalDescriptorSets[m_vulRenderer.getFrameIndex()]);
 
-        m_simpleRenderSystem.renderObjects(m_objects, descriptorSets, commandBuffer, MAX_LIGHTS);
+        m_renderSystem.renderObjects(m_objects, descriptorSets, commandBuffer, MAX_LIGHTS);
     }
     m_objRenderTime = glfwGetTime() - objRenderStartTime;
 

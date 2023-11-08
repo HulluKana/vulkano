@@ -6,8 +6,17 @@
 
 #include<iostream>
 
+struct TestData{
+    glm::mat4 modelMatrix{1.0f};
+    float speed = 1.0f;
+} testData;
+
 void GuiStuff(vul::Vulkano &vulkano, char *modelFileName, int modelFileNameLen, char *texFileName, int texFileNameLen, int &objIndex, float ownStuffTime)
 {
+    ImGui::Begin("Test");
+    ImGui::DragFloat("Speed", &testData.speed, 0.01f, 0.01f, 100.0f);
+    ImGui::End();
+
     bool addObject = false;
     ImGui::Begin("ObjManager");
     ImGui::Checkbox("Add object", &addObject);
@@ -109,6 +118,10 @@ int main()
     std::string name("Vulkano");
     vul::Vulkano vulkano(1000, 800, name);
 
+    vul::settings::renderSystemProperties.vertShaderName = std::string("../Shaders/bin/test.vert.spv");
+    vul::settings::renderSystemProperties.fragShaderName = std::string("../Shaders/bin/test.frag.spv");
+    vul::settings::renderSystemProperties.pCustomPushData = &testData;
+    vul::settings::renderSystemProperties.customPushDataSize = sizeof(TestData);
     vulkano.initVulkano();
 
     bool stop = false;
@@ -134,6 +147,11 @@ int main()
         double ownStuffStartTime = glfwGetTime();
 
         if (vulkano.shouldShowGUI()) GuiStuff(vulkano, modelFileName, modelFileNameLen, texFileName, texFileNameLen, objIndex, ownStuffTime);
+
+        if (vulkano.getObjCount() > 0){
+            vul::VulObject *obj = vulkano.getObjectsPointer();
+            testData.modelMatrix = obj->transform.transformMat();
+        }
 
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);

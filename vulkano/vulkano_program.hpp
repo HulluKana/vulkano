@@ -3,7 +3,7 @@
 #include"Backend/Headers/vul_device.hpp"
 #include"Backend/Headers/vul_descriptors.hpp"
 #include"Backend/Headers/vul_GUI.hpp"
-#include"Backend/Headers/vul_simple_render_system.hpp"
+#include"Backend/Headers/vul_render_system.hpp"
 #include"Backend/Headers/vul_movement_controller.hpp"
 #include"Backend/Headers/vul_image.hpp"
 #include"Backend/Headers/vul_settings.hpp"
@@ -82,7 +82,7 @@ class Vulkano{
         // So properly indexing into this vector is (imageIndex * maxFramesInFlight + currentFrameIndex)
         std::vector<VkDescriptorSet> m_imGuiDescriptorSets;
 
-        vulB::SimpleRenderSystem m_simpleRenderSystem{m_vulDevice};
+        vulB::RenderSystem m_renderSystem{m_vulDevice};
 
         vulB::VulCamera m_camera{};
         VulObject m_cameraObject;

@@ -1,12 +1,20 @@
 #pragma once
 
-#include<glm/glm.hpp>
+#include<stdint.h>
 
 namespace vul{
 
 class settings{
 
 public:
+    struct RenderSystemProperties{
+        std::string vertShaderName = "../Shaders/bin/default.vert.spv";
+        std::string fragShaderName = "../Shaders/bin/default.frag.spv";
+        void *pCustomPushData = nullptr; // If you don't want to use custom push constant data, you MUST keep this as nullptr
+        uint32_t customPushDataSize = 0;
+    };
+    static inline RenderSystemProperties renderSystemProperties{std::string("../Shaders/bin/default.vert.spv"), std::string("../Shaders/bin/default.frag.spv"), nullptr, 0};
+
     static inline float maxFps{60.0f};
 
     struct CameraProperties{
