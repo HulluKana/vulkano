@@ -6,17 +6,10 @@
 
 #include<iostream>
 
-struct TestData{
-    glm::mat4 modelMatrix{1.0f};
-    float speed = 1.0f;
-} testData;
+std::vector<float> speeds;
 
 void GuiStuff(vul::Vulkano &vulkano, char *modelFileName, int modelFileNameLen, char *texFileName, int texFileNameLen, int &objIndex, float ownStuffTime)
 {
-    ImGui::Begin("Test");
-    ImGui::DragFloat("Speed", &testData.speed, 0.01f, 0.01f, 100.0f);
-    ImGui::End();
-
     bool addObject = false;
     ImGui::Begin("ObjManager");
     ImGui::Checkbox("Add object", &addObject);
@@ -110,6 +103,13 @@ void GuiStuff(vul::Vulkano &vulkano, char *modelFileName, int modelFileNameLen, 
     if (addObject){
         std::string modelFileNameStr(modelFileName);
         vulkano.loadObject(modelFileNameStr);
+        speeds.push_back(1.0f);
+    }
+
+    if (vulkano.getObjCount() > 0){
+        ImGui::Begin("Test");
+        ImGui::DragFloat("Speed", &speeds[objIndex], 0.01f, 0.01f, 100.0f);
+        ImGui::End();
     }
 }
 
@@ -120,8 +120,6 @@ int main()
 
     vul::settings::renderSystemProperties.vertShaderName = std::string("../Shaders/bin/test.vert.spv");
     vul::settings::renderSystemProperties.fragShaderName = std::string("../Shaders/bin/test.frag.spv");
-    vul::settings::renderSystemProperties.pCustomPushData = &testData;
-    vul::settings::renderSystemProperties.customPushDataSize = sizeof(TestData);
     vulkano.initVulkano();
 
     bool stop = false;
@@ -148,9 +146,19 @@ int main()
 
         if (vulkano.shouldShowGUI()) GuiStuff(vulkano, modelFileName, modelFileNameLen, texFileName, texFileNameLen, objIndex, ownStuffTime);
 
+        struct TestData{
+            glm::mat4 modelMatrix{1.0f};
+            float speed = 1.0f;
+        };
+        TestData testDatas[vulkano.getObjCount()];
         if (vulkano.getObjCount() > 0){
             vul::VulObject *obj = vulkano.getObjectsPointer();
-            testData.modelMatrix = obj->transform.transformMat();
+            for (size_t i = 0; i < vulkano.getObjCount(); i++){
+                testDatas[i].modelMatrix = obj[i].transform.transformMat();
+                testDatas[i].speed = speeds[i];
+                obj[i].pCustomPushData = static_cast<void *>(&testDatas[i]);
+                obj[i].customPushDataSize = sizeof(TestData);
+            }
         }
 
         ownStuffTime = glfwGetTime() - ownStuffStartTime;

@@ -7,3 +7,5 @@ Actually, figure out if this whole 2 frames in flight thing is working at all.
 In the vulkano_program.cpp I always wait for the gpu to become idle after telling it to render. Figure out if this is necessary and if not, how much does it really slow down
 
 Move some stuff out ouf the vul_settings.hpp.
+
+Revamp the objects system, such as the getObjectsPointer

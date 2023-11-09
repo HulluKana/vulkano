@@ -27,5 +27,6 @@ void main()
 {
     vec4 worldPosition = push.modelMatrix * vec4(position, 1.0);
     gl_Position = ubo.projectionViewMatrix * push.modelMatrix * vec4(position, 1.0f);
+    fragPosWorld = worldPosition.xyz;
     fragTexCoord = uv;
 }

@@ -34,6 +34,9 @@ class VulObject{
         bool hasTexture = false;
         uint32_t textureIndex = 0;
 
+        void *pCustomPushData = nullptr; // If you don't want to use custom push constant data, you MUST keep this as nullptr
+        uint32_t customPushDataSize = 0;
+
         // Delete the to copy operator from VulObject, you know why
         VulObject(const VulObject &) = delete;
         VulObject &operator=(const VulObject &) = delete;

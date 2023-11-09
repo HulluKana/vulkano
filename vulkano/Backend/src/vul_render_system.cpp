@@ -78,7 +78,7 @@ void RenderSystem::renderObjects(std::vector<VulObject> &objects, std::vector<Vk
         void *pushData;
         uint32_t pushDataSize;
         DefaultPushConstantInputData defaultData; // Has to be outside the if statement to prevent it from going out of scope too early and making the pushData pointer point to freed memory
-        if (!settings::renderSystemProperties.pCustomPushData){
+        if (!obj.pCustomPushData){
             defaultData.modelMatrix = obj.transform.transformMat();
             defaultData.normalMatrix = obj.transform.normalMatrix();
             defaultData.color = obj.color;
@@ -89,8 +89,8 @@ void RenderSystem::renderObjects(std::vector<VulObject> &objects, std::vector<Vk
             pushData = reinterpret_cast<void *>(&defaultData);
             pushDataSize = sizeof(defaultData);
         } else{
-            pushData = settings::renderSystemProperties.pCustomPushData;
-            pushDataSize = settings::renderSystemProperties.customPushDataSize;
+            pushData = obj.pCustomPushData;
+            pushDataSize = obj.customPushDataSize;
         }
         if (obj.isLight && lightIndex < maxLights - 1) lightIndex++;
 
