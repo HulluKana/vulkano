@@ -53,9 +53,13 @@ class Vulkano{
 
         bool updateGlobalDescriptorSets();
         bool updateImGuiDescriptorSets();
+        
+        void createNewRenderSystem(std::string vertShaderName = "", std::string fragShaderName = ""); 
 
         std::array<std::shared_ptr<VulImage>, MAX_TEXTURES> images;
         uint32_t imageCount = 0u;
+
+        std::vector<std::unique_ptr<RenderSystem>> renderSystems;
     private:
         double m_currentTime;
         float m_frameTime;
@@ -81,8 +85,6 @@ class Vulkano{
         // frame 0 image 0, frame 1 image 0, frame 0, image 1, frame 1, image 1
         // So properly indexing into this vector is (imageIndex * maxFramesInFlight + currentFrameIndex)
         std::vector<VkDescriptorSet> m_imGuiDescriptorSets;
-
-        vulB::RenderSystem m_renderSystem{m_vulDevice};
 
         vulB::VulCamera m_camera{};
         VulObject m_cameraObject;

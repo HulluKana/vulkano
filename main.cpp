@@ -118,9 +118,8 @@ int main()
     std::string name("Vulkano");
     vul::Vulkano vulkano(1000, 800, name);
 
-    vul::settings::renderSystemProperties.vertShaderName = std::string("../Shaders/bin/test.vert.spv");
-    vul::settings::renderSystemProperties.fragShaderName = std::string("../Shaders/bin/test.frag.spv");
     vulkano.initVulkano();
+    vulkano.createNewRenderSystem("../Shaders/bin/test.vert.spv", "../Shaders/bin/test.frag.spv");
 
     bool stop = false;
     int objIndex = 0;
@@ -150,14 +149,16 @@ int main()
             glm::mat4 modelMatrix{1.0f};
             float speed = 1.0f;
         };
-        TestData testDatas[vulkano.getObjCount()];
+        uint32_t halfOfObjects = vulkano.getObjCount() / 2.0f + 0.8f;
+        TestData testDatas[halfOfObjects];
         if (vulkano.getObjCount() > 0){
             vul::VulObject *obj = vulkano.getObjectsPointer();
-            for (size_t i = 0; i < vulkano.getObjCount(); i++){
-                testDatas[i].modelMatrix = obj[i].transform.transformMat();
-                testDatas[i].speed = speeds[i];
-                obj[i].pCustomPushData = static_cast<void *>(&testDatas[i]);
-                obj[i].customPushDataSize = sizeof(TestData);
+            for (size_t i = 0; i < halfOfObjects; i++){
+                testDatas[i].modelMatrix = obj[i * 2].transform.transformMat();
+                testDatas[i].speed = speeds[i * 2];
+                obj[i * 2].pCustomPushData = static_cast<void *>(&testDatas[i]);
+                obj[i * 2].customPushDataSize = sizeof(TestData);
+                obj[i * 2].renderSystemIndex = 1;
             }
         }
 

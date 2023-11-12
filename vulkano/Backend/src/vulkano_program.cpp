@@ -68,8 +68,7 @@ void Vulkano::initVulkano()
         .build();
     updateImGuiDescriptorSets();
 
-    std::vector<VkDescriptorSetLayout> setLayouts{m_globalSetLayout->getDescriptorSetLayout(), m_imGuiSetLayout->getDescriptorSetLayout()};
-    m_renderSystem.init(setLayouts, m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getSwapChainDepthFormat());
+    createNewRenderSystem();
 
     vkDeviceWaitIdle(m_vulDevice.device());
     m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), m_vulRenderer, m_vulDevice);
@@ -115,6 +114,7 @@ VkCommandBuffer Vulkano::startFrame()
             if (obj.isLight && lightIndex < MAX_LIGHTS){
                 ubo.lightPosition[lightIndex] = glm::vec4(obj.transform.posOffset, 1.0f);
                 ubo.lightColor[lightIndex] = glm::vec4(obj.lightColor, obj.lightIntensity);
+                obj.lightIndex = lightIndex;
                 lightIndex++;
             }
         }
@@ -139,7 +139,8 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
         std::vector<VkDescriptorSet> descriptorSets;
         descriptorSets.push_back(m_globalDescriptorSets[m_vulRenderer.getFrameIndex()]);
 
-        m_renderSystem.renderObjects(m_objects, descriptorSets, commandBuffer, MAX_LIGHTS);
+        for (size_t i = 0; i < renderSystems.size(); i++)
+            renderSystems[i]->render(m_objects, descriptorSets, commandBuffer);
     }
     m_objRenderTime = glfwGetTime() - objRenderStartTime;
 
@@ -243,6 +244,17 @@ bool Vulkano::updateImGuiDescriptorSets()
     }
 
     return true;
+}
+
+void Vulkano::createNewRenderSystem(std::string vertShaderName, std::string fragShaderName)
+{
+    std::vector<VkDescriptorSetLayout> setLayouts{m_globalSetLayout->getDescriptorSetLayout(), m_imGuiSetLayout->getDescriptorSetLayout()};
+    std::unique_ptr<RenderSystem> renderSystem = std::make_unique<RenderSystem>(m_vulDevice);
+    if (vertShaderName != "") renderSystem->vertShaderName = vertShaderName;
+    if (fragShaderName != "") renderSystem->fragShaderName = fragShaderName;
+    renderSystem->init(setLayouts, m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getSwapChainDepthFormat());
+    renderSystem->index = renderSystems.size();
+    renderSystems.push_back(std::move(renderSystem));
 }
         
 }

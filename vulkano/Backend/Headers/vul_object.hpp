@@ -30,12 +30,14 @@ class VulObject{
         bool isLight = false;
         glm::vec3 lightColor{0.0f};
         float lightIntensity = 0.0f;
+        int lightIndex = 0;
 
         bool hasTexture = false;
         uint32_t textureIndex = 0;
 
         void *pCustomPushData = nullptr; // If you don't want to use custom push constant data, you MUST keep this as nullptr
         uint32_t customPushDataSize = 0;
+        uint32_t renderSystemIndex = 0;
 
         // Delete the to copy operator from VulObject, you know why
         VulObject(const VulObject &) = delete;

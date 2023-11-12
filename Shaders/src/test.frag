@@ -27,5 +27,5 @@ layout (push_constant) uniform Push{
 
 void main()
 {
-    FragColor = vec4(mod(fragPosWorld.x, 1.0 / push.speed), mod(fragPosWorld.y, 1.0 / push.speed), mod(fragPosWorld.z, 1.0 / push.speed), 1.0);
+    FragColor = vec4(mod(fragPosWorld.x, 1.0 / push.speed) * push.speed, mod(fragPosWorld.y, 1.0 / push.speed) * push.speed, mod(fragPosWorld.z, 1.0 / push.speed) * push.speed, 1.0);
 }

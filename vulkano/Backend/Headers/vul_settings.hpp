@@ -7,12 +7,6 @@ namespace vul{
 class settings{
 
 public:
-    struct RenderSystemProperties{
-        std::string vertShaderName = "../Shaders/bin/default.vert.spv";
-        std::string fragShaderName = "../Shaders/bin/default.frag.spv";
-    };
-    static inline RenderSystemProperties renderSystemProperties{std::string("../Shaders/bin/default.vert.spv"), std::string("../Shaders/bin/default.frag.spv")};
-
     static inline float maxFps{60.0f};
 
     struct CameraProperties{
