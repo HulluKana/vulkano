@@ -9,7 +9,7 @@ MovementController::MovementController()
 {
 }
 
-void MovementController::modifyValues(GLFWwindow *window, VulObject &object)
+void MovementController::modifyValues(GLFWwindow *window, Vul3DObject &object)
 {
     if (glfwGetKey(window, keys.toggleGUI) == GLFW_PRESS) hideGUIpressed = true;
     if (glfwGetKey(window, keys.toggleGUI) == GLFW_RELEASE && hideGUIpressed){
@@ -29,7 +29,7 @@ void MovementController::modifyValues(GLFWwindow *window, VulObject &object)
     }
 }
 
-void MovementController::rotate(GLFWwindow *window, float dt, VulObject &object, int screenWidth, int screenHeight)
+void MovementController::rotate(GLFWwindow *window, float dt, Vul3DObject &object, int screenWidth, int screenHeight)
 {
     glm::vec3 keyRotate = glm::vec3(0.0f);
     glm::vec3 mouseRotate = glm::vec3(0.0f);
@@ -61,7 +61,7 @@ void MovementController::rotate(GLFWwindow *window, float dt, VulObject &object,
     object.transform.rotation.y = glm::mod(object.transform.rotation.y, glm::two_pi<float>());
 }
 
-void MovementController::move(GLFWwindow *window, float dt, VulObject &object)
+void MovementController::move(GLFWwindow *window, float dt, Vul3DObject &object)
 {
     float yaw = object.transform.rotation.y;
     const glm::vec3 forwardDir = glm::vec3(sin(yaw), 0.0f, cos(yaw));

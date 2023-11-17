@@ -9,7 +9,7 @@
 
 namespace vul{
 
-struct transformComponent{
+struct transformComponent3D{
     glm::vec3 posOffset{};
     glm::vec3 scale{1.0f, 1.0f, 1.0f};
     glm::vec3 rotation{};
@@ -18,20 +18,19 @@ struct transformComponent{
     glm::mat3 normalMatrix();
 };
 
+struct transformComponent2D{
+    glm::vec2 pos{};
+    glm::vec2 scale{1.0f};
+    float rotation{};
+};
+
 class VulObject{
     public:
         VulObject();
 
         std::shared_ptr<vulB::VulModel> model{};
         glm::vec3 color{};
-        transformComponent transform{};
-        float specularExponent = 1.0f;
-
-        bool isLight = false;
-        glm::vec3 lightColor{0.0f};
-        float lightIntensity = 0.0f;
-        int lightIndex = 0;
-
+        
         bool hasTexture = false;
         uint32_t textureIndex = 0;
 
@@ -39,12 +38,28 @@ class VulObject{
         uint32_t customPushDataSize = 0;
         uint32_t renderSystemIndex = 0;
 
-        // Delete the to copy operator from VulObject, you know why
+        // Delete the to copy operator from Vul3DObject, you know why
         VulObject(const VulObject &) = delete;
         VulObject &operator=(const VulObject &) = delete;
         // Make the move operator (I think) default, for some reason
         VulObject(VulObject &&) = default;
         VulObject &operator=(VulObject &&) = default;
+};
+
+class Vul3DObject : public VulObject{
+    public:
+        transformComponent3D transform{};
+        float specularExponent = 1.0f;
+
+        bool isLight = false;
+        glm::vec3 lightColor{0.0f};
+        float lightIntensity = 0.0f;
+        int lightIndex = 0;
+};
+
+class VulScreenObject : public VulObject{
+    public:
+        transformComponent2D transform{};
 };
 
 }

@@ -28,7 +28,8 @@ class RenderSystem{
         void createPipelineLayout(std::vector<VkDescriptorSetLayout> setLayouts);
         void createPipeline(VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat);
                
-        void render(std::vector<VulObject> &objects, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer);
+        void render(std::vector<Vul3DObject> &objects, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer);
+        void render(std::vector<VulScreenObject> &objects, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer);
 
         uint32_t index = 0;
         

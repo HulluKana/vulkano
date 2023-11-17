@@ -6,10 +6,15 @@
 
 #include<iostream>
 
-std::vector<float> speeds;
+float brightness = 1.0f;
+float width = 0.1f;
+float speed = 2.0f;
+float angle = 10.0f;
+int tentacleCount = 1;
 
 void GuiStuff(vul::Vulkano &vulkano, char *modelFileName, int modelFileNameLen, char *texFileName, int texFileNameLen, int &objIndex, float ownStuffTime)
 {
+    /*
     bool addObject = false;
     ImGui::Begin("ObjManager");
     ImGui::Checkbox("Add object", &addObject);
@@ -105,12 +110,14 @@ void GuiStuff(vul::Vulkano &vulkano, char *modelFileName, int modelFileNameLen, 
         vulkano.loadObject(modelFileNameStr);
         speeds.push_back(1.0f);
     }
-
-    if (vulkano.getObjCount() > 0){
-        ImGui::Begin("Test");
-        ImGui::DragFloat("Speed", &speeds[objIndex], 0.01f, 0.01f, 100.0f);
-        ImGui::End();
-    }
+    */
+    ImGui::Begin("Test");
+    ImGui::SliderFloat("Brightness", &brightness, 0.0f, 1.0f);
+    ImGui::SliderFloat("Width", &width, 0.0f, 1.0f);
+    ImGui::DragFloat("Speed", &speed, 0.01f, 0.0f, 100.0f);
+    ImGui::DragFloat("angle", &angle, 0.01f, 0.0f, 100.0f);
+    ImGui::DragInt("Tentacles", &tentacleCount, 0.1f, 0, 100);
+    ImGui::End();
 }
 
 int main()
@@ -138,6 +145,10 @@ int main()
     }
     texFileName[texFileNameLen - 2] = '\0';
 
+    std::vector<glm::vec2> corners{{-1.0f, -1.0f}, {-1.0f, 1.0f}, {1.0, 1.0f}, {1.0f, -1.0f}};
+    vulkano.createScreenObject(corners);
+    vulkano.getScreenObjectsPointer()->renderSystemIndex = 2;
+
     float ownStuffTime = 0.0f;
     while (!stop){
         VkCommandBuffer commandBuffer = vulkano.startFrame();
@@ -145,22 +156,26 @@ int main()
 
         if (vulkano.shouldShowGUI()) GuiStuff(vulkano, modelFileName, modelFileNameLen, texFileName, texFileNameLen, objIndex, ownStuffTime);
 
+        static float time;
+        time += vulkano.getFrameTime();
+        time = fmod(time, 100.0f);
         struct TestData{
-            glm::mat4 modelMatrix{1.0f};
-            float speed = 1.0f;
-        };
-        uint32_t halfOfObjects = vulkano.getObjCount() / 2.0f + 0.8f;
-        TestData testDatas[halfOfObjects];
-        if (vulkano.getObjCount() > 0){
-            vul::VulObject *obj = vulkano.getObjectsPointer();
-            for (size_t i = 0; i < halfOfObjects; i++){
-                testDatas[i].modelMatrix = obj[i * 2].transform.transformMat();
-                testDatas[i].speed = speeds[i * 2];
-                obj[i * 2].pCustomPushData = static_cast<void *>(&testDatas[i]);
-                obj[i * 2].customPushDataSize = sizeof(TestData);
-                obj[i * 2].renderSystemIndex = 1;
-            }
-        }
+            float time = 1.0f;
+            float brightness = 0.1f;
+            float width = 0.1f;
+            float speed = 2.0f;
+            float angle = 10.0f;
+            int tentacleCount = 1;
+        } testData;
+        vul::VulScreenObject *obj = vulkano.getScreenObjectsPointer();
+        testData.time = time;
+        testData.brightness = brightness;
+        testData.width = width;
+        testData.speed = speed;
+        testData.angle = angle;
+        testData.tentacleCount = tentacleCount;
+        obj->pCustomPushData = static_cast<void *>(&testData);
+        obj->customPushDataSize = sizeof(TestData);
 
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);

@@ -32,6 +32,7 @@ class VulModel{
             std::vector<uint32_t> indices{};
             
             void loadModel(const std::string &filepath);
+            void createModel(const std::vector<glm::vec2> &corners);
         };
 
         VulModel(VulDevice &device, const VulModel::Builder &builder);
@@ -44,6 +45,7 @@ class VulModel{
         VulModel &operator=(const VulModel &) = delete;
 
         static std::unique_ptr<VulModel> createModelFromFile(VulDevice &device, const std::string &filepath);
+        static std::unique_ptr<VulModel> createScreenModelFromData(VulDevice &device, const std::vector<glm::vec2> &corners);
 
         void bind(VkCommandBuffer commandBuffer);
         void draw(VkCommandBuffer commandBuffer);

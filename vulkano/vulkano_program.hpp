@@ -46,8 +46,10 @@ class Vulkano{
         bool shouldShowGUI() const {return !m_cameraController.hideGUI;}
         
         void loadObject(std::string file);
+        void createScreenObject(const std::vector<glm::vec2> &corners);
         size_t getObjCount() {return m_objects.size();}
-        VulObject *getObjectsPointer() {return m_objects.data();}
+        Vul3DObject *getObjectsPointer() {return m_objects.data();}
+        VulScreenObject *getScreenObjectsPointer() {return m_screenObjects.data();}
         
         vulB::VulDevice &getVulDevice() {return m_vulDevice;}
 
@@ -73,7 +75,8 @@ class Vulkano{
         vulB::VulGUI m_vulGUI;
 
         std::unique_ptr<vulB::VulDescriptorPool> m_globalPool{};
-        std::vector<VulObject> m_objects;
+        std::vector<Vul3DObject> m_objects;
+        std::vector<VulScreenObject> m_screenObjects;
         VulImage m_emptyImage{m_vulDevice};
 
         std::vector<std::unique_ptr<vulB::VulBuffer>> m_uboBuffers;
@@ -87,7 +90,7 @@ class Vulkano{
         std::vector<VkDescriptorSet> m_imGuiDescriptorSets;
 
         vulB::VulCamera m_camera{};
-        VulObject m_cameraObject;
+        Vul3DObject m_cameraObject;
         vulB::MovementController m_cameraController;
 };
 }

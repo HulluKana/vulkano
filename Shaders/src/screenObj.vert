@@ -19,12 +19,11 @@ layout (set = 0, binding = 0) uniform GlobalUbo {
 } ubo;
 
 layout (push_constant) uniform Push{
-    float time;
-    float brightness;
-    float width;
-    float speed;
-    float angle;
-    int tentacleCount;
+    mat4 modelMatrix;
+    mat4 normalMatrix;
+    vec3 color;
+    int isLight;
+    int lightIndex;
 } push;
 
 void main()

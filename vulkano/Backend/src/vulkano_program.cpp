@@ -68,7 +68,8 @@ void Vulkano::initVulkano()
         .build();
     updateImGuiDescriptorSets();
 
-    createNewRenderSystem();
+    createNewRenderSystem(); // Default 3D render system
+    createNewRenderSystem("../Shaders/bin/screenObj.vert.spv", "../Shaders/bin/screenObj.frag.spv"); // Default screen object render system
 
     vkDeviceWaitIdle(m_vulDevice.device());
     m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), m_vulRenderer, m_vulDevice);
@@ -110,7 +111,7 @@ VkCommandBuffer Vulkano::startFrame()
         ubo.camerePosition = glm::vec4(m_cameraObject.transform.posOffset, 0.0f);
 
         int lightIndex = 0;
-        for (VulObject &obj : m_objects){
+        for (Vul3DObject &obj : m_objects){
             if (obj.isLight && lightIndex < MAX_LIGHTS){
                 ubo.lightPosition[lightIndex] = glm::vec4(obj.transform.posOffset, 1.0f);
                 ubo.lightColor[lightIndex] = glm::vec4(obj.lightColor, obj.lightIntensity);
@@ -142,6 +143,13 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
         for (size_t i = 0; i < renderSystems.size(); i++)
             renderSystems[i]->render(m_objects, descriptorSets, commandBuffer);
     }
+    if (m_screenObjects.size() > 0){
+        std::vector<VkDescriptorSet> descriptorSets;
+        descriptorSets.push_back(m_globalDescriptorSets[m_vulRenderer.getFrameIndex()]);
+
+        for (size_t i = 0; i < renderSystems.size(); i++)
+            renderSystems[i]->render(m_screenObjects, descriptorSets, commandBuffer);
+    }
     m_objRenderTime = glfwGetTime() - objRenderStartTime;
 
     double guiRenderStartTime = glfwGetTime();
@@ -162,13 +170,27 @@ void Vulkano::loadObject(std::string file)
     std::string filePath = "../Models/" + file + ".obj";
     std::shared_ptr<VulModel> vulModel = VulModel::createModelFromFile(m_vulDevice, filePath);
 
-    VulObject object;
+    Vul3DObject object;
     object.model = vulModel;
     object.transform.posOffset = {0.0f, 0.0f, 0.0f};
     object.transform.scale = {1.0f, 1.0f, 1.0f};
     object.color = {1.0f, 1.0f, 1.0f};
 
     m_objects.push_back(std::move(object));
+}
+
+void Vulkano::createScreenObject(const std::vector<glm::vec2> &corners)
+{
+    std::shared_ptr<VulModel> vulModel = VulModel::createScreenModelFromData(m_vulDevice, corners);
+
+    VulScreenObject object;
+    object.renderSystemIndex = 1;
+    object.model = vulModel;
+    object.transform.pos = {0.0f, 0.0f};
+    object.transform.scale = {1.0f, 1.0f};
+    object.color = {1.0f, 1.0f, 1.0};
+
+    m_screenObjects.push_back(std::move(object));
 }
 
 bool Vulkano::updateGlobalDescriptorSets()

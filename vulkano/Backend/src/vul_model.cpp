@@ -43,6 +43,14 @@ std::unique_ptr<VulModel> VulModel::createModelFromFile(VulDevice &device, const
     return std::make_unique<VulModel>(device, builder);
 }
 
+std::unique_ptr<VulModel> VulModel::createScreenModelFromData(VulDevice &device, const std::vector<glm::vec2> &corners)
+{
+    Builder builder{};
+    builder.createModel(corners);
+
+    return std::make_unique<VulModel>(device, builder);
+}
+
 void VulModel::createVertexBuffers(const std::vector<Vertex> &vertices)
 {
     vertexCount = static_cast<uint32_t>(vertices.size());
@@ -174,6 +182,26 @@ void VulModel::Builder::loadModel(const std::string &filepath)
             indices.push_back(uniqueVertices[vertex]);
         }
     }
+}
+
+void VulModel::Builder::createModel(const std::vector<glm::vec2> &corners)
+{
+    vertices.clear();
+    indices.clear();
+
+    for (const glm::vec2 &corner : corners){
+        Vertex vertex{};
+        vertex.pos = glm::vec3(corner, 0.5f);
+        vertex.normal = glm::vec3(1.0f);
+        vertex.uv = corner;
+        vertices.push_back(vertex);
+    }
+    indices.push_back(0);
+    indices.push_back(1);
+    indices.push_back(2);
+    indices.push_back(0);
+    indices.push_back(2);
+    indices.push_back(3);
 }
 
 }

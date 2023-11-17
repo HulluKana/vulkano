@@ -57,13 +57,13 @@ void RenderSystem::createPipeline(VkFormat colorAttachmentFormat, VkFormat depth
     vulPipeline = std::make_unique<VulPipeline>(vulDevice, vertShaderName, fragShaderName, pipelineConfig, colorAttachmentFormat, depthAttachmentFormat);
 }
 
-void RenderSystem::render(std::vector<VulObject> &objects, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer)
+void RenderSystem::render(std::vector<Vul3DObject> &objects, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer)
 {
     vulPipeline->bind(commandBuffer);
 
     vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
-    for (VulObject &obj : objects){
+    for (Vul3DObject &obj : objects){
         if (obj.renderSystemIndex != index) continue;
         void *pushData;
         uint32_t pushDataSize;
@@ -75,6 +75,34 @@ void RenderSystem::render(std::vector<VulObject> &objects, std::vector<VkDescrip
             defaultData.isLight = obj.isLight;
             defaultData.lightIndex = obj.lightIndex;
             defaultData.specularExponent = obj.specularExponent;
+            defaultData.texIndex = (obj.hasTexture) ? obj.textureIndex : -1;
+            pushData = reinterpret_cast<void *>(&defaultData);
+            pushDataSize = sizeof(defaultData);
+        } else{
+            pushData = obj.pCustomPushData;
+            pushDataSize = obj.customPushDataSize;
+        }
+
+        vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushDataSize, pushData);
+
+        obj.model->bind(commandBuffer);
+        obj.model->draw(commandBuffer);
+    }
+}
+
+void RenderSystem::render(std::vector<VulScreenObject> &objects, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer)
+{
+    vulPipeline->bind(commandBuffer);
+
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+    for (VulScreenObject &obj : objects){
+        if (obj.renderSystemIndex != index) continue;
+        void *pushData;
+        uint32_t pushDataSize;
+        DefaultPushConstantInputData defaultData; // Has to be outside the if statement to prevent it from going out of scope too early and making the pushData pointer point to freed memory
+        if (!obj.pCustomPushData){
+            defaultData.color = obj.color;
             defaultData.texIndex = (obj.hasTexture) ? obj.textureIndex : -1;
             pushData = reinterpret_cast<void *>(&defaultData);
             pushDataSize = sizeof(defaultData);

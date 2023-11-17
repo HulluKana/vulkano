@@ -9,3 +9,5 @@ In the vulkano_program.cpp I always wait for the gpu to become idle after tellin
 Move some stuff out ouf the vul_settings.hpp.
 
 Revamp the objects system, such as the getObjectsPointer
+
+Refine the screen object system such as the vertices used for it and the underlying graphichs pipeline

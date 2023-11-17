@@ -7,7 +7,7 @@ VulObject::VulObject()
 
 }
 
-glm::mat4 transformComponent::transformMat()
+glm::mat4 transformComponent3D::transformMat()
 {
     // Rotations correspond to Tait-bryan angles of Y(1), X(2), Z(3)
     // https://en.wikipedia.org/wiki/Euler_angles#Rotation_matrix
@@ -49,7 +49,7 @@ glm::mat4 transformComponent::transformMat()
     };
 }
 
-glm::mat3 transformComponent::normalMatrix()
+glm::mat3 transformComponent3D::normalMatrix()
 {
     const float c3 = glm::cos(rotation.z);
     const float s3 = glm::sin(rotation.z);
