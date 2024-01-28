@@ -21,6 +21,7 @@ class VulImage
 
         void createTextureFromFile(std::string fileName, bool modifyLater = false);
         void createTextureFromData(uint8_t* pixels, uint32_t width, uint32_t height, bool modifyLater = false);
+        void createRtImage(uint32_t width, uint32_t height);
         void modifyTextureImage(uint8_t* pixels);
 
         uint32_t getWidth() const {return m_width;}
@@ -49,11 +50,12 @@ class VulImage
         void transitionImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
         void copyBufferToImage(VkBuffer buffer);
 
-        void createTextureImageView();
+        void createImageView(bool isStorageImage = false);
         void createTextureSampler();
 
         uint32_t m_width, m_height;
         bool m_modifiable{false}; 
+        bool m_hasSampler = false;
 
         VkImage m_image;
         void *m_mappedMemory;

@@ -1,4 +1,5 @@
 #include"../../vulkano_GUI_tools.hpp"
+#include <string>
 
 namespace vul{
 

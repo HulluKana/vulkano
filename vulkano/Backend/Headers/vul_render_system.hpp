@@ -3,7 +3,8 @@
 #include"vul_camera.hpp"
 #include"vul_device.hpp"
 #include"vul_pipeline.hpp"
-#include"vul_object.hpp"
+#include"vul_scene.hpp"
+#include"vul_2d_object.hpp"
 
 #include<memory>
 
@@ -24,31 +25,27 @@ class RenderSystem{
         RenderSystem &operator=(RenderSystem &&) = default;
     private:
 
-        void init(std::vector<VkDescriptorSetLayout> setLayouts, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat);
+        void init(std::vector<VkDescriptorSetLayout> setLayouts, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat, bool is2D = false);
         void createPipelineLayout(std::vector<VkDescriptorSetLayout> setLayouts);
-        void createPipeline(VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat);
+        void createPipeline(VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat, bool is2D);
                
-        void render(std::vector<Vul3DObject> &objects, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer);
-        void render(std::vector<VulScreenObject> &objects, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer);
+        void render(const Scene &scene, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer);
+        void render(Object2D &obj, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer);
 
         uint32_t index = 0;
         
         struct DefaultPushConstantInputData{
             glm::mat4 modelMatrix{1.0f};
             glm::mat4 normalMatrix{1.0f};
-            glm::vec3 color{1.0f}; 
-            int isLight = false;
-            int lightIndex = 0;
-            float specularExponent = 0.0f;
-            int texIndex = -1;
+            int matIdx = -1;
         };
 
         vulB::VulDevice &vulDevice;
         std::unique_ptr<vulB::VulPipeline> vulPipeline;
         VkPipelineLayout pipelineLayout;
         
-        std::string vertShaderName = "../Shaders/bin/default.vert.spv";
-        std::string fragShaderName = "../Shaders/bin/default.frag.spv";
+        std::string vertShaderName = "../bin/default.vert.spv";
+        std::string fragShaderName = "../bin/default.frag.spv";
 
         friend class Vulkano;
 };

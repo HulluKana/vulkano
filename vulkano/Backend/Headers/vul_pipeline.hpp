@@ -19,6 +19,8 @@ struct PipelineConfigInfo {
     VkPipelineLayout pipelineLayout = nullptr;
     VkRenderPass renderPass = nullptr;
     uint32_t subpass = 0;
+    std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
+    std::vector<VkVertexInputBindingDescription> bindingDescriptions;
 };
 
 class VulPipeline{
@@ -36,11 +38,10 @@ class VulPipeline{
 
         static void defaultPipeLineConfigInfo(PipelineConfigInfo &configInfo);
     
-    private:
         static std::vector<char> readFile(const std::string& filePath);
-
+        static void createShaderModule(VulDevice &vulDevice, const std::vector<char>& code, VkShaderModule* shaderModule);
+    private:
         void createGraphicsPipeline(const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat);
-        void createShaderModule(const std::vector<char>& code, VkShaderModule* shaderModule);
 
         VulDevice& vulDevice;
         VkPipeline graphicsPipeline;

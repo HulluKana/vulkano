@@ -8,6 +8,7 @@
 
 #include<stdexcept>
 #include<iostream>
+#include <vulkan/vulkan_core.h>
 
 namespace vulB{
 
@@ -114,10 +115,14 @@ void VulRenderer::endFrame()
     currentFrameIndex = (currentFrameIndex + 1) % VulSwapChain::MAX_FRAMES_IN_FLIGHT;
 }
 
-void VulRenderer::beginRendering(VkCommandBuffer commandBuffer)
+void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, uint32_t renderWidth, uint32_t renderHeight)
 {
     assert(isFrameStarted && "Can't call beginRendering if the frame hasn't been started either");
     assert(commandBuffer == getCurrentCommandBuffer() && "Can't begin rendering on a command buffer from a different frame");
+
+    VkExtent2D renderArea{};
+    renderArea.width = renderWidth > 0 ? renderWidth : vulSwapChain->getSwapChainExtent().width;
+    renderArea.height = renderHeight > 0 ? renderHeight : vulSwapChain->getSwapChainExtent().height;
 
     VkImageSubresourceRange subResourceRange{};
     subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -166,13 +171,13 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer)
     VkViewport viewport{};
     viewport.x = 0.0f;
     viewport.y = 0.0f;
-    viewport.width = static_cast<float>(vulSwapChain->getSwapChainExtent().width);
-    viewport.height = static_cast<float>(vulSwapChain->getSwapChainExtent().height);
+    viewport.width = static_cast<float>(renderArea.width);
+    viewport.height = static_cast<float>(renderArea.height);
     viewport.minDepth = 0.0f;
     viewport.maxDepth = 1.0f;
-    VkRect2D scissor;
+    VkRect2D scissor{};
     scissor.offset = {0, 0};
-    scissor.extent = vulSwapChain->getSwapChainExtent();
+    scissor.extent = renderArea;
     vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 }

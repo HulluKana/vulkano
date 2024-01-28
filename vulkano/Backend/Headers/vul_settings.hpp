@@ -1,12 +1,16 @@
 #pragma once
 
-#include<stdint.h>
+#include <cmath>
+#include <inttypes.h>
 
 namespace vul{
 
 class settings{
 
 public:
+    static inline uint32_t renderWidth{0};
+    static inline uint32_t renderHeight{0};
+
     static inline float maxFps{60.0f};
 
     struct CameraProperties{
@@ -20,7 +24,6 @@ public:
         float bottomPlane = 1.0f;
     };
     static inline CameraProperties cameraProperties{true, 80.0f * (M_PI * 2.0f / 360.0f), 0.1f, 100.0f, -1.0f, 1.0f, -1.0f, 1.0f};
-
 };
 
 }

@@ -1,34 +1,19 @@
 #include"../../vulkano_program.hpp"
 
-#include<imgui.h>
-#include<imconfig.h>
-#include<imgui_internal.h>
-#include<imgui_impl_vulkan.h>
-#include<imgui_impl_glfw.h>
+#include"../../../3rdParty/imgui/imgui.h"
+#include <vulkan/vulkan_core.h>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include<glm/glm.hpp>
 #include<glm/gtc/constants.hpp>
 
-#include<stdexcept>
-#include<iostream>
+#include <iostream>
 
 using namespace vulB;
 namespace vul{
 
-struct GlobalUbo {
-    glm::mat4 projectionView{1.0f};
-    glm::vec4 camerePosition{0.0f}; //4th component is ignored
-
-    glm::vec4 ambientLightColor{1.0f, 1.0f, 1.0f, 0.02f};
-
-    glm::vec4 lightPosition[MAX_LIGHTS]; // 4th component is ignored
-    glm::vec4 lightColor[MAX_LIGHTS];
-    int numLights = 0;
-};
-
-Vulkano::Vulkano(uint32_t width, uint32_t height, std::string &name) : m_vulWindow{(int)width, (int)height, name}
+Vulkano::Vulkano(uint32_t width, uint32_t height, std::string name) : m_vulWindow{(int)width, (int)height, name}
 {
 
 }
@@ -43,38 +28,43 @@ void Vulkano::initVulkano()
     m_globalPool = VulDescriptorPool::Builder(m_vulDevice)
         .setMaxSets(m_vulDevice.properties.limits.maxBoundDescriptorSets)
         .setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * MAX_UBOS)
+        .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * 5)
         .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * MAX_TEXTURES * 2)
+        .addPoolSize(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VulSwapChain::MAX_FRAMES_IN_FLIGHT)
+        .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VulSwapChain::MAX_FRAMES_IN_FLIGHT)
+        .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * 12)
         .build();
 
     for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-        std::unique_ptr<VulBuffer> vulBuffer;
-        vulBuffer = std::make_unique<VulBuffer>(m_vulDevice, sizeof(GlobalUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_vulDevice.properties.limits.minUniformBufferOffsetAlignment);
-        vulBuffer->map();
-        m_uboBuffers.push_back(std::move(vulBuffer));
+        std::unique_ptr<VulBuffer> globalBuffer;
+        globalBuffer = std::make_unique<VulBuffer>  (m_vulDevice, sizeof(GlobalUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
+                                                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_vulDevice.properties.limits.minUniformBufferOffsetAlignment);
+        globalBuffer->map();
+        m_uboBuffers.push_back(std::move(globalBuffer));
     }
 
     uint8_t *data = new uint8_t[16]{255, 0, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 0, 255, 255};
     m_emptyImage.createTextureFromData(data, 2, 2);
 
     m_globalSetLayout = VulDescriptorSetLayout::Builder(m_vulDevice)
-        .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT)
-        .addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT, MAX_TEXTURES)
+        .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR)
+        .addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, MAX_TEXTURES)
+        .addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
         .build();
-    updateGlobalDescriptorSets();
+    createGlobalDescriptorSets();
 
     m_imGuiSetLayout = VulDescriptorSetLayout::Builder(m_vulDevice)
         .addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
         .build();
-    updateImGuiDescriptorSets();
+    createImGuiDescriptorSets();
 
-    createNewRenderSystem(); // Default 3D render system
-    createNewRenderSystem("../Shaders/bin/screenObj.vert.spv", "../Shaders/bin/screenObj.frag.spv"); // Default screen object render system
+    std::vector<VkDescriptorSetLayout> defaultSetLayouts{m_globalSetLayout->getDescriptorSetLayout()};
+    createNewRenderSystem(defaultSetLayouts); // Default 3D render system
 
-    vkDeviceWaitIdle(m_vulDevice.device());
     m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), m_vulRenderer, m_vulDevice);
 
     m_currentTime = glfwGetTime();
+    m_prevWindowSize = m_vulRenderer.getSwapChainExtent();
 }
 
 VkCommandBuffer Vulkano::startFrame()
@@ -93,37 +83,36 @@ VkCommandBuffer Vulkano::startFrame()
     double renderPreparationStartTime = glfwGetTime();
 
     ImGuiIO &io = ImGui::GetIO(); (void)io;
-    if (!io.WantCaptureKeyboard) m_cameraController.modifyValues(m_vulWindow.getGLFWwindow(), m_cameraObject);
-    if (!io.WantCaptureMouse && !io.WantCaptureKeyboard) m_cameraController.rotate(m_vulWindow.getGLFWwindow(), m_frameTime, m_cameraObject, m_vulRenderer.getSwapChainExtent().width, m_vulRenderer.getSwapChainExtent().height);
-    if (!io.WantCaptureKeyboard) m_cameraController.move(m_vulWindow.getGLFWwindow(), m_frameTime, m_cameraObject);
+    if (!io.WantCaptureKeyboard) m_cameraController.modifyValues(m_vulWindow.getGLFWwindow(), m_cameraTransform);
+    if (!io.WantCaptureMouse && !io.WantCaptureKeyboard) m_cameraController.rotate(m_vulWindow.getGLFWwindow(), m_frameTime, m_cameraTransform, m_vulRenderer.getSwapChainExtent().width, m_vulRenderer.getSwapChainExtent().height);
+    if (!io.WantCaptureKeyboard) m_cameraController.move(m_vulWindow.getGLFWwindow(), m_frameTime, m_cameraTransform);
 
     float aspect = m_vulRenderer.getAspectRatio();
     if (settings::cameraProperties.hasPerspective) m_camera.setPerspectiveProjection(settings::cameraProperties.fovY, aspect, settings::cameraProperties.nearPlane, settings::cameraProperties.farPlane);
     else m_camera.setOrthographicProjection(settings::cameraProperties.leftPlane, settings::cameraProperties.rightPlane, settings::cameraProperties.topPlane,
                                             settings::cameraProperties.bottomPlane, settings::cameraProperties.nearPlane, settings::cameraProperties.farPlane);
-    m_camera.setViewYXZ(m_cameraObject.transform.posOffset, m_cameraObject.transform.rotation);
+
+    m_camera.setViewYXZ(m_cameraTransform.pos, m_cameraTransform.rot);
 
     if (VkCommandBuffer commandBuffer = m_vulRenderer.beginFrame()){
+        m_prevWindowSize = m_vulRenderer.getSwapChainExtent();
         int frameIndex = m_vulRenderer.getFrameIndex();
 
         GlobalUbo ubo{};
-        ubo.projectionView = m_camera.getProjection() * m_camera.getView();
-        ubo.camerePosition = glm::vec4(m_cameraObject.transform.posOffset, 0.0f);
+        ubo.projectionMatrix = m_camera.getProjection();
+        ubo.viewMatrix = m_camera.getView();
+        ubo.cameraPosition = glm::vec4(m_cameraTransform.pos, 0.0f);
 
-        int lightIndex = 0;
-        for (Vul3DObject &obj : m_objects){
-            if (obj.isLight && lightIndex < MAX_LIGHTS){
-                ubo.lightPosition[lightIndex] = glm::vec4(obj.transform.posOffset, 1.0f);
-                ubo.lightColor[lightIndex] = glm::vec4(obj.lightColor, obj.lightIntensity);
-                obj.lightIndex = lightIndex;
-                lightIndex++;
-            }
+        ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.02f);
+        ubo.numLights = scene.lightCount;
+        for (int i = 0; i < scene.lightCount; i++){
+            ubo.lightPositions[i] = scene.lightPositions[i];
+            ubo.lightColors[i] = scene.lightColors[i];
         }
-        ubo.numLights = lightIndex;
 
-        m_uboBuffers[frameIndex]->writeToBuffer(&ubo);
+        m_uboBuffers[frameIndex]->writeToBuffer(&ubo, sizeof(ubo));
 
-        m_vulRenderer.beginRendering(commandBuffer);
+        m_vulRenderer.beginRendering(commandBuffer, settings::renderWidth, settings::renderHeight);
         if (!m_cameraController.hideGUI) m_vulGUI.startFrame();
 
         m_renderPreparationTime = glfwGetTime() - renderPreparationStartTime;
@@ -135,20 +124,20 @@ VkCommandBuffer Vulkano::startFrame()
 
 bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 {
+    int frameIdx = m_vulRenderer.getFrameIndex();
+
     double objRenderStartTime = glfwGetTime();
-    if (m_objects.size() > 0){
-        std::vector<VkDescriptorSet> descriptorSets;
-        descriptorSets.push_back(m_globalDescriptorSets[m_vulRenderer.getFrameIndex()]);
-
-        for (size_t i = 0; i < renderSystems.size(); i++)
-            renderSystems[i]->render(m_objects, descriptorSets, commandBuffer);
+    if (hasScene){
+        std::vector<VkDescriptorSet> defaultDescriptorSets;
+        defaultDescriptorSets.push_back(m_globalDescriptorSets[frameIdx].getSet());
+        renderSystems[0]->render(scene, defaultDescriptorSets, commandBuffer);
     }
-    if (m_screenObjects.size() > 0){
-        std::vector<VkDescriptorSet> descriptorSets;
-        descriptorSets.push_back(m_globalDescriptorSets[m_vulRenderer.getFrameIndex()]);
-
-        for (size_t i = 0; i < renderSystems.size(); i++)
-            renderSystems[i]->render(m_screenObjects, descriptorSets, commandBuffer);
+    if (object2Ds.size() > 0){
+        std::vector<VkDescriptorSet> defaultDescriptorSets;
+        defaultDescriptorSets.push_back(m_globalDescriptorSets[frameIdx].getSet());
+        for (Object2D &obj : object2Ds){
+            renderSystems[obj.renderSystemIndex]->render(obj, defaultDescriptorSets, commandBuffer);
+        }
     }
     m_objRenderTime = glfwGetTime() - objRenderStartTime;
 
@@ -165,37 +154,22 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
     return m_vulWindow.shouldClose();
 }
 
-void Vulkano::loadObject(std::string file)
+void Vulkano::createSquare(float x, float y, float width, float height)
 {
-    std::string filePath = "../Models/" + file + ".obj";
-    std::shared_ptr<VulModel> vulModel = VulModel::createModelFromFile(m_vulDevice, filePath);
-
-    Vul3DObject object;
-    object.model = vulModel;
-    object.transform.posOffset = {0.0f, 0.0f, 0.0f};
-    object.transform.scale = {1.0f, 1.0f, 1.0f};
-    object.color = {1.0f, 1.0f, 1.0f};
-
-    m_objects.push_back(std::move(object));
+    Object2D object;
+    object.addSquare(m_vulDevice, x, y, width, height);
+    object2Ds.push_back(std::move(object));
 }
 
-void Vulkano::createScreenObject(const std::vector<glm::vec2> &corners)
+void Vulkano::createTriangle(glm::vec2 corner1, glm::vec2 corner2, glm::vec2 corner3)
 {
-    std::shared_ptr<VulModel> vulModel = VulModel::createScreenModelFromData(m_vulDevice, corners);
-
-    VulScreenObject object;
-    object.renderSystemIndex = 1;
-    object.model = vulModel;
-    object.transform.pos = {0.0f, 0.0f};
-    object.transform.scale = {1.0f, 1.0f};
-    object.color = {1.0f, 1.0f, 1.0};
-
-    m_screenObjects.push_back(std::move(object));
+    Object2D object;
+    object.addTriangle(m_vulDevice, corner1, corner2, corner3);
+    object2Ds.push_back(std::move(object));
 }
 
-bool Vulkano::updateGlobalDescriptorSets()
+bool Vulkano::createGlobalDescriptorSets()
 {
-    std::vector<VkDescriptorSet> descriptorSets;
     VkDescriptorImageInfo imageInfo[MAX_TEXTURES];
     for (size_t j = 0; j < MAX_TEXTURES; j++){
         imageInfo[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -209,30 +183,25 @@ bool Vulkano::updateGlobalDescriptorSets()
     }
     for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
         VkDescriptorBufferInfo bufferInfo = m_uboBuffers[i]->descriptorInfo();
-        VkDescriptorSet descriptorSet;
-        if (!VulDescriptorWriter(*m_globalSetLayout, *m_globalPool)
-            .writeBuffer(0, &bufferInfo)
-            .writeImage(1, imageInfo, MAX_TEXTURES)
-            .build(descriptorSet)){
-            fprintf(stderr, "Allocating globalDescriptorSets failed. Old descriptorSets remain in use and unchanged\n");
+        VkDescriptorBufferInfo matBufInfo;
+        if (hasScene) matBufInfo = scene.materialBuffer->descriptorInfo();
+        VulDescriptorSet vulSet(*m_globalSetLayout, *m_globalPool);
+        vulSet.writeBuffer(0, &bufferInfo)
+            .writeImage(1, imageInfo, MAX_TEXTURES);
+        if (hasScene) vulSet.writeBuffer(2, &matBufInfo);
+        vulSet.build();
+        if (!vulSet.hasSet()){
+            fprintf(stderr, "Allocating globalDescriptorSets\n");
+            return false;
         }
-        descriptorSets.push_back(descriptorSet);
+        m_globalDescriptorSets.push_back(std::move(vulSet));
     }
-
-    // I have to clear the previous sets after new sets have been created and not after, because allocating set could fail and clearing previous sets before that would leave the set vector empty
-    if (m_globalDescriptorSets.size() > 0){
-        vkFreeDescriptorSets(m_vulDevice.device(), m_globalPool->getDescriptorPoolReference(), static_cast<uint32_t>(m_globalDescriptorSets.size()), m_globalDescriptorSets.data());
-        m_globalDescriptorSets.clear();
-    }
-    for (VkDescriptorSet &set : descriptorSets)
-        m_globalDescriptorSets.push_back(set);
 
     return true;
 }
 
-bool Vulkano::updateImGuiDescriptorSets()
+bool Vulkano::createImGuiDescriptorSets()
 { 
-    std::vector<VkDescriptorSet> descriptorSets;
     std::vector<uint32_t> imguiImages;
     for (uint32_t i = 0; i < imageCount; i++){
         if (!images[i]->usableByImGui) continue;
@@ -243,38 +212,26 @@ bool Vulkano::updateImGuiDescriptorSets()
             imageInfo.imageView = images[i]->getImageView();
             imageInfo.sampler = images[i]->getTextureSampler();
 
-            VkDescriptorSet descriptorSet;
-            if (!VulDescriptorWriter(*m_imGuiSetLayout, *m_globalPool)
-                .writeImage(0, &imageInfo)
-                .build(descriptorSet)){
-                fprintf(stderr, "Allocating descriptorSets for imGuiImages failed. Old descriptorSets remain in use and unchanged\n");
+            VulDescriptorSet vulSet(*m_imGuiSetLayout, *m_globalPool);
+            vulSet.writeImage(0, &imageInfo)
+                .build();
+            if (!vulSet.hasSet()){
+                fprintf(stderr, "Allocating descriptorSets for imGuiImages\n");
                 return false;
             }
-            descriptorSets.push_back(descriptorSet);
+            m_imGuiDescriptorSets.push_back(std::move(vulSet));
         }
-    }
-
-    // I have to clear the previous sets after new sets have been created and not after, because allocating set could fail and clearing previous sets before that would leave the set vector empty
-    if (m_imGuiDescriptorSets.size() > 0){
-        vkFreeDescriptorSets(m_vulDevice.device(), m_globalPool->getDescriptorPoolReference(), static_cast<uint32_t>(m_imGuiDescriptorSets.size()), m_imGuiDescriptorSets.data());
-        m_imGuiDescriptorSets.clear();
-    }
-    for (int i = 0; i < static_cast<int>(descriptorSets.size()); i++){
-        m_imGuiDescriptorSets.push_back(descriptorSets[i]);
-        if (i % VulSwapChain::MAX_FRAMES_IN_FLIGHT == 0)
-            images[i / VulSwapChain::MAX_FRAMES_IN_FLIGHT]->setDescriptorSet(descriptorSets[i]);
     }
 
     return true;
 }
 
-void Vulkano::createNewRenderSystem(std::string vertShaderName, std::string fragShaderName)
+void Vulkano::createNewRenderSystem(const std::vector<VkDescriptorSetLayout> &setLayouts, bool is2D, std::string vertShaderName, std::string fragShaderName)
 {
-    std::vector<VkDescriptorSetLayout> setLayouts{m_globalSetLayout->getDescriptorSetLayout(), m_imGuiSetLayout->getDescriptorSetLayout()};
     std::unique_ptr<RenderSystem> renderSystem = std::make_unique<RenderSystem>(m_vulDevice);
     if (vertShaderName != "") renderSystem->vertShaderName = vertShaderName;
     if (fragShaderName != "") renderSystem->fragShaderName = fragShaderName;
-    renderSystem->init(setLayouts, m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getSwapChainDepthFormat());
+    renderSystem->init(setLayouts, m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getSwapChainDepthFormat(), is2D);
     renderSystem->index = renderSystems.size();
     renderSystems.push_back(std::move(renderSystem));
 }

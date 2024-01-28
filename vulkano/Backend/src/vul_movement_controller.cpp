@@ -9,7 +9,7 @@ MovementController::MovementController()
 {
 }
 
-void MovementController::modifyValues(GLFWwindow *window, Vul3DObject &object)
+void MovementController::modifyValues(GLFWwindow *window, transform3D &transform)
 {
     if (glfwGetKey(window, keys.toggleGUI) == GLFW_PRESS) hideGUIpressed = true;
     if (glfwGetKey(window, keys.toggleGUI) == GLFW_RELEASE && hideGUIpressed){
@@ -24,12 +24,12 @@ void MovementController::modifyValues(GLFWwindow *window, Vul3DObject &object)
     if (glfwGetKey(window, keys.moveSlower) == GLFW_PRESS) moveSpeed = baseMoveSpeed / speedChanger;
 
     if (glfwGetKey(window, keys.resetAll) == GLFW_PRESS){
-        object.transform.posOffset = glm::vec3(0.0f, 0.0f, 0.0f);
-        object.transform.rotation = glm::vec3(0.0f, 0.0f, 0.0f);
+        transform.pos = glm::vec3(0.0f, 0.0f, 0.0f);
+        transform.rot = glm::vec3(0.0f, 0.0f, 0.0f);
     }
 }
 
-void MovementController::rotate(GLFWwindow *window, float dt, Vul3DObject &object, int screenWidth, int screenHeight)
+void MovementController::rotate(GLFWwindow *window, float dt, transform3D &transform, int screenWidth, int screenHeight)
 {
     glm::vec3 keyRotate = glm::vec3(0.0f);
     glm::vec3 mouseRotate = glm::vec3(0.0f);
@@ -52,18 +52,18 @@ void MovementController::rotate(GLFWwindow *window, float dt, Vul3DObject &objec
     }
 
     if (glm::dot(keyRotate, keyRotate) > std::numeric_limits<float>::epsilon())
-        object.transform.rotation += glm::normalize(keyRotate) * lookSpeed * dt;
+        transform.rot += glm::normalize(keyRotate) * lookSpeed * dt;
     if (glm::dot(mouseRotate, mouseRotate) > std::numeric_limits<float>::epsilon())
-        object.transform.rotation += glm::normalize(mouseRotate) * sensitivity * dt;
+        transform.rot += glm::normalize(mouseRotate) * sensitivity * dt;
 
     
-    object.transform.rotation.x = glm::mod(object.transform.rotation.x, glm::two_pi<float>());
-    object.transform.rotation.y = glm::mod(object.transform.rotation.y, glm::two_pi<float>());
+    transform.rot.x = glm::mod(transform.rot.x, glm::two_pi<float>());
+    transform.rot.y = glm::mod(transform.rot.y, glm::two_pi<float>());
 }
 
-void MovementController::move(GLFWwindow *window, float dt, Vul3DObject &object)
+void MovementController::move(GLFWwindow *window, float dt, transform3D &transform)
 {
-    float yaw = object.transform.rotation.y;
+    float yaw = transform.rot.y;
     const glm::vec3 forwardDir = glm::vec3(sin(yaw), 0.0f, cos(yaw));
     const glm::vec3 rightDir = glm::vec3(forwardDir.z, 0.0f, -forwardDir.x);
     const glm::vec3 upDir = glm::vec3(0.0f, -1.0f, 0.0f);
@@ -77,7 +77,7 @@ void MovementController::move(GLFWwindow *window, float dt, Vul3DObject &object)
     if (glfwGetKey(window, keys.moveDown) == GLFW_PRESS) moveDir -= upDir;
 
     if (glm::dot(moveDir, moveDir) > std::numeric_limits<float>::epsilon())
-        object.transform.posOffset += glm::normalize(moveDir) * moveSpeed * dt;
+        transform.pos += glm::normalize(moveDir) * moveSpeed * dt;
 }
 
 }

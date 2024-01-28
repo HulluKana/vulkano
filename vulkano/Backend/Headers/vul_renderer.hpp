@@ -39,7 +39,7 @@ class VulRenderer{
 
         VkCommandBuffer beginFrame();
         void endFrame();
-        void beginRendering(VkCommandBuffer commandBuffer);
+        void beginRendering(VkCommandBuffer commandBuffer, uint32_t renderWidth = 0, uint32_t renderHeight = 0);
         void stopRendering(VkCommandBuffer commandBuffer);
         
     private:

@@ -1,181 +1,68 @@
+#include "vulkano/Backend/Headers/vul_settings.hpp"
 #include"vulkano/vulkano_program.hpp"
 #include"vulkano/vulkano_GUI_tools.hpp"
-#include"vulkano/vulkano_random.hpp"
 
-#include<imgui.h>
+#include"3rdParty/imgui/imgui.h"
 
+#include <cmath>
 #include<iostream>
 
-float brightness = 1.0f;
-float width = 0.1f;
-float speed = 2.0f;
-float angle = 10.0f;
-int tentacleCount = 1;
-
-void GuiStuff(vul::Vulkano &vulkano, char *modelFileName, int modelFileNameLen, char *texFileName, int texFileNameLen, int &objIndex, float ownStuffTime)
-{
-    /*
-    bool addObject = false;
-    ImGui::Begin("ObjManager");
-    ImGui::Checkbox("Add object", &addObject);
-    ImGui::InputText("File name", modelFileName, modelFileNameLen);
-    if (vulkano.getObjCount() > 0){
-        ImGui::SliderInt("Obj Index", &objIndex, 0, (int)vulkano.getObjCount() - 1);
-
-        auto obj = vulkano.getObjectsPointer();
-        vul::GUI::DragFloat3("Obj pos", obj[objIndex].transform.posOffset, 0.0f, 0.0f, 0.1f);
-        vul::GUI::DragFloat3("Obj rotation", obj[objIndex].transform.rotation, 2 * M_PI, -2 * M_PI, 0.017f);
-        vul::GUI::DragFloat3("Obj scale", obj[objIndex].transform.scale, 10'000.0f, -10'000.0f, 0.1f);
-        vul::GUI::DragFloat3("Obj color", obj[objIndex].color, 1.0f, 0.0f, 0.005f);
-        ImGui::DragFloat("Obj specular exponent", &obj[objIndex].specularExponent, (sqrt(obj[objIndex].specularExponent)) / 10.0f, 1.0f, 1'000.0f);
-        ImGui::Checkbox("Obj is light", &obj[objIndex].isLight);
-        if (obj[objIndex].isLight){
-            vul::GUI::DragFloat3("Light color", obj[objIndex].lightColor, 1.0f, 0.0f, 0.005f);
-            ImGui::DragFloat("Light intensity", &obj[objIndex].lightIntensity, (sqrt(obj[objIndex].lightIntensity) + 0.1f) / 10.0f, 0.0f, 1'000'000.0f);
-        }
-        
-        ImGui::Checkbox("Obj has texture", &obj[objIndex].hasTexture);
-        if (obj[objIndex].hasTexture) ImGui::SliderInt("Texture index", reinterpret_cast<int *>(&obj[objIndex].textureIndex), 0, glm::max(0, static_cast<int>(vulkano.imageCount) - 1));
-    }
-    ImGui::End(); 
-
-    bool addTexture = false;
-    ImGui::Begin("Texture manager");
-    ImGui::Checkbox("Add texture", &addTexture);
-    ImGui::InputText("Texture name", texFileName, texFileNameLen);
-    if (addTexture){
-        std::shared_ptr<vul::VulImage> image = std::make_shared<vul::VulImage>(vulkano.getVulDevice());
-        image->createTextureFromFile(texFileName);
-        vulkano.images[vulkano.imageCount] = image;
-        vulkano.imageCount++;
-        vulkano.updateGlobalDescriptorSets();
-    }
-
-    if (vulkano.imageCount > 0){
-        static int textureIndex = 0;
-        ImGui::SliderInt("Texture index", &textureIndex, 0, static_cast<int>(vulkano.imageCount) - 1, 0);
-        bool enabledImguiTexture = false;
-        enabledImguiTexture = ImGui::Checkbox("Enable texture for ImGui", &vulkano.images[textureIndex]->usableByImGui);
-        if (enabledImguiTexture && vulkano.images[textureIndex]->usableByImGui){
-            vulkano.images[textureIndex]->usableByImGui = true;
-            vulkano.updateImGuiDescriptorSets();
-        }
-        if (enabledImguiTexture && !vulkano.images[textureIndex]->usableByImGui){
-            vulkano.images[textureIndex]->usableByImGui = false;
-            vulkano.updateImGuiDescriptorSets();
-        }
-    }
-    ImGui::End();
-
-    if (vulkano.imageCount){
-        std::vector<uint32_t> validImageTextures;
-        bool validImageFound = false;
-        for (uint32_t i = 0; i < vulkano.imageCount; i++){
-            if (vulkano.images[i]->usableByImGui){
-                validImageTextures.push_back(i);
-                validImageFound = true;
-            }
-        }
-        static int imageIndex = 0;
-        if (validImageFound){
-            ImGui::Begin("Image");
-            ImGui::SliderInt("Image", &imageIndex, 0, static_cast<int>(validImageTextures.size() - 1));
-            ImGui::Image(vulkano.images[imageIndex]->getImGuiTextureID(), ImVec2(vulkano.images[imageIndex]->getWidth(), vulkano.images[imageIndex]->getHeight()));
-            ImGui::End();
-        }
-    }
-
-    ImGui::Begin("Camera controller");
-    ImGui::Checkbox("Has perspective", &vul::settings::cameraProperties.hasPerspective);
-    if (vul::settings::cameraProperties.hasPerspective) ImGui::DragFloat("FOV", &vul::settings::cameraProperties.fovY, 0.017f, -2.0f * M_PI, 2.0f * M_PI);
-    ImGui::DragFloat("Near plane", &vul::settings::cameraProperties.nearPlane, 0.001f, 0.001f, 10.0f);
-    ImGui::DragFloat("Far plane", &vul::settings::cameraProperties.farPlane, 1.0f, 1.0f, 100'000.0f);
-    if (!vul::settings::cameraProperties.hasPerspective){
-        ImGui::DragFloat("Left plane", &vul::settings::cameraProperties.leftPlane, 0.2f, -1'000.0f, 1'000.0f);
-        ImGui::DragFloat("Right plane", &vul::settings::cameraProperties.rightPlane, 0.2f, -1'000.0f, 1'000.0f);
-        ImGui::DragFloat("Top plane", &vul::settings::cameraProperties.topPlane, 0.2f, -1'000.0f, 1'000.0f);
-        ImGui::DragFloat("Bottom plane", &vul::settings::cameraProperties.bottomPlane, 0.2f, -1'000.0f, 1'000.0f);
-    }
-    ImGui::End();
-
+void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime)
+{   
     ImGui::Begin("Performance");
     ImGui::DragFloat("Max FPS", &vul::settings::maxFps, vul::settings::maxFps / 30.0f, 3.0f, 10'000.0f);
     ImGui::Text("Fps: %f\nTotal frame time: %fms\nObject render time: %fms\nGUI render time: %fms\nRender preparation time: %fms\nRender finishing time: %fms\nIdle time %fms\nOwn stuff: %fms",
                 1.0f / vulkano.getFrameTime(), vulkano.getFrameTime() * 1000.0f, vulkano.getObjRenderTime() * 1000.0f, vulkano.getGuiRenderTime() * 1000.0f,
                 vulkano.getRenderPreparationTime() * 1000.0f, vulkano.getRenderFinishingTime() * 1000.0f, vulkano.getIdleTime() * 1000.0f, ownStuffTime * 1000.0f);
     ImGui::End();
-
-    if (addObject){
-        std::string modelFileNameStr(modelFileName);
-        vulkano.loadObject(modelFileNameStr);
-        speeds.push_back(1.0f);
-    }
-    */
-    ImGui::Begin("Test");
-    ImGui::SliderFloat("Brightness", &brightness, 0.0f, 1.0f);
-    ImGui::SliderFloat("Width", &width, 0.0f, 1.0f);
-    ImGui::DragFloat("Speed", &speed, 0.01f, 0.0f, 100.0f);
-    ImGui::DragFloat("angle", &angle, 0.01f, 0.0f, 100.0f);
-    ImGui::DragInt("Tentacles", &tentacleCount, 0.1f, 0, 100);
-    ImGui::End();
 }
 
 int main()
 {
-    std::string name("Vulkano");
-    vul::Vulkano vulkano(1000, 800, name);
-
+    vul::Vulkano vulkano(2560, 1440, "Vulkano");
     vulkano.initVulkano();
-    vulkano.createNewRenderSystem("../Shaders/bin/test.vert.spv", "../Shaders/bin/test.frag.spv");
+    constexpr double aspect = 480.0f / 360.0f;
+    vul::settings::renderHeight = vulkano.getSwapChainExtent().height;
+    vul::settings::renderWidth = std::min(static_cast<uint32_t>(vul::settings::renderHeight * aspect), vulkano.getSwapChainExtent().width);
+
+    const double radius = 1.0;
+    const double cornerX = radius * sqrt(3.0);
+    vulkano.createTriangle({-cornerX, radius}, {cornerX, radius}, {0.0, -radius * 2.0});
+    vulkano.createTriangle({-cornerX, radius}, {cornerX, radius}, {0.0, -radius * 2.0});
+    vulkano.createNewRenderSystem({vulkano.getGlobalSetLayout()}, true, "../bin/circle.vert.spv", "../bin/circle.frag.spv");
+
+    struct CirclePC{
+        float x;
+        float y;
+        float radius;
+    };
+
+    CirclePC circ1;
+    circ1.x = -0.3f;
+    circ1.y = -0.6f;
+    circ1.radius = 0.45f;
+    CirclePC circ2;
+    circ2.x = 0.2f;
+    circ2.y = 0.2f;
+    circ2.radius = 0.8f;
+
+    vulkano.object2Ds[0].pCustomPushData = &circ1;
+    vulkano.object2Ds[0].customPushDataSize = sizeof(circ1);
+    vulkano.object2Ds[1].pCustomPushData = &circ2;
+    vulkano.object2Ds[1].customPushDataSize = sizeof(circ2);
 
     bool stop = false;
-    int objIndex = 0;
-
-    int modelFileNameLen = 25;
-    char *modelFileName = new char[modelFileNameLen];
-    for (int i = 0; i < modelFileNameLen - 1; i++){
-        modelFileName[i] = '0';
-    }
-    modelFileName[modelFileNameLen - 2] = '\0';
-
-    int texFileNameLen = 25;
-    char *texFileName = new char[texFileNameLen];
-    for (int i = 0; i < texFileNameLen - 1; i++){
-        texFileName[i] = '0';
-    }
-    texFileName[texFileNameLen - 2] = '\0';
-
-    std::vector<glm::vec2> corners{{-1.0f, -1.0f}, {-1.0f, 1.0f}, {1.0, 1.0f}, {1.0f, -1.0f}};
-    vulkano.createScreenObject(corners);
-    vulkano.getScreenObjectsPointer()->renderSystemIndex = 2;
-
     float ownStuffTime = 0.0f;
     while (!stop){
         VkCommandBuffer commandBuffer = vulkano.startFrame();
         double ownStuffStartTime = glfwGetTime();
 
-        if (vulkano.shouldShowGUI()) GuiStuff(vulkano, modelFileName, modelFileNameLen, texFileName, texFileNameLen, objIndex, ownStuffTime);
+        if (vulkano.windowWasResized()){
+            vul::settings::renderHeight = vulkano.getSwapChainExtent().height;
+            vul::settings::renderWidth = std::min(static_cast<uint32_t>(vul::settings::renderHeight * aspect), vulkano.getSwapChainExtent().width);
+        }
 
-        static float time;
-        time += vulkano.getFrameTime();
-        time = fmod(time, 100.0f);
-        struct TestData{
-            float time = 1.0f;
-            float brightness = 0.1f;
-            float width = 0.1f;
-            float speed = 2.0f;
-            float angle = 10.0f;
-            int tentacleCount = 1;
-        } testData;
-        vul::VulScreenObject *obj = vulkano.getScreenObjectsPointer();
-        testData.time = time;
-        testData.brightness = brightness;
-        testData.width = width;
-        testData.speed = speed;
-        testData.angle = angle;
-        testData.tentacleCount = tentacleCount;
-        obj->pCustomPushData = static_cast<void *>(&testData);
-        obj->customPushDataSize = sizeof(TestData);
+        if (vulkano.shouldShowGUI()) GuiStuff(vulkano, ownStuffTime);
 
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);

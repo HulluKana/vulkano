@@ -150,22 +150,28 @@ void VulDevice::createLogicalDevice() {
     queueCreateInfos.push_back(queueCreateInfo);
   }
 
-  VkPhysicalDeviceFeatures deviceFeatures = {};
-  deviceFeatures.samplerAnisotropy = VK_TRUE;
+  VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddresFeature{};
+  bufferDeviceAddresFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+  bufferDeviceAddresFeature.bufferDeviceAddress = VK_TRUE;
 
- VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature {
-    .sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR,
-    .dynamicRendering = VK_TRUE,
-  };
+  VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature{};
+  dynamic_rendering_feature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
+  dynamic_rendering_feature.dynamicRendering = VK_TRUE;
+  dynamic_rendering_feature.pNext = &bufferDeviceAddresFeature;
+
+  VkPhysicalDeviceFeatures2 physicalFeatures2{};
+  physicalFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  physicalFeatures2.features.samplerAnisotropy = VK_TRUE;
+  physicalFeatures2.pNext = &dynamic_rendering_feature;
+  vkGetPhysicalDeviceFeatures2(physicalDevice, &physicalFeatures2);
 
   VkDeviceCreateInfo createInfo = {};
   createInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-  createInfo.pNext = &dynamic_rendering_feature;
 
   createInfo.queueCreateInfoCount = static_cast<uint32_t>(queueCreateInfos.size());
   createInfo.pQueueCreateInfos = queueCreateInfos.data();
 
-  createInfo.pEnabledFeatures = &deviceFeatures;
+  createInfo.pNext = &physicalFeatures2;
   createInfo.enabledExtensionCount = static_cast<uint32_t>(deviceExtensions.size());
   createInfo.ppEnabledExtensionNames = deviceExtensions.data();
 
@@ -417,7 +423,8 @@ void VulDevice::createBuffer(
     VkBufferUsageFlags usage,
     VkMemoryPropertyFlags properties,
     VkBuffer &buffer,
-    VkDeviceMemory &bufferMemory) {
+    VkDeviceMemory &bufferMemory,
+    bool rayTracable) {
   VkBufferCreateInfo bufferInfo{};
   bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
   bufferInfo.size = size;
@@ -431,10 +438,15 @@ void VulDevice::createBuffer(
   VkMemoryRequirements memRequirements;
   vkGetBufferMemoryRequirements(device_, buffer, &memRequirements);
 
+  VkMemoryAllocateFlagsInfo allocFlagsInfo{};
+  allocFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+  allocFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+
   VkMemoryAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
   allocInfo.allocationSize = memRequirements.size;
   allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+  if (rayTracable) allocInfo.pNext = &allocFlagsInfo;
 
   if (vkAllocateMemory(device_, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
     throw std::runtime_error("failed to allocate vertex buffer memory!");

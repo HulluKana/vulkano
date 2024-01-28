@@ -1,0 +1,40 @@
+#pragma once
+
+#include <memory>
+
+#include"vul_gltf_loader.hpp"
+#include"vul_buffer.hpp"
+
+class Scene
+{
+    public:
+        Scene(vulB::VulDevice &vulDevice);
+
+        void loadScene(std::string fileName);
+
+        std::vector<GltfLoader::GltfPrimMesh> meshes;
+        std::vector<GltfLoader::GltfNode> nodes;
+        std::vector<GltfLoader::Material> materials;
+
+        std::unique_ptr<vulB::VulBuffer> vertexBuffer;
+        std::unique_ptr<vulB::VulBuffer> normalBuffer;
+        std::unique_ptr<vulB::VulBuffer> uvBuffer;
+        std::unique_ptr<vulB::VulBuffer> indexBuffer;
+        std::unique_ptr<vulB::VulBuffer> materialBuffer;
+        std::unique_ptr<vulB::VulBuffer> primInfoBuffer;
+
+        int lightCount = 0;
+        std::vector<int> isLightVec;
+        std::vector<glm::vec4> lightPositions;
+        std::vector<glm::vec4> lightColors;
+        
+    private:
+        GltfLoader m_gltfLoader;
+        vulB::VulDevice &m_vulDevice; 
+
+        struct PrimitiveInfo{
+            uint32_t indexOffset;
+            uint32_t vertexOffset;
+            int materialIndex;
+        };
+};

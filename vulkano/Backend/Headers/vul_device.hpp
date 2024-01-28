@@ -59,7 +59,8 @@ class VulDevice {
       VkBufferUsageFlags usage,
       VkMemoryPropertyFlags properties,
       VkBuffer &buffer,
-      VkDeviceMemory &bufferMemory);
+      VkDeviceMemory &bufferMemory,
+      bool rayTracable = false);
   VkCommandBuffer beginSingleTimeCommands();
   void endSingleTimeCommands(VkCommandBuffer commandBuffer);
   void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -103,10 +104,10 @@ class VulDevice {
   VkQueue graphicsQueue_;
   VkQueue presentQueue_;
 
-  const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
-  const std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, VK_KHR_DEPTH_STENCIL_RESOLVE_EXTENSION_NAME, 
-                                                      VK_KHR_CREATE_RENDERPASS_2_EXTENSION_NAME, VK_KHR_MULTIVIEW_EXTENSION_NAME, VK_KHR_MAINTENANCE2_EXTENSION_NAME, VK_EXT_GRAPHICS_PIPELINE_LIBRARY_EXTENSION_NAME,
-                                                      VK_KHR_PIPELINE_LIBRARY_EXTENSION_NAME};
+  const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"}; // Enabled validation layers for normal use
+  // const std::vector<const char *> validationLayers = {}; // Disabled validation layers for nsight
+  const std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME, VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME, VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME, VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+                                                      VK_NV_RAY_TRACING_EXTENSION_NAME};
 };
 
-}  // namespace lve
+}

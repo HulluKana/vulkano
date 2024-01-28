@@ -1,6 +1,6 @@
 #pragma once
 
-#include"vul_object.hpp"
+#include"vul_transform.hpp"
 #include"vul_window.hpp"
 
 namespace vulB{
@@ -28,9 +28,9 @@ class MovementController{
             int resetAll = GLFW_KEY_R;
         };
 
-        void modifyValues(GLFWwindow *window, vul::Vul3DObject &object);
-        void rotate(GLFWwindow *window, float dt, vul::Vul3DObject &object, int screenWidth, int screenHeight);
-        void move(GLFWwindow *window, float dt, vul::Vul3DObject &object);
+        void modifyValues(GLFWwindow *window, vul::transform3D &transform);
+        void rotate(GLFWwindow *window, float dt, vul::transform3D &transform, int screenWidth, int screenHeight);
+        void move(GLFWwindow *window, float dt, vul::transform3D &transform);
 
         bool hideGUI = false;
 

@@ -8,11 +8,13 @@
 #include"Backend/Headers/vul_image.hpp"
 #include"Backend/Headers/vul_settings.hpp"
 
-#include<memory>
+#include"Backend/Headers/vul_host_device.hpp"
+#include"Backend/Headers/vul_2d_object.hpp"
+#include"Backend/Headers/vul_transform.hpp"
 
-#define MAX_LIGHTS 10
-#define MAX_TEXTURES 10
-#define MAX_UBOS 5
+#include<memory>
+#include<array>
+#include <vulkan/vulkan_core.h>
 
 namespace vul{
 
@@ -22,7 +24,7 @@ class Vulkano{
         vulB::VulDevice m_vulDevice{m_vulWindow}; // vulDevice has to be at the top to prevent some vulkan validation layer errors
 
     public:
-        Vulkano(uint32_t width, uint32_t height, std::string &name);
+        Vulkano(uint32_t width, uint32_t height, std::string name);
         ~Vulkano();
 
         void initVulkano();
@@ -44,19 +46,30 @@ class Vulkano{
         float getRenderFinishingTime() const {return m_renderFinishingTime;}
 
         bool shouldShowGUI() const {return !m_cameraController.hideGUI;}
+        bool windowWasResized() {return m_vulWindow.wasWindowResized();}
         
-        void loadObject(std::string file);
-        void createScreenObject(const std::vector<glm::vec2> &corners);
-        size_t getObjCount() {return m_objects.size();}
-        Vul3DObject *getObjectsPointer() {return m_objects.data();}
-        VulScreenObject *getScreenObjectsPointer() {return m_screenObjects.data();}
+        void createSquare(float x, float y, float width, float height);
+        void createTriangle(glm::vec2 corner1, glm::vec2 corner2, glm::vec2 corner3);
+        void loadScene(std::string fileName)
+        {
+            scene.loadScene(fileName);
+            hasScene = true;
+        }
         
         vulB::VulDevice &getVulDevice() {return m_vulDevice;}
+        VkExtent2D getSwapChainExtent() const {return m_vulRenderer.getSwapChainExtent();}
 
-        bool updateGlobalDescriptorSets();
-        bool updateImGuiDescriptorSets();
-        
-        void createNewRenderSystem(std::string vertShaderName = "", std::string fragShaderName = ""); 
+        bool createGlobalDescriptorSets();
+        bool createImGuiDescriptorSets();
+
+        void createNewRenderSystem(const std::vector<VkDescriptorSetLayout> &setLayouts, bool is2D = false, std::string vertShaderName = "", std::string fragShaderName = ""); 
+
+        VkDescriptorSetLayout getGlobalSetLayout() const {return m_globalSetLayout->getDescriptorSetLayout();}
+
+        Scene scene{m_vulDevice};
+        bool hasScene = false;
+
+        std::vector<Object2D> object2Ds;
 
         std::array<std::shared_ptr<VulImage>, MAX_TEXTURES> images;
         uint32_t imageCount = 0u;
@@ -71,26 +84,26 @@ class Vulkano{
         float m_GuiRenderTime;
         float m_renderFinishingTime;
 
+        VkExtent2D m_prevWindowSize;
+
         vulB::VulRenderer m_vulRenderer{m_vulWindow, m_vulDevice};
         vulB::VulGUI m_vulGUI;
 
         std::unique_ptr<vulB::VulDescriptorPool> m_globalPool{};
-        std::vector<Vul3DObject> m_objects;
-        std::vector<VulScreenObject> m_screenObjects;
         VulImage m_emptyImage{m_vulDevice};
 
         std::vector<std::unique_ptr<vulB::VulBuffer>> m_uboBuffers;
-        std::vector<VkDescriptorSet> m_globalDescriptorSets;
+        std::vector<vulB::VulDescriptorSet> m_globalDescriptorSets;
         std::unique_ptr<vulB::VulDescriptorSetLayout> m_globalSetLayout;
 
         std::unique_ptr<vulB::VulDescriptorSetLayout> m_imGuiSetLayout;
         // Descriptor set layout for maxFramesInFlight of 2 is:
         // frame 0 image 0, frame 1 image 0, frame 0, image 1, frame 1, image 1
         // So properly indexing into this vector is (imageIndex * maxFramesInFlight + currentFrameIndex)
-        std::vector<VkDescriptorSet> m_imGuiDescriptorSets;
+        std::vector<vulB::VulDescriptorSet> m_imGuiDescriptorSets;
 
         vulB::VulCamera m_camera{};
-        Vul3DObject m_cameraObject;
+        transform3D m_cameraTransform;
         vulB::MovementController m_cameraController;
-};
+   };
 }

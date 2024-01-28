@@ -1,9 +1,9 @@
 #include"../Headers/vul_pipeline.hpp"
-#include"../Headers/vul_model.hpp"
 
 #include<fstream>
 #include<stdexcept>
 #include<iostream>
+#include <vulkan/vulkan_core.h>
 
 namespace vulB{
 
@@ -41,8 +41,8 @@ void VulPipeline::createGraphicsPipeline(const std::string& vertFile, const std:
     std::vector<char> vertCode = readFile(vertFile);
     std::vector<char> fragCode = readFile(fragFile);
 
-    createShaderModule(vertCode, &vertShaderModule);
-    createShaderModule(fragCode, &fragShaderModule);
+    createShaderModule(vulDevice, vertCode, &vertShaderModule);
+    createShaderModule(vulDevice, fragCode, &fragShaderModule);
 
     VkPipelineShaderStageCreateInfo shaderStages[2]{};
     shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
@@ -61,14 +61,12 @@ void VulPipeline::createGraphicsPipeline(const std::string& vertFile, const std:
     shaderStages[1].pNext = nullptr;
     shaderStages[1].pSpecializationInfo = nullptr;
 
-    std::vector<VkVertexInputAttributeDescription> attributeDescription = VulModel::Vertex::getAttributeDescriptions();
-    std::vector<VkVertexInputBindingDescription> bindingDescriptions = VulModel::Vertex::getBindingDescriptions();
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescription.size());
-    vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
-    vertexInputInfo.pVertexAttributeDescriptions = attributeDescription.data();
-    vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(configInfo.attributeDescriptions.size());
+    vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(configInfo.bindingDescriptions.size());
+    vertexInputInfo.pVertexAttributeDescriptions = configInfo.attributeDescriptions.data();
+    vertexInputInfo.pVertexBindingDescriptions = configInfo.bindingDescriptions.data();
 
     VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
     pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
@@ -102,7 +100,7 @@ void VulPipeline::createGraphicsPipeline(const std::string& vertFile, const std:
     }
 }
 
-void VulPipeline::createShaderModule(const std::vector<char>& code, VkShaderModule* shaderModule)
+void VulPipeline::createShaderModule(VulDevice &vulDevice, const std::vector<char>& code, VkShaderModule* shaderModule)
 {
     VkShaderModuleCreateInfo createInfo{};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;

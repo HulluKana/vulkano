@@ -10,9 +10,11 @@
 // std
 #include <cassert>
 #include <cstring>
+#include <memory>
+#include <vulkan/vulkan_core.h>
  
 namespace vulB {
- 
+
 /**
  * Returns the minimum instance size required to be compatible with devices minOffsetAlignment
  *
@@ -35,6 +37,7 @@ VulBuffer::VulBuffer(
     uint32_t instanceCount,
     VkBufferUsageFlags usageFlags,
     VkMemoryPropertyFlags memoryPropertyFlags,
+    bool rayTracable,
     VkDeviceSize minOffsetAlignment)
     : vulDevice{device},
       instanceSize{instanceSize},
@@ -43,7 +46,7 @@ VulBuffer::VulBuffer(
       memoryPropertyFlags{memoryPropertyFlags} {
   alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
   bufferSize = alignmentSize * instanceCount;
-  device.createBuffer(bufferSize, usageFlags, memoryPropertyFlags, buffer, memory);
+  device.createBuffer(bufferSize, usageFlags, memoryPropertyFlags, buffer, memory, rayTracable);
 }
  
 VulBuffer::~VulBuffer() {

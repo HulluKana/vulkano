@@ -65,12 +65,14 @@ VulSwapChain::~VulSwapChain() {
 }
 
 VkResult VulSwapChain::acquireNextImage(uint32_t *imageIndex) {
-  vkWaitForFences(
+  VkResult fenceResult = vkWaitForFences(
       device.device(),
       1,
       &inFlightFences[currentFrame],
       VK_TRUE,
       std::numeric_limits<uint64_t>::max());
+  if (fenceResult != VK_SUCCESS) throw std::runtime_error("Waiting for fences in VulSwapChain::acquireNextImage failed with error code of " 
+                                                          + std::to_string(fenceResult) + ". Usually it's VK_ERROR_DEVICE_LOST, which has error code of -4");
 
   VkResult result = vkAcquireNextImageKHR(
       device.device(),
