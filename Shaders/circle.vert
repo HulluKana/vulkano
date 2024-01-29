@@ -16,9 +16,9 @@ layout (push_constant) uniform Push{
 
 void main()
 {
-    const float roomForError = 0.01;
+    const float roomForError = 0.00;
     vec3 adjustedPos = vec3(position.x * (push.radius + roomForError) + push.x, position.y * (push.radius + roomForError) + push.y, position.z);
     gl_Position = vec4(adjustedPos, 1.0f);
-    fragPos = adjustedPos.xyz;
+    fragPos = adjustedPos;
     fragTexCoord = uv;
 }

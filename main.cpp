@@ -20,6 +20,7 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime)
 int main()
 {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
+    vulkano.loadScene("../Models/Room.glb");
     vulkano.initVulkano();
     constexpr double aspect = 480.0f / 360.0f;
     vul::settings::renderHeight = vulkano.getSwapChainExtent().height;
@@ -40,11 +41,11 @@ int main()
     CirclePC circ1;
     circ1.x = -0.3f;
     circ1.y = -0.6f;
-    circ1.radius = 0.45f;
+    circ1.radius = 0.15f;
     CirclePC circ2;
-    circ2.x = 0.2f;
-    circ2.y = 0.2f;
-    circ2.radius = 0.8f;
+    circ2.x = 0.0f;
+    circ2.y = 0.0f;
+    circ2.radius = 0.5f;
 
     vulkano.object2Ds[0].pCustomPushData = &circ1;
     vulkano.object2Ds[0].customPushDataSize = sizeof(circ1);
@@ -67,6 +68,8 @@ int main()
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);
     }
+
+    vulkano.letVulkanoFinish();
 
     return 0;
 }

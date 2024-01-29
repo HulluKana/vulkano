@@ -148,7 +148,6 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
     double renderFinishStartTime = glfwGetTime();
     m_vulRenderer.stopRendering(commandBuffer);
     m_vulRenderer.endFrame();
-    vkDeviceWaitIdle(m_vulDevice.device());
     m_renderFinishingTime = glfwGetTime() - renderFinishStartTime;
 
     return m_vulWindow.shouldClose();

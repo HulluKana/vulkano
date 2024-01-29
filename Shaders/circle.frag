@@ -14,7 +14,7 @@ layout (push_constant) uniform Push{
 void main()
 {
     const float aspect = 4.0 / 3.0;
-    if (distance(vec2(fragPos.x * aspect, fragPos.y), vec2(push.x, push.y)) > push.radius) discard;
+    if (distance(vec2(fragPos.x * aspect, fragPos.y), vec2(push.x * aspect, push.y)) > push.radius) discard;
 
     FragColor = vec4(1.0, 1.0, 1.0, 1.0);
 }

@@ -28,6 +28,7 @@ class Vulkano{
         ~Vulkano();
 
         void initVulkano();
+        void letVulkanoFinish() {vkDeviceWaitIdle(m_vulDevice.device());}
 
         /* These 2 lines remove the copy constructor and operator from Vulkano class.
         Because I'm using a pointer to stuff and that stuff is initialized by constructor and removed by destructor,
