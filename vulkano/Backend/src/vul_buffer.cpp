@@ -152,7 +152,7 @@ VkResult VulBuffer::invalidate(VkDeviceSize size, VkDeviceSize offset) {
  *
  * @return VkDescriptorBufferInfo of specified offset and range
  */
-VkDescriptorBufferInfo VulBuffer::descriptorInfo(VkDeviceSize size, VkDeviceSize offset) {
+VkDescriptorBufferInfo VulBuffer::descriptorInfo(VkDeviceSize size, VkDeviceSize offset) const{
   return VkDescriptorBufferInfo{
       buffer,
       offset,

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "Backend/Headers/vul_buffer.hpp"
 #include"Backend/Headers/vul_device.hpp"
 #include"Backend/Headers/vul_descriptors.hpp"
 #include"Backend/Headers/vul_GUI.hpp"
@@ -14,6 +15,7 @@
 
 #include<memory>
 #include<array>
+#include<variant>
 #include <vulkan/vulkan_core.h>
 
 namespace vul{
@@ -60,6 +62,31 @@ class Vulkano{
         vulB::VulDevice &getVulDevice() {return m_vulDevice;}
         VkExtent2D getSwapChainExtent() const {return m_vulRenderer.getSwapChainExtent();}
 
+        enum class DescriptorType{
+            ubo,
+            ssbo,
+            combinedTexSampler,
+            spCombinedTexSampler
+        };
+        enum class ShaderStage{
+            frag = VK_SHADER_STAGE_FRAGMENT_BIT,
+            vert = VK_SHADER_STAGE_VERTEX_BIT
+        };
+        struct Descriptor{
+            DescriptorType type;
+            std::vector<ShaderStage> stages;
+            void *content;
+            uint32_t count = 1;
+        };
+        struct descSetReturnVal{
+            vulB::VulDescriptorSet set;
+            std::unique_ptr<vulB::VulDescriptorSetLayout> layout;
+            bool succeeded;
+        };
+        descSetReturnVal createDescriptorSet(const std::vector<Descriptor> &descriptors);
+
+
+
         bool createGlobalDescriptorSets();
         bool createImGuiDescriptorSets();
 
@@ -91,16 +118,11 @@ class Vulkano{
         vulB::VulGUI m_vulGUI;
 
         std::unique_ptr<vulB::VulDescriptorPool> m_globalPool{};
-        VulImage m_emptyImage{m_vulDevice};
 
         std::vector<std::unique_ptr<vulB::VulBuffer>> m_uboBuffers;
         std::vector<vulB::VulDescriptorSet> m_globalDescriptorSets;
         std::unique_ptr<vulB::VulDescriptorSetLayout> m_globalSetLayout;
 
-        std::unique_ptr<vulB::VulDescriptorSetLayout> m_imGuiSetLayout;
-        // Descriptor set layout for maxFramesInFlight of 2 is:
-        // frame 0 image 0, frame 1 image 0, frame 0, image 1, frame 1, image 1
-        // So properly indexing into this vector is (imageIndex * maxFramesInFlight + currentFrameIndex)
         std::vector<vulB::VulDescriptorSet> m_imGuiDescriptorSets;
 
         vulB::VulCamera m_camera{};

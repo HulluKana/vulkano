@@ -34,6 +34,7 @@ void VulImage::createTextureFromFile(std::string fileName, bool modifyLater)
     }
     if (!modifyLater) createTextureImage(pixels);
     else createModifiableTextureImage(pixels);
+    stbi_image_free(pixels);
 }
 
 void VulImage::createTextureFromData(uint8_t* pixels, uint32_t width, uint32_t height, bool modifyLater)
@@ -120,7 +121,6 @@ void VulImage::createTextureImage(uint8_t* pixels)
     stagingBuffer.map(imageSize);
     memcpy(stagingBuffer.getMappedMemory(), pixels, static_cast<size_t>(imageSize));
     stagingBuffer.unmap();
-    stbi_image_free(pixels);
 
     createImage(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
     transitionImageLayout(VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);

@@ -1,11 +1,12 @@
-#include "vulkano/Backend/Headers/vul_settings.hpp"
 #include"vulkano/vulkano_program.hpp"
-#include"vulkano/vulkano_GUI_tools.hpp"
 
 #include"3rdParty/imgui/imgui.h"
 
 #include <cmath>
+#include <cstdint>
+#include <cstdlib>
 #include<iostream>
+#include <memory>
 
 void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime)
 {   
@@ -20,6 +21,7 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime)
 int main()
 {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
+    vulkano.loadScene("../Models/Room.glb");
     vulkano.initVulkano();
     constexpr double aspect = 480.0f / 360.0f;
     vul::settings::renderHeight = vulkano.getSwapChainExtent().height;

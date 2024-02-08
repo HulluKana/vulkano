@@ -1,6 +1,9 @@
 #include"../../vulkano_program.hpp"
 
 #include"../../../3rdParty/imgui/imgui.h"
+#include <memory>
+#include <stdexcept>
+#include <variant>
 #include <vulkan/vulkan_core.h>
 
 #define GLM_FORCE_RADIANS
@@ -35,28 +38,61 @@ void Vulkano::initVulkano()
         .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * 12)
         .build();
 
-    for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
+    for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
         std::unique_ptr<VulBuffer> globalBuffer;
         globalBuffer = std::make_unique<VulBuffer>  (m_vulDevice, sizeof(GlobalUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
-                                                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_vulDevice.properties.limits.minUniformBufferOffsetAlignment);
+                                                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, false, m_vulDevice.properties.limits.minUniformBufferOffsetAlignment);
         globalBuffer->map();
         m_uboBuffers.push_back(std::move(globalBuffer));
     }
 
     uint8_t *data = new uint8_t[16]{255, 0, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 0, 255, 255};
-    m_emptyImage.createTextureFromData(data, 2, 2);
+    std::shared_ptr<VulImage> emptyImage = VulImage::createAsUniquePtr(m_vulDevice);
+    emptyImage->createTextureFromData(data, 2, 2);
+    for (uint32_t i = imageCount; i < MAX_TEXTURES; i++)
+        images[i] = emptyImage;
 
-    m_globalSetLayout = VulDescriptorSetLayout::Builder(m_vulDevice)
-        .addBinding(0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR)
-        .addBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, MAX_TEXTURES)
-        .addBinding(2, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR)
-        .build();
-    createGlobalDescriptorSets();
+    for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
+        std::vector<Descriptor> descs;
+        Descriptor ubo{}; 
+        ubo.type = DescriptorType::ubo;
+        ubo.content = m_uboBuffers[i].get();
+        ubo.stages = {ShaderStage::vert, ShaderStage::frag};
+        descs.push_back(ubo);
 
-    m_imGuiSetLayout = VulDescriptorSetLayout::Builder(m_vulDevice)
-        .addBinding(0, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT)
-        .build();
-    createImGuiDescriptorSets();
+        Descriptor image{};
+        image.type = DescriptorType::spCombinedTexSampler;
+        image.content = &images[0];
+        image.count = MAX_TEXTURES;
+        image.stages = {ShaderStage::frag};
+        descs.push_back(image);
+
+        if (hasScene){
+            Descriptor matBuf{};
+            matBuf.type = DescriptorType::ssbo;
+            matBuf.content = scene.materialBuffer.get();
+            matBuf.stages = {ShaderStage::frag};
+            descs.push_back(matBuf);
+        }
+        descSetReturnVal retVal = createDescriptorSet(descs);
+        if (!retVal.succeeded) throw std::runtime_error("Failed to create global descriptor sets");
+        m_globalDescriptorSets.push_back(std::move(retVal.set));
+        m_globalSetLayout = std::move(retVal.layout);
+    }
+
+    for (uint32_t i = 0; i < imageCount; i++){
+        if (!images[i]->usableByImGui) continue;
+
+        Descriptor image{};
+        image.type = DescriptorType::combinedTexSampler;
+        image.content = images[i].get();
+        image.stages = {ShaderStage::frag};
+
+        descSetReturnVal retVal = createDescriptorSet({image});
+        if (!retVal.succeeded) throw std::runtime_error("Failed to create imgui image descriptor sets");
+        images[i]->setDescriptorSet(retVal.set.getSet());
+        m_imGuiDescriptorSets.push_back(std::move(retVal.set));
+    }
 
     std::vector<VkDescriptorSetLayout> defaultSetLayouts{m_globalSetLayout->getDescriptorSetLayout()};
     createNewRenderSystem(defaultSetLayouts); // Default 3D render system
@@ -170,62 +206,62 @@ void Vulkano::createTriangle(glm::vec2 corner1, glm::vec2 corner2, glm::vec2 cor
     object2Ds.push_back(std::move(object));
 }
 
-bool Vulkano::createGlobalDescriptorSets()
+Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descriptor> &descriptors)
 {
-    VkDescriptorImageInfo imageInfo[MAX_TEXTURES];
-    for (size_t j = 0; j < MAX_TEXTURES; j++){
-        imageInfo[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        if (j < imageCount){
-            imageInfo[j].imageView = images[j]->getImageView();
-            imageInfo[j].sampler = images[j]->getTextureSampler();
-        } else{
-            imageInfo[j].imageView = m_emptyImage.getImageView();
-            imageInfo[j].sampler = m_emptyImage.getTextureSampler();
-        }
+    VulDescriptorSetLayout::Builder layoutBuilder = VulDescriptorSetLayout::Builder(m_vulDevice);
+    for (size_t i = 0; i < descriptors.size(); i++){
+        int stageFlags = 0;
+        for (size_t j = 0; j < descriptors[i].stages.size(); j++)
+            stageFlags |= static_cast<int>(descriptors[i].stages[j]);
+        VkDescriptorType type;
+        if (descriptors[i].type == DescriptorType::ubo) type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        else if (descriptors[i].type == DescriptorType::ssbo) type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        else if (descriptors[i].type == DescriptorType::combinedTexSampler ||
+            descriptors[i].type == DescriptorType::spCombinedTexSampler)
+            type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        layoutBuilder.addBinding(i, type, stageFlags, descriptors[i].count);
     }
-    for (size_t i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-        VkDescriptorBufferInfo bufferInfo = m_uboBuffers[i]->descriptorInfo();
-        VkDescriptorBufferInfo matBufInfo;
-        if (hasScene) matBufInfo = scene.materialBuffer->descriptorInfo();
-        VulDescriptorSet vulSet(*m_globalSetLayout, *m_globalPool);
-        vulSet.writeBuffer(0, &bufferInfo)
-            .writeImage(1, imageInfo, MAX_TEXTURES);
-        if (hasScene) vulSet.writeBuffer(2, &matBufInfo);
-        vulSet.build();
-        if (!vulSet.hasSet()){
-            fprintf(stderr, "Allocating globalDescriptorSets\n");
-            return false;
+    std::unique_ptr<VulDescriptorSetLayout> layout = layoutBuilder.build();
+
+    VulDescriptorSet set(*layout, *m_globalPool);
+    std::vector<std::vector<VkDescriptorBufferInfo>> bufferInfosStorage;
+    std::vector<std::vector<VkDescriptorImageInfo>> imageInfosStorage;
+    for (size_t i = 0; i < descriptors.size(); i++){
+        const Descriptor &desc = descriptors[i];
+        if (desc.type == DescriptorType::ubo || desc.type == DescriptorType::ssbo){
+            VulBuffer *buffer = static_cast<VulBuffer *>(desc.content);
+            std::vector<VkDescriptorBufferInfo> bufferInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++)
+                bufferInfos[j] = buffer[j].descriptorInfo();
+            bufferInfosStorage.push_back(bufferInfos);
+            set.writeBuffer(i, bufferInfosStorage[bufferInfosStorage.size() - 1].data(), desc.count);
         }
-        m_globalDescriptorSets.push_back(std::move(vulSet));
-    }
-
-    return true;
-}
-
-bool Vulkano::createImGuiDescriptorSets()
-{ 
-    std::vector<uint32_t> imguiImages;
-    for (uint32_t i = 0; i < imageCount; i++){
-        if (!images[i]->usableByImGui) continue;
-        imguiImages.push_back(i);
-        for (int j = 0; j < VulSwapChain::MAX_FRAMES_IN_FLIGHT; j++){
-            VkDescriptorImageInfo imageInfo;
-            imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            imageInfo.imageView = images[i]->getImageView();
-            imageInfo.sampler = images[i]->getTextureSampler();
-
-            VulDescriptorSet vulSet(*m_imGuiSetLayout, *m_globalPool);
-            vulSet.writeImage(0, &imageInfo)
-                .build();
-            if (!vulSet.hasSet()){
-                fprintf(stderr, "Allocating descriptorSets for imGuiImages\n");
-                return false;
+        if (desc.type == DescriptorType::combinedTexSampler){
+            VulImage *image = static_cast<VulImage *>(desc.content);
+            std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++){
+                imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfos[j].imageView = image[j].getImageView();
+                imageInfos[j].sampler = image[j].getTextureSampler();
             }
-            m_imGuiDescriptorSets.push_back(std::move(vulSet));
+            imageInfosStorage.push_back(imageInfos);
+            set.writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
+        }
+        if (desc.type == DescriptorType::spCombinedTexSampler){
+            std::shared_ptr<VulImage> *image = static_cast<std::shared_ptr<VulImage> *>(desc.content);
+            std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++){
+                imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfos[j].imageView = image[j]->getImageView();
+                imageInfos[j].sampler = image[j]->getTextureSampler();
+            }
+            imageInfosStorage.push_back(imageInfos);
+            set.writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
         }
     }
+    set.build();
 
-    return true;
+    return {std::move(set), std::move(layout), set.hasSet()};
 }
 
 void Vulkano::createNewRenderSystem(const std::vector<VkDescriptorSetLayout> &setLayouts, bool is2D, std::string vertShaderName, std::string fragShaderName)

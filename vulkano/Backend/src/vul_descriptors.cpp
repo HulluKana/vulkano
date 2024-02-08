@@ -3,6 +3,7 @@
 // std
 #include <cassert>
 #include <stdexcept>
+#include <iostream>
 #include <vulkan/vulkan_core.h>
  
 namespace vulB {
@@ -158,7 +159,7 @@ VulDescriptorSet &VulDescriptorSet::writeBuffer(
     write.descriptorCount = descriptorCount;
 
     m_writes.push_back(write);
-
+    
     DescriptorInfo descInfo{};
     for (uint32_t i = 0; i < descriptorCount; i++)
         descInfo.bufferInfos.push_back(bufferInfo[i]);

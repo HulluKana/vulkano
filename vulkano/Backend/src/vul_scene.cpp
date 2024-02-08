@@ -73,7 +73,7 @@ void Scene::loadScene(std::string fileName)
     uvBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, m_gltfLoader.uvCoords, 
         VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
     materialBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, packedMaterials, 
-        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
+        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
     primInfoBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, primLookup, 
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
 

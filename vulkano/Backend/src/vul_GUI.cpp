@@ -1,10 +1,9 @@
 #include"../Headers/vul_GUI.hpp"
 
-#include<imgui.h>
-#include<imconfig.h>
-#include<imgui_internal.h>
-#include<imgui_impl_vulkan.h>
-#include<imgui_impl_glfw.h>
+#include"../../../3rdParty/imgui/imgui.h"
+#include"../../../3rdParty/imgui/imgui_internal.h"
+#include"../../../3rdParty/imgui/imgui_impl_vulkan.h"
+#include"../../../3rdParty/imgui/imgui_impl_glfw.h"
 
 namespace vulB{
 
