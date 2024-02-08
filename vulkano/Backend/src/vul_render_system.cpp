@@ -109,4 +109,18 @@ void RenderSystem::render(Object2D &obj, std::vector<VkDescriptorSet> &descripto
     obj.draw(commandBuffer);
 }
 
+void RenderSystem::render(std::vector<Object2D> &objs, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer)
+{
+    vulPipeline->bind(commandBuffer);
+
+    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+    objs[0].bind(commandBuffer);
+    for (size_t i = 0; i < objs.size(); i++){
+        if (objs[i].customPushDataSize > 0) vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 
+            0, objs[i].customPushDataSize, objs[i].pCustomPushData);
+        objs[i].draw(commandBuffer);
+    }
+}
+
 }

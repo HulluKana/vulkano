@@ -20,37 +20,27 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime)
 int main()
 {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
-    vulkano.loadScene("../Models/Room.glb");
     vulkano.initVulkano();
     constexpr double aspect = 480.0f / 360.0f;
     vul::settings::renderHeight = vulkano.getSwapChainExtent().height;
     vul::settings::renderWidth = std::min(static_cast<uint32_t>(vul::settings::renderHeight * aspect), vulkano.getSwapChainExtent().width);
+    vul::settings::batchRender2Ds = true;
 
-    const double radius = 1.0;
-    const double cornerX = radius * sqrt(3.0);
-    vulkano.createTriangle({-cornerX, radius}, {cornerX, radius}, {0.0, -radius * 2.0});
-    vulkano.createTriangle({-cornerX, radius}, {cornerX, radius}, {0.0, -radius * 2.0});
     vulkano.createNewRenderSystem({vulkano.getGlobalSetLayout()}, true, "../bin/circle.vert.spv", "../bin/circle.frag.spv");
 
     struct CirclePC{
-        float x;
-        float y;
-        float radius;
+        float x = 0.0f;
+        float y = 0.0f;
+        float radius = 1.0f;
     };
-
-    CirclePC circ1;
-    circ1.x = -0.3f;
-    circ1.y = -0.6f;
-    circ1.radius = 0.15f;
-    CirclePC circ2;
-    circ2.x = 0.0f;
-    circ2.y = 0.0f;
-    circ2.radius = 0.5f;
-
-    vulkano.object2Ds[0].pCustomPushData = &circ1;
-    vulkano.object2Ds[0].customPushDataSize = sizeof(circ1);
-    vulkano.object2Ds[1].pCustomPushData = &circ2;
-    vulkano.object2Ds[1].customPushDataSize = sizeof(circ2);
+    const double radius = 1.0;
+    const double cornerX = radius * sqrt(3.0);
+    std::array<CirclePC, 500> circles;
+    for (int i = 0; i < 500; i++){
+        vulkano.createTriangle({-cornerX, radius}, {cornerX, radius}, {0.0, -radius * 2.0});
+        vulkano.object2Ds[i].pCustomPushData = &circles[i];
+        vulkano.object2Ds[i].customPushDataSize = sizeof(circles[i]);
+    }
 
     bool stop = false;
     float ownStuffTime = 0.0f;

@@ -135,8 +135,11 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
     if (object2Ds.size() > 0){
         std::vector<VkDescriptorSet> defaultDescriptorSets;
         defaultDescriptorSets.push_back(m_globalDescriptorSets[frameIdx].getSet());
-        for (Object2D &obj : object2Ds){
-            renderSystems[obj.renderSystemIndex]->render(obj, defaultDescriptorSets, commandBuffer);
+        if (vul::settings::batchRender2Ds) renderSystems[object2Ds[0].renderSystemIndex]->render(object2Ds, defaultDescriptorSets, commandBuffer);
+        else{
+            for (Object2D &obj : object2Ds){
+                renderSystems[obj.renderSystemIndex]->render(obj, defaultDescriptorSets, commandBuffer);
+            }
         }
     }
     m_objRenderTime = glfwGetTime() - objRenderStartTime;

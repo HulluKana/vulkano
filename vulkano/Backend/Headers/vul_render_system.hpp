@@ -31,6 +31,7 @@ class RenderSystem{
                
         void render(const Scene &scene, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer);
         void render(Object2D &obj, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer);
+        void render(std::vector<Object2D> &objs, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer);
 
         uint32_t index = 0;
         

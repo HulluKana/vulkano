@@ -13,6 +13,8 @@ public:
 
     static inline float maxFps{60.0f};
 
+    static inline bool batchRender2Ds{false};
+
     struct CameraProperties{
         bool hasPerspective = true;
         float fovY = 80.0f * (M_PI * 2.0f / 360.0f);
