@@ -11,6 +11,7 @@
 
 #include"Backend/Headers/vul_host_device.hpp"
 #include"Backend/Headers/vul_2d_object.hpp"
+#include "Backend/Headers/vul_swap_chain.hpp"
 #include"Backend/Headers/vul_transform.hpp"
 
 #include<memory>
@@ -83,26 +84,23 @@ class Vulkano{
             std::unique_ptr<vulB::VulDescriptorSetLayout> layout;
             bool succeeded;
         };
+
         descSetReturnVal createDescriptorSet(const std::vector<Descriptor> &descriptors);
-
-
-
-        bool createGlobalDescriptorSets();
-        bool createImGuiDescriptorSets();
-
-        void createNewRenderSystem(const std::vector<VkDescriptorSetLayout> &setLayouts, bool is2D = false, std::string vertShaderName = "", std::string fragShaderName = ""); 
-
-        VkDescriptorSetLayout getGlobalSetLayout() const {return m_globalSetLayout->getDescriptorSetLayout();}
+        std::unique_ptr<RenderSystem> createNewRenderSystem(const std::vector<VkDescriptorSetLayout> &setLayouts, std::string vertShaderName, std::string fragShaderName, bool is2D); 
 
         Scene scene{m_vulDevice};
         bool hasScene = false;
 
-        std::vector<Object2D> object2Ds;
+        std::unique_ptr<RenderSystem> renderSystem3D;
+        std::unique_ptr<RenderSystem> renderSystem2D;
+        std::vector<vulB::VulDescriptorSet> mainDescriptorSets;
+        std::unique_ptr<vulB::VulDescriptorSetLayout> mainSetLayout;
+        std::vector<std::unique_ptr<vulB::VulBuffer>> buffers;
+        bool usesDefaultDescriptorSets = false;
 
+        std::vector<Object2D> object2Ds;
         std::array<std::shared_ptr<VulImage>, MAX_TEXTURES> images;
         uint32_t imageCount = 0u;
-
-        std::vector<std::unique_ptr<RenderSystem>> renderSystems;
     private:
         double m_currentTime;
         float m_frameTime;
@@ -118,11 +116,6 @@ class Vulkano{
         vulB::VulGUI m_vulGUI;
 
         std::unique_ptr<vulB::VulDescriptorPool> m_globalPool{};
-
-        std::vector<std::unique_ptr<vulB::VulBuffer>> m_uboBuffers;
-        std::vector<vulB::VulDescriptorSet> m_globalDescriptorSets;
-        std::unique_ptr<vulB::VulDescriptorSetLayout> m_globalSetLayout;
-
         std::vector<vulB::VulDescriptorSet> m_imGuiDescriptorSets;
 
         vulB::VulCamera m_camera{};

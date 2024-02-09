@@ -18,7 +18,19 @@ namespace vul{
 
 Vulkano::Vulkano(uint32_t width, uint32_t height, std::string name) : m_vulWindow{(int)width, (int)height, name}
 {
+    m_globalPool = VulDescriptorPool::Builder(m_vulDevice)
+        .setMaxSets(m_vulDevice.properties.limits.maxBoundDescriptorSets)
+        .setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
+        .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 50)
+        .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 50)
+        .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 50)
+        .build();
 
+    uint8_t *data = new uint8_t[16]{255, 0, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 0, 255, 255};
+    std::shared_ptr<VulImage> emptyImage = VulImage::createAsUniquePtr(m_vulDevice);
+    emptyImage->createTextureFromData(data, 2, 2);
+    for (uint32_t i = 0; i < MAX_TEXTURES; i++)
+        images[i] = emptyImage;
 }
 
 Vulkano::~Vulkano()
@@ -28,58 +40,6 @@ Vulkano::~Vulkano()
 
 void Vulkano::initVulkano()
 {
-    m_globalPool = VulDescriptorPool::Builder(m_vulDevice)
-        .setMaxSets(m_vulDevice.properties.limits.maxBoundDescriptorSets)
-        .setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * 5)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * MAX_TEXTURES * 2)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VulSwapChain::MAX_FRAMES_IN_FLIGHT)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VulSwapChain::MAX_FRAMES_IN_FLIGHT)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VulSwapChain::MAX_FRAMES_IN_FLIGHT * 12)
-        .build();
-
-    for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-        std::unique_ptr<VulBuffer> globalBuffer;
-        globalBuffer = std::make_unique<VulBuffer>  (m_vulDevice, sizeof(GlobalUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
-                                                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, false, m_vulDevice.properties.limits.minUniformBufferOffsetAlignment);
-        globalBuffer->map();
-        m_uboBuffers.push_back(std::move(globalBuffer));
-    }
-
-    uint8_t *data = new uint8_t[16]{255, 0, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 0, 255, 255};
-    std::shared_ptr<VulImage> emptyImage = VulImage::createAsUniquePtr(m_vulDevice);
-    emptyImage->createTextureFromData(data, 2, 2);
-    for (uint32_t i = imageCount; i < MAX_TEXTURES; i++)
-        images[i] = emptyImage;
-
-    for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-        std::vector<Descriptor> descs;
-        Descriptor ubo{}; 
-        ubo.type = DescriptorType::ubo;
-        ubo.content = m_uboBuffers[i].get();
-        ubo.stages = {ShaderStage::vert, ShaderStage::frag};
-        descs.push_back(ubo);
-
-        Descriptor image{};
-        image.type = DescriptorType::spCombinedTexSampler;
-        image.content = &images[0];
-        image.count = MAX_TEXTURES;
-        image.stages = {ShaderStage::frag};
-        descs.push_back(image);
-
-        if (hasScene){
-            Descriptor matBuf{};
-            matBuf.type = DescriptorType::ssbo;
-            matBuf.content = scene.materialBuffer.get();
-            matBuf.stages = {ShaderStage::frag};
-            descs.push_back(matBuf);
-        }
-        descSetReturnVal retVal = createDescriptorSet(descs);
-        if (!retVal.succeeded) throw std::runtime_error("Failed to create global descriptor sets");
-        m_globalDescriptorSets.push_back(std::move(retVal.set));
-        m_globalSetLayout = std::move(retVal.layout);
-    }
-
     for (uint32_t i = 0; i < imageCount; i++){
         if (!images[i]->usableByImGui) continue;
 
@@ -93,9 +53,6 @@ void Vulkano::initVulkano()
         images[i]->setDescriptorSet(retVal.set.getSet());
         m_imGuiDescriptorSets.push_back(std::move(retVal.set));
     }
-
-    std::vector<VkDescriptorSetLayout> defaultSetLayouts{m_globalSetLayout->getDescriptorSetLayout()};
-    createNewRenderSystem(defaultSetLayouts); // Default 3D render system
 
     m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), m_vulRenderer, m_vulDevice);
 
@@ -134,19 +91,21 @@ VkCommandBuffer Vulkano::startFrame()
         m_prevWindowSize = m_vulRenderer.getSwapChainExtent();
         int frameIndex = m_vulRenderer.getFrameIndex();
 
-        GlobalUbo ubo{};
-        ubo.projectionMatrix = m_camera.getProjection();
-        ubo.viewMatrix = m_camera.getView();
-        ubo.cameraPosition = glm::vec4(m_cameraTransform.pos, 0.0f);
+        if (usesDefaultDescriptorSets){
+            GlobalUbo ubo{};
+            ubo.projectionMatrix = m_camera.getProjection();
+            ubo.viewMatrix = m_camera.getView();
+            ubo.cameraPosition = glm::vec4(m_cameraTransform.pos, 0.0f);
 
-        ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.02f);
-        ubo.numLights = scene.lightCount;
-        for (int i = 0; i < scene.lightCount; i++){
-            ubo.lightPositions[i] = scene.lightPositions[i];
-            ubo.lightColors[i] = scene.lightColors[i];
+            ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.02f);
+            ubo.numLights = scene.lightCount;
+            for (int i = 0; i < scene.lightCount; i++){
+                ubo.lightPositions[i] = scene.lightPositions[i];
+                ubo.lightColors[i] = scene.lightColors[i];
+            }
+
+            buffers[frameIndex]->writeToBuffer(&ubo, sizeof(ubo));
         }
-
-        m_uboBuffers[frameIndex]->writeToBuffer(&ubo, sizeof(ubo));
 
         m_vulRenderer.beginRendering(commandBuffer, settings::renderWidth, settings::renderHeight);
         if (!m_cameraController.hideGUI) m_vulGUI.startFrame();
@@ -165,16 +124,16 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
     double objRenderStartTime = glfwGetTime();
     if (hasScene){
         std::vector<VkDescriptorSet> defaultDescriptorSets;
-        defaultDescriptorSets.push_back(m_globalDescriptorSets[frameIdx].getSet());
-        renderSystems[0]->render(scene, defaultDescriptorSets, commandBuffer);
+        defaultDescriptorSets.push_back(mainDescriptorSets[frameIdx].getSet());
+        renderSystem3D->render(scene, defaultDescriptorSets, commandBuffer);
     }
     if (object2Ds.size() > 0){
         std::vector<VkDescriptorSet> defaultDescriptorSets;
-        defaultDescriptorSets.push_back(m_globalDescriptorSets[frameIdx].getSet());
-        if (vul::settings::batchRender2Ds) renderSystems[object2Ds[0].renderSystemIndex]->render(object2Ds, defaultDescriptorSets, commandBuffer);
+        defaultDescriptorSets.push_back(mainDescriptorSets[frameIdx].getSet());
+        if (vul::settings::batchRender2Ds) renderSystem2D->render(object2Ds, defaultDescriptorSets, commandBuffer);
         else{
             for (Object2D &obj : object2Ds){
-                renderSystems[obj.renderSystemIndex]->render(obj, defaultDescriptorSets, commandBuffer);
+                renderSystem2D->render(obj, defaultDescriptorSets, commandBuffer);
             }
         }
     }
@@ -264,14 +223,13 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
     return {std::move(set), std::move(layout), set.hasSet()};
 }
 
-void Vulkano::createNewRenderSystem(const std::vector<VkDescriptorSetLayout> &setLayouts, bool is2D, std::string vertShaderName, std::string fragShaderName)
+std::unique_ptr<RenderSystem> Vulkano::createNewRenderSystem(const std::vector<VkDescriptorSetLayout> &setLayouts, std::string vertShaderName, std::string fragShaderName, bool is2D)
 {
     std::unique_ptr<RenderSystem> renderSystem = std::make_unique<RenderSystem>(m_vulDevice);
-    if (vertShaderName != "") renderSystem->vertShaderName = vertShaderName;
-    if (fragShaderName != "") renderSystem->fragShaderName = fragShaderName;
+    renderSystem->vertShaderName = vertShaderName;
+    renderSystem->fragShaderName = fragShaderName;
     renderSystem->init(setLayouts, m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getSwapChainDepthFormat(), is2D);
-    renderSystem->index = renderSystems.size();
-    renderSystems.push_back(std::move(renderSystem));
+    return renderSystem;
 }
         
 }
