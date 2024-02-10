@@ -4,15 +4,15 @@
  * Initially based off VulkanBuffer by Sascha Willems -
  * https://github.com/SaschaWillems/Vulkan/blob/master/base/VulkanBuffer.h
  */
- 
+
 #include "../Headers/vul_buffer.hpp"
- 
+
 // std
 #include <cassert>
 #include <cstring>
 #include <memory>
-#include <vulkan/vulkan_core.h>
- 
+#include <stdexcept>
+
 namespace vulB {
 
 /**
@@ -25,36 +25,65 @@ namespace vulB {
  * @return VkResult of the buffer mapping call
  */
 VkDeviceSize VulBuffer::getAlignment(VkDeviceSize instanceSize, VkDeviceSize minOffsetAlignment) {
-  if (minOffsetAlignment > 0) {
-    return (instanceSize + minOffsetAlignment - 1) & ~(minOffsetAlignment - 1);
-  }
-  return instanceSize;
+    if (minOffsetAlignment > 0) {
+        return (instanceSize + minOffsetAlignment - 1) & ~(minOffsetAlignment - 1);
+    }
+    return instanceSize;
 }
- 
+
 VulBuffer::VulBuffer(
-    VulDevice &device,
-    VkDeviceSize instanceSize,
-    uint32_t instanceCount,
-    VkBufferUsageFlags usageFlags,
-    VkMemoryPropertyFlags memoryPropertyFlags,
-    bool rayTracable,
-    VkDeviceSize minOffsetAlignment)
+        VulDevice &device,
+        VkDeviceSize instanceSize,
+        uint32_t instanceCount,
+        VkBufferUsageFlags usageFlags,
+        VkMemoryPropertyFlags memoryPropertyFlags,
+        VkMemoryAllocateFlags allocateFlags,
+        VkDeviceSize minOffsetAlignment)
     : vulDevice{device},
-      instanceSize{instanceSize},
-      instanceCount{instanceCount},
-      usageFlags{usageFlags},
-      memoryPropertyFlags{memoryPropertyFlags} {
-  alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
-  bufferSize = alignmentSize * instanceCount;
-  device.createBuffer(bufferSize, usageFlags, memoryPropertyFlags, buffer, memory, rayTracable);
+    instanceSize{instanceSize},
+    instanceCount{instanceCount},
+    usageFlags{usageFlags},
+    memoryPropertyFlags{memoryPropertyFlags} {
+
+    alignmentSize = getAlignment(instanceSize, minOffsetAlignment);
+    bufferSize = alignmentSize * instanceCount;
+
+    VkBufferCreateInfo bufferInfo{};
+    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    bufferInfo.size = bufferSize;
+    bufferInfo.usage = usageFlags;
+    bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+    if (vkCreateBuffer(device.device(), &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create buffer!");
+    }
+
+    VkMemoryRequirements memRequirements;
+    vkGetBufferMemoryRequirements(device.device(), buffer, &memRequirements);
+
+    VkMemoryAllocateFlagsInfo allocFlagsInfo{};
+    allocFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+    allocFlagsInfo.flags = allocateFlags;
+
+    VkMemoryAllocateInfo allocInfo{};
+    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.allocationSize = memRequirements.size;
+    allocInfo.memoryTypeIndex = device.findMemoryType(memRequirements.memoryTypeBits, memoryPropertyFlags);
+    allocInfo.pNext = &allocFlagsInfo;
+
+    if (vkAllocateMemory(device.device(), &allocInfo, nullptr, &memory) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate buffer memory!");
+    }
+
+    vkBindBufferMemory(device.device(), buffer, memory, 0);
 }
- 
+
 VulBuffer::~VulBuffer() {
-  unmap();
-  vkDestroyBuffer(vulDevice.device(), buffer, nullptr);
-  vkFreeMemory(vulDevice.device(), memory, nullptr);
+    unmap();
+    vkDestroyBuffer(vulDevice.device(), buffer, nullptr);
+    vkFreeMemory(vulDevice.device(), memory, nullptr);
 }
- 
+
 /**
  * Map a memory range of this buffer. If successful, mapped points to the specified buffer range.
  *
@@ -65,24 +94,24 @@ VulBuffer::~VulBuffer() {
  * @return VkResult of the buffer mapping call
  */
 VkResult VulBuffer::map(VkDeviceSize size, VkDeviceSize offset) {
-  assert(buffer && memory && "Called map on buffer before create");
-  VkResult result = vkMapMemory(vulDevice.device(), memory, offset, size, 0, &mapped);
-  if (result != 0) fprintf(stderr, "Mapping memory to buffer failed in vul_buffer.cpp");
-  return result;
+    assert(buffer && memory && "Called map on buffer before create");
+    VkResult result = vkMapMemory(vulDevice.device(), memory, offset, size, 0, &mapped);
+    if (result != 0) fprintf(stderr, "Mapping memory to buffer failed in vul_buffer.cpp");
+    return result;
 }
- 
+
 /**
  * Unmap a mapped memory range
  *
  * @note Does not return a result as vkUnmapMemory can't fail
  */
 void VulBuffer::unmap() {
-  if (mapped) {
-    vkUnmapMemory(vulDevice.device(), memory);
-    mapped = nullptr;
-  }
+    if (mapped) {
+        vkUnmapMemory(vulDevice.device(), memory);
+        mapped = nullptr;
+    }
 }
- 
+
 /**
  * Copies the specified data to the mapped buffer. Default value writes whole buffer range
  *
@@ -93,17 +122,17 @@ void VulBuffer::unmap() {
  *
  */
 void VulBuffer::writeToBuffer(void *data, VkDeviceSize size, VkDeviceSize offset) {
-  assert(mapped && "Cannot copy to unmapped buffer");
- 
-  if (size == VK_WHOLE_SIZE) {
-    memcpy(mapped, data, bufferSize);
-  } else {
-    char *memOffset = (char *)mapped;
-    memOffset += offset;
-    memcpy(memOffset, data, size);
-  }
+    assert(mapped && "Cannot copy to unmapped buffer");
+
+    if (size == VK_WHOLE_SIZE) {
+        memcpy(mapped, data, bufferSize);
+    } else {
+        char *memOffset = (char *)mapped;
+        memOffset += offset;
+        memcpy(memOffset, data, size);
+    }
 }
- 
+
 /**
  * Flush a memory range of the buffer to make it visible to the device
  *
@@ -116,14 +145,14 @@ void VulBuffer::writeToBuffer(void *data, VkDeviceSize size, VkDeviceSize offset
  * @return VkResult of the flush call
  */
 VkResult VulBuffer::flush(VkDeviceSize size, VkDeviceSize offset) {
-  VkMappedMemoryRange mappedRange = {};
-  mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-  mappedRange.memory = memory;
-  mappedRange.offset = offset;
-  mappedRange.size = size;
-  return vkFlushMappedMemoryRanges(vulDevice.device(), 1, &mappedRange);
+    VkMappedMemoryRange mappedRange = {};
+    mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+    mappedRange.memory = memory;
+    mappedRange.offset = offset;
+    mappedRange.size = size;
+    return vkFlushMappedMemoryRanges(vulDevice.device(), 1, &mappedRange);
 }
- 
+
 /**
  * Invalidate a memory range of the buffer to make it visible to the host
  *
@@ -136,14 +165,14 @@ VkResult VulBuffer::flush(VkDeviceSize size, VkDeviceSize offset) {
  * @return VkResult of the invalidate call
  */
 VkResult VulBuffer::invalidate(VkDeviceSize size, VkDeviceSize offset) {
-  VkMappedMemoryRange mappedRange = {};
-  mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
-  mappedRange.memory = memory;
-  mappedRange.offset = offset;
-  mappedRange.size = size;
-  return vkInvalidateMappedMemoryRanges(vulDevice.device(), 1, &mappedRange);
+    VkMappedMemoryRange mappedRange = {};
+    mappedRange.sType = VK_STRUCTURE_TYPE_MAPPED_MEMORY_RANGE;
+    mappedRange.memory = memory;
+    mappedRange.offset = offset;
+    mappedRange.size = size;
+    return vkInvalidateMappedMemoryRanges(vulDevice.device(), 1, &mappedRange);
 }
- 
+
 /**
  * Create a buffer info descriptor
  *
@@ -153,13 +182,13 @@ VkResult VulBuffer::invalidate(VkDeviceSize size, VkDeviceSize offset) {
  * @return VkDescriptorBufferInfo of specified offset and range
  */
 VkDescriptorBufferInfo VulBuffer::descriptorInfo(VkDeviceSize size, VkDeviceSize offset) const{
-  return VkDescriptorBufferInfo{
-      buffer,
-      offset,
-      size,
-  };
+    return VkDescriptorBufferInfo{
+        buffer,
+            offset,
+            size,
+    };
 }
- 
+
 /**
  * Copies "instanceSize" bytes of data to the mapped buffer at an offset of index * alignmentSize
  *
@@ -168,9 +197,9 @@ VkDescriptorBufferInfo VulBuffer::descriptorInfo(VkDeviceSize size, VkDeviceSize
  *
  */
 void VulBuffer::writeToIndex(void *data, int index) {
-  writeToBuffer(data, instanceSize, index * alignmentSize);
+    writeToBuffer(data, instanceSize, index * alignmentSize);
 }
- 
+
 /**
  *  Flush the memory range at index * alignmentSize of the buffer to make it visible to the device
  *
@@ -178,7 +207,7 @@ void VulBuffer::writeToIndex(void *data, int index) {
  *
  */
 VkResult VulBuffer::flushIndex(int index) { return flush(alignmentSize, index * alignmentSize); }
- 
+
 /**
  * Create a buffer info descriptor
  *
@@ -187,9 +216,9 @@ VkResult VulBuffer::flushIndex(int index) { return flush(alignmentSize, index * 
  * @return VkDescriptorBufferInfo for instance at index
  */
 VkDescriptorBufferInfo VulBuffer::descriptorInfoForIndex(int index) {
-  return descriptorInfo(alignmentSize, index * alignmentSize);
+    return descriptorInfo(alignmentSize, index * alignmentSize);
 }
- 
+
 /**
  * Invalidate a memory range of the buffer to make it visible to the host
  *
@@ -200,7 +229,7 @@ VkDescriptorBufferInfo VulBuffer::descriptorInfoForIndex(int index) {
  * @return VkResult of the invalidate call
  */
 VkResult VulBuffer::invalidateIndex(int index) {
-  return invalidate(alignmentSize, index * alignmentSize);
+    return invalidate(alignmentSize, index * alignmentSize);
 }
- 
+
 }

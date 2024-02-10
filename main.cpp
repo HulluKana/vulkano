@@ -1,6 +1,8 @@
 #include"vulkano/vulkano_defaults.hpp"
+#include"vulkano/Backend/Headers/vul_comp_pipeline.hpp"
 
 #include"3rdParty/imgui/imgui.h"
+#include <vulkan/vulkan_core.h>
 
 void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime)
 {   
@@ -20,9 +22,23 @@ int main()
     vul::defaults::createDefault3dRenderSystem(vulkano);
     vulkano.initVulkano();
 
+    vulB::VulCompPipeline comp("example.comp.spv", {vulkano.mainSetLayout->getDescriptorSetLayout()}, vulkano.getVulDevice());
+
     bool stop = false;
     float ownStuffTime = 0.0f;
     while (!stop){
+        // ATTENTION!!! IMPORTANT!!!
+        //
+        // Begin single time commands uses graphics queue, but for this case it needs to use compute queue
+        // Also its really slow
+        //
+        // So just come up with a better way to use the command buffers
+        //
+        // ATTENTION!!! IMPORTANT!!!
+        VkCommandBuffer cmdBuf = vulkano.getVulDevice().beginSingleTimeCommands();
+        comp.dispatch(1, 1, 1, {vulkano.mainDescriptorSets[0].getSet()}, cmdBuf);
+        vulkano.getVulDevice().endSingleTimeCommands(cmdBuf);
+
         VkCommandBuffer commandBuffer = vulkano.startFrame();
         double ownStuffStartTime = glfwGetTime();
 

@@ -17,9 +17,11 @@ struct SwapChainSupportDetails {
 struct QueueFamilyIndices {
   uint32_t graphicsFamily;
   uint32_t presentFamily;
+  uint32_t computeFamily;
   bool graphicsFamilyHasValue = false;
   bool presentFamilyHasValue = false;
-  bool isComplete() { return graphicsFamilyHasValue && presentFamilyHasValue; }
+  bool computeFamilyHasValue = false;
+  bool isComplete() { return graphicsFamilyHasValue && presentFamilyHasValue && computeFamilyHasValue; }
 };
 
 class VulDevice {
@@ -45,6 +47,7 @@ class VulDevice {
   VkSurfaceKHR surface() { return surface_; }
   VkQueue graphicsQueue() { return graphicsQueue_; }
   VkQueue presentQueue() { return presentQueue_; }
+  VkQueue computeQueue() { return m_computeQueue; }
   VkInstance getInstace() {return instance;}
 
   SwapChainSupportDetails getSwapChainSupport() { return querySwapChainSupport(physicalDevice); }
@@ -54,13 +57,6 @@ class VulDevice {
       const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
   // Buffer Helper Functions
-  void createBuffer(
-      VkDeviceSize size,
-      VkBufferUsageFlags usage,
-      VkMemoryPropertyFlags properties,
-      VkBuffer &buffer,
-      VkDeviceMemory &bufferMemory,
-      bool rayTracable = false);
   VkCommandBuffer beginSingleTimeCommands();
   void endSingleTimeCommands(VkCommandBuffer commandBuffer);
   void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size);
@@ -103,6 +99,7 @@ class VulDevice {
   VkSurfaceKHR surface_;
   VkQueue graphicsQueue_;
   VkQueue presentQueue_;
+  VkQueue m_computeQueue;
 
   const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"}; // Enabled validation layers for normal use
   // const std::vector<const char *> validationLayers = {}; // Disabled validation layers for nsight

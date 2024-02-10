@@ -71,7 +71,8 @@ class Vulkano{
         };
         enum class ShaderStage{
             frag = VK_SHADER_STAGE_FRAGMENT_BIT,
-            vert = VK_SHADER_STAGE_VERTEX_BIT
+            vert = VK_SHADER_STAGE_VERTEX_BIT,
+            comp = VK_SHADER_STAGE_COMPUTE_BIT
         };
         struct Descriptor{
             DescriptorType type;

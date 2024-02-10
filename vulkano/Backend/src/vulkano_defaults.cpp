@@ -13,7 +13,7 @@ void defaults::createDefaultDescriptors(Vulkano &vulkano)
     for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
         std::unique_ptr<VulBuffer> globalBuffer;
         globalBuffer = std::make_unique<VulBuffer>  (vulkano.getVulDevice(), sizeof(GlobalUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
-                                                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, false, vulkano.getVulDevice().properties.limits.minUniformBufferOffsetAlignment);
+                                                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 0, vulkano.getVulDevice().properties.limits.minUniformBufferOffsetAlignment);
         globalBuffer->map();
         vulkano.buffers.push_back(std::move(globalBuffer));
     }
