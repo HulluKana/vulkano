@@ -35,6 +35,7 @@ Vulkano::Vulkano(uint32_t width, uint32_t height, std::string name) : m_vulWindo
 
 Vulkano::~Vulkano()
 {
+    letVulkanoFinish();
     m_vulGUI.destroyImGui();
 }
 

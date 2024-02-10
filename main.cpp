@@ -32,7 +32,5 @@ int main()
         stop = vulkano.endFrame(commandBuffer);
     }
 
-    vulkano.letVulkanoFinish();
-
     return 0;
 }

@@ -62,20 +62,12 @@ void Scene::loadScene(std::string fileName)
         packedMaterials.push_back(packedMat);
     }
 
-    indexBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, m_gltfLoader.indices, 
-        VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
-        | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, true); 
-    vertexBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, alignedPositions, 
-        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
-        | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, true); 
-    normalBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, alignedNormals, 
-        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
-    uvBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, m_gltfLoader.uvCoords, 
-        VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
-    materialBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, packedMaterials, 
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
-    primInfoBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, primLookup, 
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, true);
+    indexBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, m_gltfLoader.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT); 
+    vertexBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, alignedPositions, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT); 
+    normalBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, alignedNormals, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    uvBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, m_gltfLoader.uvCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    materialBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, packedMaterials, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    primInfoBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, primLookup, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
     meshes = m_gltfLoader.primMeshes;
     nodes = m_gltfLoader.nodes;
