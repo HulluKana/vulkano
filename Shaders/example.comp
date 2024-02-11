@@ -1,34 +1,49 @@
 #version 460
 
-#extension GL_GOOGLE_include_directive : enable
+struct Square{
+    float x;
+    float y;
+    float width;
+    float height;
+    uint seed;
+    float r;
+    float g;
+    float b;
+};
+layout(set = 0, binding = 0) buffer squareBuffer{Square squares[];};
 
-#include"../vulkano/Backend/Headers/vul_host_device.hpp"
-#include"allCommon.glsl"
-
-layout(set = 0, binding = 2) buffer MaterialBuffer{PackedMaterial m[];} matBuf;
-
-float randomValue(inout uint state)
-{
-    state = state * 747796405 + 2891336453;
-    uint result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
-    result = (result >> 22) ^ result;
-    return result / 4294967295.0;
-}
+struct PushData{
+    vec3 color;
+};
+layout (push_constant) uniform Push{PushData push;};
 
 layout (local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 
+float randomValue(inout uint state)
+{
+    uint result;
+    for (int i = 0; i < /*1000000*/ 1; i++){
+        state = state * 747796405 + 2891336453;
+        result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
+        result = (result >> 22) ^ result;
+    }
+    return result / 4294967295.0;
+}
+
 void main()
 {
-    uint index = gl_GlobalInvocationID.x;
-    if (index > matBuf.m.length()) return;
+    const uint index = gl_GlobalInvocationID.x;
+    Square square = squares[index];
+    square.seed += index;
 
-    uint state = matBuf.m[index].padding * index;
-    float r = randomValue(state);
-    float g = randomValue(state);
-    float b = randomValue(state);
-    matBuf.m[index].padding = int(state);
+    square.x += (randomValue(square.seed) - 0.5) / 50.0;
+    square.y += (randomValue(square.seed) - 0.5) / 50.0;
+    square.width += (randomValue(square.seed) - 0.5) / 500.0;
+    square.height += (randomValue(square.seed) - 0.5) / 500.0;
 
-    matBuf.m[index].colorFactor.x = r;
-    matBuf.m[index].colorFactor.y = g;
-    matBuf.m[index].colorFactor.z = b;
+    square.r = push.color.x;
+    square.g = push.color.y;
+    square.b = push.color.z;
+
+    squares[index] = square;
 }
