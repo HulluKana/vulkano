@@ -27,8 +27,9 @@ Vulkano::Vulkano(uint32_t width, uint32_t height, std::string name) : m_vulWindo
         .build();
 
     uint8_t *data = new uint8_t[16]{255, 0, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 0, 255, 255};
-    std::shared_ptr<VulImage> emptyImage = VulImage::createAsUniquePtr(m_vulDevice);
-    emptyImage->createTextureFromData(data, 2, 2);
+    std::shared_ptr<VulImage> emptyImage = std::make_shared<VulImage>(m_vulDevice);
+    emptyImage->loadData(data, 2, 2, 4);
+    emptyImage->createImage(true, true, false);
     for (uint32_t i = 0; i < MAX_TEXTURES; i++)
         images[i] = emptyImage;
 }
@@ -179,6 +180,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
         else if (descriptors[i].type == DescriptorType::combinedTexSampler ||
             descriptors[i].type == DescriptorType::spCombinedTexSampler)
             type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        else if (descriptors[i].type == DescriptorType::storageImage) type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         layoutBuilder.addBinding(i, type, stageFlags, descriptors[i].count);
     }
     std::unique_ptr<VulDescriptorSetLayout> layout = layoutBuilder.build();
@@ -214,6 +216,16 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
                 imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 imageInfos[j].imageView = image[j]->getImageView();
                 imageInfos[j].sampler = image[j]->getTextureSampler();
+            }
+            imageInfosStorage.push_back(imageInfos);
+            set.writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
+        }
+        if (desc.type == DescriptorType::storageImage){
+            VulImage *image = static_cast<VulImage *>(desc.content);
+            std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++){
+                imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+                imageInfos[j].imageView = image[j].getImageView();
             }
             imageInfosStorage.push_back(imageInfos);
             set.writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);

@@ -67,7 +67,8 @@ class Vulkano{
             ubo,
             ssbo,
             combinedTexSampler,
-            spCombinedTexSampler
+            spCombinedTexSampler,
+            storageImage
         };
         enum class ShaderStage{
             frag = VK_SHADER_STAGE_FRAGMENT_BIT,

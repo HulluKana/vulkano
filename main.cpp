@@ -6,6 +6,7 @@
 #include "3rdParty/imgui/imgui.h"
 #include <GLFW/glfw3.h>
 #include <stdexcept>
+#include <vulkan/vulkan_core.h>
 
 float maxFps = 60.0f;
 void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
