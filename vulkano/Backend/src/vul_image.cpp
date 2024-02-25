@@ -22,7 +22,7 @@ VulImage::~VulImage()
     vkFreeMemory(m_vulDevice.device(), m_imageMemory, nullptr);
 }
 
-void VulImage::loadData(const std::string &fileName)
+void VulImage::loadFile(const std::string &fileName)
 {
     stbi_uc* pixels = stbi_load(fileName.c_str(), (int *)&m_width, (int *)&m_height, (int *)&m_channels, STBI_rgb_alpha);
     if (!pixels) throw std::runtime_error("failed to load image!");
@@ -32,9 +32,13 @@ void VulImage::loadData(const std::string &fileName)
 
 void VulImage::loadData(void *data, uint32_t width, uint32_t height, uint32_t channels)
 {
-    if (channels != 1 && channels != 2 && channels != 4) throw std::runtime_error("The amount of channels in an image must be 1, 2 or 4");
-
     m_data = data;
+    keepEmpty(width, height, channels);
+}
+
+void VulImage::keepEmpty(uint32_t width, uint32_t height, uint32_t channels)
+{
+    if (channels != 1 && channels != 2 && channels != 4) throw std::runtime_error("The amount of channels in an image must be 1, 2 or 4");
     m_width = width;
     m_height = height;
     m_channels = channels;
@@ -71,7 +75,7 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorag
     VkImageTiling tiling = VK_IMAGE_TILING_LINEAR;
     if (isDeviceLocal && !isStorageImage) tiling = VK_IMAGE_TILING_OPTIMAL; 
 
-    VkImageLayout m_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    m_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     if (isStorageImage) m_layout = VK_IMAGE_LAYOUT_GENERAL;
 
     createVkImage(m_format, tiling, usage, memoryProperties);

@@ -8,6 +8,8 @@ namespace vul{
 class settings{
 
 public:
+    static inline bool preferSeparateComputeQueue{false};
+
     static inline uint32_t renderWidth{0};
     static inline uint32_t renderHeight{0};
 

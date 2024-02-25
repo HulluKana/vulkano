@@ -8,10 +8,9 @@
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
-float maxFps = 60.0f;
 void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
     ImGui::Begin("Performance");
-    ImGui::DragFloat("Max FPS", &maxFps, maxFps / 30.0f, 3.0f, 10'000.0f);
+    ImGui::DragFloat("Max FPS", &vul::settings::maxFps, vul::settings::maxFps / 30.0f, 3.0f, 10'000.0f);
     ImGui::Text("Fps: %f\nTotal frame time: %fms\nObject render time: %fms\nGUI "
             "render time: %fms\nRender preparation time: %fms\nRender "
             "finishing time: %fms\nIdle time %fms\nOwn stuff: %fms",
@@ -25,6 +24,7 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 }
 
 int main() {
+    vul::settings::preferSeparateComputeQueue = true;
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
 
     struct SquarePc {
@@ -67,27 +67,20 @@ int main() {
     vulkano.initVulkano();
     vul::settings::maxFps = 10000.0f;
 
-    vulB::VulCompPipeline comp("example.comp.spv",
-            {vulkano.mainSetLayout->getDescriptorSetLayout()},
-            vulkano.getVulDevice());
+    vul::VulCompPipeline comp = vulkano.createNewComputePipeline({vulkano.mainSetLayout->getDescriptorSetLayout()}, "example.comp.spv", 2);
 
     bool stop = false;
     float ownStuffTime = 0.0f;
-    double lastTime = glfwGetTime();
     while (!stop) {
-        double newTime = glfwGetTime();
-        while (1) {
-            if (1.0 / (newTime - lastTime ) < maxFps)
-                break;
-            newTime = glfwGetTime();
-        }
-        lastTime = newTime;
         glm::vec3 color = glm::vec3(vul::random::floatNormalized(),
                 vul::random::floatNormalized(),
                 vul::random::floatNormalized());
         comp.pPushData = &color;
         comp.pushSize = sizeof(color);
-        comp.dispatch(10, 1, 1, {vulkano.mainDescriptorSets[0].getSet()});
+        comp.begin({vulkano.mainDescriptorSets[0].getSet()});
+        for (int i = 0; i < 1; i++)
+            comp.dispatch(10, 1, 1); 
+        comp.end(false);
 
         VkCommandBuffer commandBuffer = vulkano.startFrame();
         double ownStuffStartTime = glfwGetTime();
@@ -98,11 +91,7 @@ int main() {
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);
     }
-
     vulkano.letVulkanoFinish();
-    for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-        vulkano.mainDescriptorSets[i].free();
-    }
 
     return 0;
 }

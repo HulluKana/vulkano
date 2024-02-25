@@ -12,8 +12,9 @@ class VulImage
         VulImage(vulB::VulDevice &vulDevice);
         ~VulImage();
 
-        void loadData(const std::string &fileName);
+        void loadFile(const std::string &fileName);
         void loadData(void *data, uint32_t width, uint32_t height, uint32_t channels);
+        void keepEmpty(uint32_t width, uint32_t height, uint32_t channels);
         void createImage(bool createSampler, bool isDeviceLocal, bool isStorageImage);
         void addSampler(VkSampler sampler);
         void modifyImage(void *data);

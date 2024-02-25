@@ -3,19 +3,23 @@
 #include"vul_device.hpp"
 #include <vulkan/vulkan_core.h>
 
-namespace vulB
+namespace vul
 {
 
 class VulCompPipeline
 {
     public:
-        VulCompPipeline(const std::string &shaderName, const std::vector<VkDescriptorSetLayout> &setLayouts, VulDevice &device);
+        VulCompPipeline(const std::string &shaderName, const std::vector<VkDescriptorSetLayout> &setLayouts, vulB::VulDevice &device, uint32_t maxFramesInFlight);
         ~VulCompPipeline();
 
         VulCompPipeline(const VulCompPipeline &) = delete;
         VulCompPipeline &operator=(const VulCompPipeline &) = delete;
+        VulCompPipeline(VulCompPipeline &&) = default;
+        VulCompPipeline &operator=(VulCompPipeline &&) = default;
 
-        void dispatch(uint32_t x, uint32_t y, uint32_t z, const std::vector<VkDescriptorSet> &sets);
+        void begin(const std::vector<VkDescriptorSet> &sets);
+        void dispatch(uint32_t x, uint32_t y, uint32_t z);
+        void end(bool waitForSubmitToFinish);
 
         void *pPushData = nullptr;
         uint32_t pushSize = 0;
@@ -27,9 +31,10 @@ class VulCompPipeline
 
         std::vector<VkCommandBuffer> m_cmdBufs;
         std::vector<VkFence> m_fences;
-        int m_frame = 0;
+        uint32_t m_frame = 0;
+        uint32_t m_maxFramesInFlight;
 
-        VulDevice &m_vulDevice;
+        vulB::VulDevice &m_vulDevice;
 };
 
 }

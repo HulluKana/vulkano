@@ -42,6 +42,7 @@ class VulDevice {
   VulDevice &operator=(VulDevice &&) = delete;
 
   VkCommandPool getCommandPool() { return commandPool; }
+  VkCommandPool getComputeCommandPool() { return m_computeCommandPool; }
   VkDevice device() { return device_; }
   VkPhysicalDevice getPhysicalDevice() {return physicalDevice;}
   VkSurfaceKHR surface() { return surface_; }
@@ -77,7 +78,7 @@ class VulDevice {
   void createSurface();
   void pickPhysicalDevice();
   void createLogicalDevice();
-  void createCommandPool();
+  void createCommandPools();
 
   // helper functions
   bool isDeviceSuitable(VkPhysicalDevice device);
@@ -94,6 +95,7 @@ class VulDevice {
   VkPhysicalDevice physicalDevice = VK_NULL_HANDLE;
   vulB::VulWindow &window;
   VkCommandPool commandPool;
+  VkCommandPool m_computeCommandPool;
 
   VkDevice device_;
   VkSurfaceKHR surface_;

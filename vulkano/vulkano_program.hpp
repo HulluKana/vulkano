@@ -13,6 +13,7 @@
 #include"Backend/Headers/vul_2d_object.hpp"
 #include "Backend/Headers/vul_swap_chain.hpp"
 #include"Backend/Headers/vul_transform.hpp"
+#include"Backend/Headers/vul_comp_pipeline.hpp"
 
 #include<memory>
 #include<array>
@@ -89,6 +90,7 @@ class Vulkano{
 
         descSetReturnVal createDescriptorSet(const std::vector<Descriptor> &descriptors);
         std::unique_ptr<RenderSystem> createNewRenderSystem(const std::vector<VkDescriptorSetLayout> &setLayouts, std::string vertShaderName, std::string fragShaderName, bool is2D); 
+        VulCompPipeline createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight);        
 
         Scene scene{m_vulDevice};
         bool hasScene = false;

@@ -245,4 +245,10 @@ std::unique_ptr<RenderSystem> Vulkano::createNewRenderSystem(const std::vector<V
     return renderSystem;
 }
         
+VulCompPipeline Vulkano::createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight)
+{
+    VulCompPipeline compPipeline(compShaderName, setLayouts, m_vulDevice, maxSubmitsInFlight);
+    return compPipeline;
+}
+
 }

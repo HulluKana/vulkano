@@ -22,9 +22,9 @@ layout (local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
 float randomValue(inout uint state)
 {
     uint result;
-    for (int i = 0; i < /*1000000*/ 1; i++){
-        state = state * 747796405 + 2891336453;
-        result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
+    state = state * 747796405 + 2891336453;
+    for (int i = 0; i < 150000000; i++){
+        result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737 + i;
         result = (result >> 22) ^ result;
     }
     return result / 4294967295.0;
@@ -36,10 +36,10 @@ void main()
     Square square = squares[index];
     square.seed += index;
 
-    square.x += (randomValue(square.seed) - 0.5) / 50.0;
-    square.y += (randomValue(square.seed) - 0.5) / 50.0;
-    square.width += (randomValue(square.seed) - 0.5) / 500.0;
-    square.height += (randomValue(square.seed) - 0.5) / 500.0;
+    square.x += (randomValue(square.seed) - 0.5) / 5.0;
+    square.y += (randomValue(square.seed) - 0.5) / 5.0;
+    square.width += (randomValue(square.seed) - 0.5) / 50.0;
+    square.height += (randomValue(square.seed) - 0.5) / 50.0;
 
     square.r = push.color.x;
     square.g = push.color.y;

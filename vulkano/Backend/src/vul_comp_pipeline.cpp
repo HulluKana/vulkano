@@ -4,11 +4,15 @@
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
-namespace vulB
+using namespace vulB;
+namespace vul
 {
 
-VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vector<VkDescriptorSetLayout> &setLayouts, VulDevice &device) : m_vulDevice{device}
+VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vector<VkDescriptorSetLayout> &setLayouts, VulDevice &device, uint32_t maxFramesInFlight) : m_vulDevice{device}
 {
+    if (maxFramesInFlight == 0) throw std::runtime_error("Max frames in flight for compute pipelines must be at least 1");
+    m_maxFramesInFlight = maxFramesInFlight;
+
     std::vector<char> shaderCode = VulPipeline::readFile(shaderName);
     VulPipeline::createShaderModule(m_vulDevice, shaderCode, &m_shader);
 
@@ -42,10 +46,10 @@ VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vecto
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = m_vulDevice.getCommandPool();
-    allocInfo.commandBufferCount = 2;
+    allocInfo.commandPool = m_vulDevice.getComputeCommandPool();
+    allocInfo.commandBufferCount = m_maxFramesInFlight;
 
-    m_cmdBufs.resize(VulSwapChain::MAX_FRAMES_IN_FLIGHT);
+    m_cmdBufs.resize(m_maxFramesInFlight);
     if (vkAllocateCommandBuffers(m_vulDevice.device(), &allocInfo, m_cmdBufs.data()) != VK_SUCCESS)
         throw std::runtime_error("Failed to allocate command buffer while creating compute pipeline");
 
@@ -53,8 +57,8 @@ VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vecto
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-    m_fences.resize(VulSwapChain::MAX_FRAMES_IN_FLIGHT);
-    for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
+    m_fences.resize(m_maxFramesInFlight);
+    for (uint32_t i = 0; i < m_maxFramesInFlight; i++){
         if (vkCreateFence(m_vulDevice.device(), &fenceInfo, nullptr, &m_fences[i]) != VK_SUCCESS)
             throw std::runtime_error("Failed to create fence while creating compute pipeline");
     }
@@ -65,12 +69,12 @@ VulCompPipeline::~VulCompPipeline()
     vkDestroyPipeline(m_vulDevice.device(), m_pipeline, nullptr);
     vkDestroyPipelineLayout(m_vulDevice.device(), m_layout, nullptr);
     vkDestroyShaderModule(m_vulDevice.device(), m_shader, nullptr);
-    vkFreeCommandBuffers(m_vulDevice.device(), m_vulDevice.getCommandPool(), 2, m_cmdBufs.data());
-    for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++)
+    vkFreeCommandBuffers(m_vulDevice.device(), m_vulDevice.getComputeCommandPool(), m_maxFramesInFlight, m_cmdBufs.data());
+    for (uint32_t i = 0; i < m_maxFramesInFlight; i++)
         vkDestroyFence(m_vulDevice.device(), m_fences[i], nullptr);
 }
 
-void VulCompPipeline::dispatch(uint32_t x, uint32_t y, uint32_t z, const std::vector<VkDescriptorSet> &sets)
+void VulCompPipeline::begin(const std::vector<VkDescriptorSet> &sets)
 {
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -84,9 +88,16 @@ void VulCompPipeline::dispatch(uint32_t x, uint32_t y, uint32_t z, const std::ve
 
     vkCmdBindPipeline(m_cmdBufs[m_frame], VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
     vkCmdBindDescriptorSets(m_cmdBufs[m_frame], VK_PIPELINE_BIND_POINT_COMPUTE, m_layout, 0, static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
+}
+
+void VulCompPipeline::dispatch(uint32_t x, uint32_t y, uint32_t z)
+{
     vkCmdPushConstants(m_cmdBufs[m_frame], m_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, pushSize, pPushData);
     vkCmdDispatch(m_cmdBufs[m_frame], x, y, z);
+}
 
+void VulCompPipeline::end(bool waitForSubmitToFinish)
+{
     if (vkEndCommandBuffer(m_cmdBufs[m_frame]) != VK_SUCCESS){
         throw std::runtime_error("Failed to end commandBuffer");
     }
@@ -98,8 +109,10 @@ void VulCompPipeline::dispatch(uint32_t x, uint32_t y, uint32_t z, const std::ve
     if (vkQueueSubmit(m_vulDevice.computeQueue(), 1, &submitInfo, m_fences[m_frame]) != VK_SUCCESS) {
         throw std::runtime_error("failed to submit draw command buffer!");
     }
+    if (waitForSubmitToFinish) 
+        vkWaitForFences(m_vulDevice.device(), 1, &m_fences[m_frame], VK_TRUE, UINT64_MAX);
 
-    m_frame = (m_frame + 1) % VulSwapChain::MAX_FRAMES_IN_FLIGHT;
+    m_frame = (m_frame + 1) % m_maxFramesInFlight;
 }
 
 }
