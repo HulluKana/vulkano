@@ -50,7 +50,9 @@ class Vulkano{
         float getGuiRenderTime() const {return m_GuiRenderTime;}
         float getRenderFinishingTime() const {return m_renderFinishingTime;}
 
-        bool shouldShowGUI() const {return !m_cameraController.hideGUI;}
+        int getFrameIdx() const {return m_vulRenderer.getFrameIndex();}
+
+        bool shouldShowGUI() const {return !cameraController.hideGUI;}
         bool windowWasResized() {return m_vulWindow.wasWindowResized();}
         
         void createSquare(float x, float y, float width, float height);
@@ -100,11 +102,14 @@ class Vulkano{
         std::vector<vulB::VulDescriptorSet> mainDescriptorSets;
         std::unique_ptr<vulB::VulDescriptorSetLayout> mainSetLayout;
         std::vector<std::unique_ptr<vulB::VulBuffer>> buffers;
-        bool usesDefaultDescriptorSets = false;
 
         std::vector<Object2D> object2Ds;
         std::array<std::shared_ptr<VulImage>, MAX_TEXTURES> images;
         uint32_t imageCount = 0u;
+
+        vulB::VulCamera camera{};
+        transform3D cameraTransform;
+        vulB::MovementController cameraController;
     private:
         double m_currentTime;
         float m_frameTime;
@@ -121,9 +126,5 @@ class Vulkano{
 
         std::unique_ptr<vulB::VulDescriptorPool> m_globalPool{};
         std::vector<vulB::VulDescriptorSet> m_imGuiDescriptorSets;
-
-        vulB::VulCamera m_camera{};
-        transform3D m_cameraTransform;
-        vulB::MovementController m_cameraController;
    };
 }

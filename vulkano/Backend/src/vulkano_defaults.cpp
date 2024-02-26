@@ -44,7 +44,6 @@ void defaults::createDefaultDescriptors(Vulkano &vulkano)
         if (!retVal.succeeded) throw std::runtime_error("Failed to create default descriptor sets");
         vulkano.mainDescriptorSets.push_back(std::move(retVal.set));
         vulkano.mainSetLayout = std::move(retVal.layout);
-        vulkano.usesDefaultDescriptorSets = true;
     }
 }
 
@@ -56,6 +55,44 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano)
 void defaults::createDefault2dRenderSystem(Vulkano &vulkano)
 {
     vulkano.renderSystem2D = vulkano.createNewRenderSystem({vulkano.mainSetLayout->getDescriptorSetLayout()}, "default2D.vert.spv", "default2D.frag.spv", true);
+}
+
+void defaults::updateDefault3dInputValues(Vulkano &vulkano)
+{
+    Scene &scene = vulkano.scene;
+
+    GlobalUbo ubo{};
+    ubo.projectionMatrix = vulkano.camera.getProjection();
+    ubo.viewMatrix = vulkano.camera.getView();
+    ubo.cameraPosition = glm::vec4(vulkano.cameraTransform.pos, 0.0f);
+
+    ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.02f);
+    ubo.numLights = scene.lightCount;
+    for (int i = 0; i < scene.lightCount; i++){
+        ubo.lightPositions[i] = scene.lightPositions[i];
+        ubo.lightColors[i] = scene.lightColors[i];
+    }
+
+    vulkano.buffers[vulkano.getFrameIdx()]->writeToBuffer(&ubo, sizeof(ubo));
+
+    struct DefaultPushConstantInputData{
+        glm::mat4 modelMatrix;
+        glm::mat4 normalMatrix;
+        int matIdx;
+    };
+    
+    scene.pushDataSize = sizeof(DefaultPushConstantInputData);
+    for (size_t i = 0; i < scene.nodes.size(); i++){
+        const GltfLoader::GltfNode &node = scene.nodes[i];
+        const GltfLoader::GltfPrimMesh &mesh = scene.meshes[node.primMesh];
+        std::vector<std::shared_ptr<void>> &pPushDatas = scene.pPushDatas;
+        if (i >= pPushDatas.size() || pPushDatas[i] == nullptr) pPushDatas.push_back(std::shared_ptr<void>(new DefaultPushConstantInputData));
+
+        DefaultPushConstantInputData *pushData = static_cast<DefaultPushConstantInputData *>(pPushDatas[i].get());
+        pushData->modelMatrix = node.worldMatrix;
+        pushData->normalMatrix = glm::mat4(1.0f);
+        pushData->matIdx = mesh.materialIndex;
+    }
 }
     
 }

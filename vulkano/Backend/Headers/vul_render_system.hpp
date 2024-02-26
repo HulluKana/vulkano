@@ -23,31 +23,19 @@ class RenderSystem{
         // Move instead of reference, you know the deal
         RenderSystem(RenderSystem &&) = default;
         RenderSystem &operator=(RenderSystem &&) = default;
-    private:
 
-        void init(std::vector<VkDescriptorSetLayout> setLayouts, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat, bool is2D = false);
-        void createPipelineLayout(std::vector<VkDescriptorSetLayout> setLayouts);
-        void createPipeline(VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat, bool is2D);
-               
+        void init(std::vector<VkDescriptorSetLayout> setLayouts, std::string vertShaderName, std::string fragShaderName, 
+                  VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat, bool is2D);
+
         void render(const Scene &scene, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer);
         void render(Object2D &obj, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer);
         void render(std::vector<Object2D> &objs, std::vector<VkDescriptorSet> &descriptorSets, VkCommandBuffer &commandBuffer);
-
-        uint32_t index = 0;
-        
-        struct DefaultPushConstantInputData{
-            glm::mat4 modelMatrix{1.0f};
-            glm::mat4 normalMatrix{1.0f};
-            int matIdx = -1;
-        };
-
+    private:
+        void createPipelineLayout(std::vector<VkDescriptorSetLayout> setLayouts);
+        void createPipeline(std::string vertShaderName, std::string fragShaderName, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat, bool is2D);
+               
         vulB::VulDevice &vulDevice;
         std::unique_ptr<vulB::VulPipeline> vulPipeline;
-        VkPipelineLayout pipelineLayout;
-        
-        std::string vertShaderName = "../bin/default.vert.spv";
-        std::string fragShaderName = "../bin/default.frag.spv";
-
-        friend class Vulkano;
+        VkPipelineLayout pipelineLayout;       
 };
 }

@@ -78,39 +78,22 @@ VkCommandBuffer Vulkano::startFrame()
     double renderPreparationStartTime = glfwGetTime();
 
     ImGuiIO &io = ImGui::GetIO(); (void)io;
-    if (!io.WantCaptureKeyboard) m_cameraController.modifyValues(m_vulWindow.getGLFWwindow(), m_cameraTransform);
-    if (!io.WantCaptureMouse && !io.WantCaptureKeyboard) m_cameraController.rotate(m_vulWindow.getGLFWwindow(), m_frameTime, m_cameraTransform, m_vulRenderer.getSwapChainExtent().width, m_vulRenderer.getSwapChainExtent().height);
-    if (!io.WantCaptureKeyboard) m_cameraController.move(m_vulWindow.getGLFWwindow(), m_frameTime, m_cameraTransform);
+    if (!io.WantCaptureKeyboard) cameraController.modifyValues(m_vulWindow.getGLFWwindow(), cameraTransform);
+    if (!io.WantCaptureMouse && !io.WantCaptureKeyboard) cameraController.rotate(m_vulWindow.getGLFWwindow(), m_frameTime, cameraTransform, m_vulRenderer.getSwapChainExtent().width, m_vulRenderer.getSwapChainExtent().height);
+    if (!io.WantCaptureKeyboard) cameraController.move(m_vulWindow.getGLFWwindow(), m_frameTime, cameraTransform);
 
     float aspect = m_vulRenderer.getAspectRatio();
-    if (settings::cameraProperties.hasPerspective) m_camera.setPerspectiveProjection(settings::cameraProperties.fovY, aspect, settings::cameraProperties.nearPlane, settings::cameraProperties.farPlane);
-    else m_camera.setOrthographicProjection(settings::cameraProperties.leftPlane, settings::cameraProperties.rightPlane, settings::cameraProperties.topPlane,
+    if (settings::cameraProperties.hasPerspective) camera.setPerspectiveProjection(settings::cameraProperties.fovY, aspect, settings::cameraProperties.nearPlane, settings::cameraProperties.farPlane);
+    else camera.setOrthographicProjection(settings::cameraProperties.leftPlane, settings::cameraProperties.rightPlane, settings::cameraProperties.topPlane,
                                             settings::cameraProperties.bottomPlane, settings::cameraProperties.nearPlane, settings::cameraProperties.farPlane);
 
-    m_camera.setViewYXZ(m_cameraTransform.pos, m_cameraTransform.rot);
+    camera.setViewYXZ(cameraTransform.pos, cameraTransform.rot);
 
     if (VkCommandBuffer commandBuffer = m_vulRenderer.beginFrame()){
         m_prevWindowSize = m_vulRenderer.getSwapChainExtent();
-        int frameIndex = m_vulRenderer.getFrameIndex();
-
-        if (usesDefaultDescriptorSets){
-            GlobalUbo ubo{};
-            ubo.projectionMatrix = m_camera.getProjection();
-            ubo.viewMatrix = m_camera.getView();
-            ubo.cameraPosition = glm::vec4(m_cameraTransform.pos, 0.0f);
-
-            ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.02f);
-            ubo.numLights = scene.lightCount;
-            for (int i = 0; i < scene.lightCount; i++){
-                ubo.lightPositions[i] = scene.lightPositions[i];
-                ubo.lightColors[i] = scene.lightColors[i];
-            }
-
-            buffers[frameIndex]->writeToBuffer(&ubo, sizeof(ubo));
-        }
 
         m_vulRenderer.beginRendering(commandBuffer, settings::renderWidth, settings::renderHeight);
-        if (!m_cameraController.hideGUI) m_vulGUI.startFrame();
+        if (!cameraController.hideGUI) m_vulGUI.startFrame();
 
         m_renderPreparationTime = glfwGetTime() - renderPreparationStartTime;
         return commandBuffer;
@@ -142,7 +125,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
     m_objRenderTime = glfwGetTime() - objRenderStartTime;
 
     double guiRenderStartTime = glfwGetTime();
-    if (!m_cameraController.hideGUI) m_vulGUI.endFrame(commandBuffer);
+    if (!cameraController.hideGUI) m_vulGUI.endFrame(commandBuffer);
     m_GuiRenderTime = glfwGetTime() - guiRenderStartTime;
 
     double renderFinishStartTime = glfwGetTime();
@@ -239,9 +222,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
 std::unique_ptr<RenderSystem> Vulkano::createNewRenderSystem(const std::vector<VkDescriptorSetLayout> &setLayouts, std::string vertShaderName, std::string fragShaderName, bool is2D)
 {
     std::unique_ptr<RenderSystem> renderSystem = std::make_unique<RenderSystem>(m_vulDevice);
-    renderSystem->vertShaderName = vertShaderName;
-    renderSystem->fragShaderName = fragShaderName;
-    renderSystem->init(setLayouts, m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getSwapChainDepthFormat(), is2D);
+    renderSystem->init(setLayouts, vertShaderName, fragShaderName, m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getSwapChainDepthFormat(), is2D);
     return renderSystem;
 }
         

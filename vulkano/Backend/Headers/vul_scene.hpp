@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <memory>
 
 #include"vul_gltf_loader.hpp"
@@ -27,6 +28,9 @@ class Scene
         std::vector<int> isLightVec;
         std::vector<glm::vec4> lightPositions;
         std::vector<glm::vec4> lightColors;
+
+        std::vector<std::shared_ptr<void>> pPushDatas;
+        uint32_t pushDataSize;
         
     private:
         GltfLoader m_gltfLoader;

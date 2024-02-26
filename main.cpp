@@ -1,12 +1,7 @@
-#include "vulkano/Backend/Headers/vul_comp_pipeline.hpp"
-#include "vulkano/Backend/Headers/vul_settings.hpp"
 #include "vulkano/vulkano_program.hpp"
-#include "vulkano/vulkano_random.hpp"
+#include "vulkano/vulkano_defaults.hpp"
 
 #include "3rdParty/imgui/imgui.h"
-#include <GLFW/glfw3.h>
-#include <stdexcept>
-#include <vulkan/vulkan_core.h>
 
 void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
     ImGui::Begin("Performance");
@@ -24,69 +19,21 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 }
 
 int main() {
-    vul::settings::preferSeparateComputeQueue = true;
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
-
-    struct SquarePc {
-        int index;
-    };
-    std::array<SquarePc, 320> squarePCs;
-    for (int i = 0; i < 320; i++) {
-        vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
-        squarePCs[i].index = i;
-        vulkano.object2Ds[i].pCustomPushData = &squarePCs[i];
-        vulkano.object2Ds[i].customPushDataSize = sizeof(SquarePc);
-    }
-    vul::settings::batchRender2Ds = true;
-
-    vulB::VulBuffer squareBuffer(
-            vulkano.getVulDevice(), 7 * sizeof(float) + sizeof(uint32_t), 320,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT);
-    vul::Vulkano::Descriptor descriptor{};
-    descriptor.type = vul::Vulkano::DescriptorType::ssbo;
-    descriptor.stages = {vul::Vulkano::ShaderStage::vert,
-        vul::Vulkano::ShaderStage::frag,
-        vul::Vulkano::ShaderStage::comp};
-    descriptor.content = &squareBuffer;
-    descriptor.count = 1;
-    for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-        vul::Vulkano::descSetReturnVal descRetVal =
-            vulkano.createDescriptorSet({descriptor});
-        if (!descRetVal.succeeded)
-            throw std::runtime_error("Failed to create descriptor set");
-        vulkano.mainSetLayout = std::move(descRetVal.layout);
-        vulkano.mainDescriptorSets.push_back(std::move(descRetVal.set));
-    }
-
-    std::unique_ptr<vul::RenderSystem> renderSystem =
-        vulkano.createNewRenderSystem(
-                {vulkano.mainSetLayout->getDescriptorSetLayout()}, "example.vert.spv",
-                "example.frag.spv", true);
-    vulkano.renderSystem2D = std::move(renderSystem);
-
+    vulkano.loadScene("../Models/Room.glb");
+    vul::defaults::createDefaultDescriptors(vulkano);
+    vul::defaults::createDefault3dRenderSystem(vulkano);
     vulkano.initVulkano();
-    vul::settings::maxFps = 10000.0f;
-
-    vul::VulCompPipeline comp = vulkano.createNewComputePipeline({vulkano.mainSetLayout->getDescriptorSetLayout()}, "example.comp.spv", 2);
+    vul::settings::maxFps = 60.0f;
 
     bool stop = false;
     float ownStuffTime = 0.0f;
     while (!stop) {
-        glm::vec3 color = glm::vec3(vul::random::floatNormalized(),
-                vul::random::floatNormalized(),
-                vul::random::floatNormalized());
-        comp.pPushData = &color;
-        comp.pushSize = sizeof(color);
-        comp.begin({vulkano.mainDescriptorSets[0].getSet()});
-        for (int i = 0; i < 1; i++)
-            comp.dispatch(10, 1, 1); 
-        comp.end(false);
-
         VkCommandBuffer commandBuffer = vulkano.startFrame();
         double ownStuffStartTime = glfwGetTime();
 
-        if (vulkano.shouldShowGUI())
-            GuiStuff(vulkano, ownStuffTime);
+        vul::defaults::updateDefault3dInputValues(vulkano);
+        if (vulkano.shouldShowGUI()) GuiStuff(vulkano, ownStuffTime);
 
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);

@@ -9,5 +9,7 @@ namespace defaults
     void createDefaultDescriptors(Vulkano &vulkano);
     void createDefault3dRenderSystem(Vulkano &vulkano);
     void createDefault2dRenderSystem(Vulkano &vulkano);
+
+    void updateDefault3dInputValues(Vulkano &vulkano);
 }
 }

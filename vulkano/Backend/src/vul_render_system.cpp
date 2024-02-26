@@ -17,10 +17,11 @@ RenderSystem::RenderSystem(VulDevice &device) : vulDevice{device}
 {
 }
 
-void RenderSystem::init(std::vector<VkDescriptorSetLayout> setLayouts, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat, bool is2D)
+void RenderSystem::init(std::vector<VkDescriptorSetLayout> setLayouts, std::string vertShaderName, std::string fragShaderName, 
+                        VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat, bool is2D)
 {
     createPipelineLayout(setLayouts);
-    createPipeline(colorAttachmentFormat, depthAttachmentFormat, is2D);
+    createPipeline(vertShaderName, fragShaderName, colorAttachmentFormat, depthAttachmentFormat, is2D);
 }
 
 RenderSystem::~RenderSystem()
@@ -46,7 +47,7 @@ void RenderSystem::createPipelineLayout(std::vector<VkDescriptorSetLayout> setLa
     }
 }
 
-void RenderSystem::createPipeline(VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat, bool is2D)
+void RenderSystem::createPipeline(std::string vertShaderName, std::string fragShaderName, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat, bool is2D)
 {
     assert(pipelineLayout != nullptr && "Cannot create pipeline before pipeline layout");
 
@@ -77,23 +78,12 @@ void RenderSystem::render(const Scene &scene, std::vector<VkDescriptorSet> &desc
     vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<uint32_t>(vertexBuffers.size()), vertexBuffers.data(), offsets.data());
     vkCmdBindIndexBuffer(commandBuffer, scene.indexBuffer->getBuffer(), 0, VK_INDEX_TYPE_UINT32);
 
-    int idx = 0;
-    for (const GltfLoader::GltfNode &node : scene.nodes){
+    for (size_t i = 0; i < scene.nodes.size(); i++){
+        const GltfLoader::GltfNode &node = scene.nodes[i];
         const GltfLoader::GltfPrimMesh &mesh = scene.meshes[node.primMesh];
 
-        void *pushData;
-        uint32_t pushDataSize;
-        DefaultPushConstantInputData defaultData; // Has to be outside the if statement to prevent it from going out of scope too early and making the pushData pointer point to freed memory
-        defaultData.modelMatrix = node.worldMatrix;
-        defaultData.normalMatrix = glm::mat4(1.0f);
-        defaultData.matIdx = mesh.materialIndex;
-        pushData = reinterpret_cast<void *>(&defaultData);
-        pushDataSize = sizeof(defaultData);
-
-        vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushDataSize, pushData);
+        vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, scene.pushDataSize, scene.pPushDatas[i].get());
         vkCmdDrawIndexed(commandBuffer, mesh.indexCount, 1, mesh.firstIndex, mesh.vertexOffset, 0);
-
-        idx++;
     }
 }
 
