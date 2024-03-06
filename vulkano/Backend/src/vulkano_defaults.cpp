@@ -67,10 +67,10 @@ void defaults::updateDefault3dInputValues(Vulkano &vulkano)
     ubo.cameraPosition = glm::vec4(vulkano.cameraTransform.pos, 0.0f);
 
     ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.02f);
-    ubo.numLights = scene.lightCount;
-    for (int i = 0; i < scene.lightCount; i++){
-        ubo.lightPositions[i] = scene.lightPositions[i];
-        ubo.lightColors[i] = scene.lightColors[i];
+    ubo.numLights = scene.lights.size();
+    for (int i = 0; i < std::min(static_cast<int>(scene.lights.size()), MAX_LIGHTS); i++){
+        ubo.lightPositions[i] = glm::vec4(scene.lights[i].position, 69.0f);
+        ubo.lightColors[i] = glm::vec4(scene.lights[i].color, scene.lights[i].intensity);
     }
 
     vulkano.buffers[vulkano.getFrameIdx()]->writeToBuffer(&ubo, sizeof(ubo));

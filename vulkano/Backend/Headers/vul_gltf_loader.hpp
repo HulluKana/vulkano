@@ -42,7 +42,6 @@ class GltfLoader
             float emissionStrength = 0.0f;
             float ior = 1.5f;
         };
-
         struct GltfPrimMesh{
             uint32_t firstIndex = 0;
             uint32_t indexCount = 0;
@@ -54,15 +53,17 @@ class GltfLoader
             glm::vec3 posMax = glm::vec3(0.0f);
 
             std::string name;
-
-            const tinygltf::Mesh *mesh = nullptr;
-            const tinygltf::Primitive *prim = nullptr;
         };
         struct GltfNode{
             glm::mat4 worldMatrix{1.0f};
-            glm::vec3 position;
+            glm::vec3 position{0.0f};
             int primMesh = 0;
-            const tinygltf::Node *node;
+        };
+        struct GltfLight{
+            glm::mat4 worldMatrix{1.0f};
+            glm::vec3 position{0.0f};
+            glm::vec3 color{0.0f};
+            double intensity = 0.0;
         };
 
         std::vector<uint32_t> indices;
@@ -71,6 +72,7 @@ class GltfLoader
         std::vector<glm::vec2> uvCoords;
         std::vector<glm::vec4> colors;
 
+        std::vector<GltfLight> lights;
         std::vector<GltfNode> nodes;
         std::vector<GltfPrimMesh> primMeshes;
         std::vector<Material> materials;
@@ -81,7 +83,7 @@ class GltfLoader
     private:
         void processMesh(   const tinygltf::Model &model, const tinygltf::Primitive &mesh, 
                             GltfAttributes requestedAttributes, const std::string &name);
-        void processNode(const tinygltf::Model &model, int nodeIdx, const glm::mat4 &parentMatrix);
+        void processNode(const tinygltf::Model &model, int nodeIdx, const glm::mat4 &parentMatrix, const glm::vec3 &parentPos);
 
 
         float getFloat(const tinygltf::Value &value, const std::string &name);

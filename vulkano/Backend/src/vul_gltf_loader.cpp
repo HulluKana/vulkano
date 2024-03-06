@@ -87,8 +87,6 @@ void GltfLoader::importDrawableNodes(const tinygltf::Model &model, GltfAttribute
         tinygltf::Mesh mesh = model.meshes[meshIdx];
         for (tinygltf::Primitive prim : mesh.primitives){
             processMesh(model, prim, requestedAttributes, mesh.name);
-            primMeshes.back().mesh = &mesh;
-            primMeshes.back().prim = &prim;
         }
     }
 
@@ -96,7 +94,7 @@ void GltfLoader::importDrawableNodes(const tinygltf::Model &model, GltfAttribute
         // By default the loaded scenes are upside down. By rotating the matrix by PI, or 180 degrees, I can flip it back up to correct orientation
         glm::mat4 matrix = glm::mat4(1.0f);
         matrix = glm::rotate(matrix, M_PIf, glm::vec3(1.0f, 0.0f, 0.0f));
-        processNode(model, nodeIdx, matrix);
+        processNode(model, nodeIdx, matrix, {0.0f, 0.0f, 0.0f});
     }
 
     m_meshToPrimMesh.clear();
@@ -205,7 +203,7 @@ void GltfLoader::processMesh(const tinygltf::Model &model, const tinygltf::Primi
     primMeshes.emplace_back(resultMesh);
 }
 
-void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const glm::mat4 &parentMatrix)
+void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const glm::mat4 &parentMatrix, const glm::vec3 &parentPos)
 {
     const tinygltf::Node &node = model.nodes[nodeIdx];
 
@@ -224,6 +222,7 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
     if (!node.matrix.empty()) throw std::runtime_error("The node has some sort of matrix. Handle it");
 
     glm::mat4 worldMatrix = parentMatrix * transform.transformMat();
+    transform.pos += parentPos;
 
     if (node.mesh > -1){
         const std::vector<uint32_t> &meshes = m_meshToPrimMesh[node.mesh];
@@ -232,16 +231,23 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
             dunno.primMesh = mesh;
             dunno.worldMatrix = worldMatrix;
             dunno.position = transform.pos;
-            dunno.node = &node;
             nodes.push_back(dunno);
         }
     }
     else if (node.camera > -1) throw std::runtime_error("The node is a camera. Do something about it");
-    else if (node.extensions.find("KHR_lights_punctual") != node.extensions.end())
-        throw std::runtime_error("The scene has lights. Do something about it");
+    else if (node.extensions.find("KHR_lights_punctual") != node.extensions.end()){
+        const tinygltf::Light &light = model.lights[node.light];
+        GltfLight gltfLight{};
+        gltfLight.worldMatrix = worldMatrix;
+        // I'm using xzy coords with negative y pointing upwards, where as blender uses xyz with positive y upwards, so I need to convert them
+        gltfLight.position = {transform.pos.x, -transform.pos.z, transform.pos.y};
+        gltfLight.color = {light.color[0], light.color[1], light.color[2]};
+        gltfLight.intensity = light.intensity;
+        lights.push_back(gltfLight);
+    }
 
     for (int child : node.children){
-        processNode(model, child, worldMatrix);
+        processNode(model, child, worldMatrix, transform.pos);
     }
 }
 

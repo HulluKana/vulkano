@@ -69,27 +69,17 @@ void Scene::loadScene(std::string fileName)
     materialBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, packedMaterials, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     primInfoBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, primLookup, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
-    meshes = m_gltfLoader.primMeshes;
+    lights = m_gltfLoader.lights;
     nodes = m_gltfLoader.nodes;
+    meshes = m_gltfLoader.primMeshes;
     materials = m_gltfLoader.materials;
 
-    for (const GltfLoader::GltfNode &node : nodes){
-        GltfLoader::GltfPrimMesh mesh = meshes[node.primMesh];
-        GltfLoader::Material mat = materials[mesh.materialIndex];
-        if (mat.emissionStrength > 0.01f){
-            isLightVec.push_back(lightCount);
-            lightPositions.push_back(glm::vec4(node.position, 1.0f));
-            lightColors.push_back(glm::vec4(mat.emissiveFactor, mat.emissionStrength));
-            lightCount++;
-            continue;
-        }
-        isLightVec.push_back(-1);
-    }
-
-    m_gltfLoader.primMeshes.clear();
+    m_gltfLoader.lights.clear();
     m_gltfLoader.nodes.clear();
+    m_gltfLoader.primMeshes.clear();
     m_gltfLoader.materials.clear();
-    m_gltfLoader.primMeshes.shrink_to_fit();
+    m_gltfLoader.lights.shrink_to_fit();
     m_gltfLoader.nodes.shrink_to_fit();
+    m_gltfLoader.primMeshes.shrink_to_fit();
     m_gltfLoader.materials.shrink_to_fit();
 }

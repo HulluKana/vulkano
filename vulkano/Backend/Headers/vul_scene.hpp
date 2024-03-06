@@ -13,8 +13,9 @@ class Scene
 
         void loadScene(std::string fileName);
 
-        std::vector<GltfLoader::GltfPrimMesh> meshes;
+        std::vector<GltfLoader::GltfLight> lights;
         std::vector<GltfLoader::GltfNode> nodes;
+        std::vector<GltfLoader::GltfPrimMesh> meshes;
         std::vector<GltfLoader::Material> materials;
 
         std::unique_ptr<vulB::VulBuffer> vertexBuffer;
@@ -23,11 +24,6 @@ class Scene
         std::unique_ptr<vulB::VulBuffer> indexBuffer;
         std::unique_ptr<vulB::VulBuffer> materialBuffer;
         std::unique_ptr<vulB::VulBuffer> primInfoBuffer;
-
-        int lightCount = 0;
-        std::vector<int> isLightVec;
-        std::vector<glm::vec4> lightPositions;
-        std::vector<glm::vec4> lightColors;
 
         std::vector<std::shared_ptr<void>> pPushDatas;
         uint32_t pushDataSize;

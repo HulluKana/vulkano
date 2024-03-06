@@ -3,7 +3,6 @@ cmake_minimum_required(VERSION "3.22.1")
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
 
 add_custom_target(shaders)
-set(GLSLC "/usr/bin/glslc")
 
 file(GLOB_RECURSE SHADERS_SRC "../Shaders/*.vert" "../Shaders/*.frag" "../Shaders/*.comp")
 foreach(FILE ${SHADERS_SRC})
@@ -13,7 +12,7 @@ foreach(FILE ${SHADERS_SRC})
         add_custom_command( TARGET shaders
                             WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                             DEPENDS ${FILE}
-                            COMMAND ${GLSLC} --target-env=vulkan1.3 ${FILE} -o ${COMPILED_FILE}
+                            COMMAND glslc --target-env=vulkan1.3 ${FILE} -o ${COMPILED_FILE}
                             COMMENT "Compiling ${FILE_NAME}"
         )
     endif()
@@ -36,10 +35,6 @@ find_package(Vulkan REQUIRED)
 target_link_libraries(vulkano ${Vulkan_LIBRARIES})
 target_link_libraries(debugVulkano ${Vulkan_LIBRARIES})
 
-set(GLFW_BUILD_DOCS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_TESTS OFF CACHE BOOL "" FORCE)
-set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-add_subdirectory("../3rdParty/GLFW" ${CMAKE_RUNTIME_OUTPUT_DIRECTORY})
 target_link_libraries(vulkano glfw)
 target_link_libraries(debugVulkano glfw)
 
