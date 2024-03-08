@@ -388,12 +388,12 @@ VkSurfaceFormatKHR VulSwapChain::chooseSwapSurfaceFormat(
 
 VkPresentModeKHR VulSwapChain::chooseSwapPresentMode(
     const std::vector<VkPresentModeKHR> &availablePresentModes) {
-  /*for (const auto &availablePresentMode : availablePresentModes) {
+  for (const auto &availablePresentMode : availablePresentModes) {
     if (availablePresentMode == VK_PRESENT_MODE_MAILBOX_KHR) {
-      std::cout << "Present mode: Mailbox" << std::endl;
+      // std::cout << "Present mode: Mailbox" << std::endl;
       return availablePresentMode;
     }
-  }*/
+  }
 
   for (const auto &availablePresentMode : availablePresentModes) {
       if (availablePresentMode == VK_PRESENT_MODE_IMMEDIATE_KHR) {

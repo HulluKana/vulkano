@@ -29,7 +29,6 @@ class Scene
         uint32_t pushDataSize;
         
     private:
-        GltfLoader m_gltfLoader;
         vulB::VulDevice &m_vulDevice; 
 
         struct PrimitiveInfo{

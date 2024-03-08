@@ -31,9 +31,8 @@ add_dependencies(debugVulkano shaders)
 target_compile_options(vulkano PRIVATE "-Wall")
 target_compile_options(debugVulkano PRIVATE "-Wall" "-g")
 
-find_package(Vulkan REQUIRED)
-target_link_libraries(vulkano ${Vulkan_LIBRARIES})
-target_link_libraries(debugVulkano ${Vulkan_LIBRARIES})
+target_link_libraries(vulkano vulkan)
+target_link_libraries(debugVulkano vulkan)
 
 target_link_libraries(vulkano glfw)
 target_link_libraries(debugVulkano glfw)

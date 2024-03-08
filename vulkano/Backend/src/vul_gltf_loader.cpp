@@ -1,4 +1,3 @@
-#include <cmath>
 #include <cstddef>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/quaternion_float.hpp>
@@ -238,9 +237,7 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
     else if (node.extensions.find("KHR_lights_punctual") != node.extensions.end()){
         const tinygltf::Light &light = model.lights[node.light];
         GltfLight gltfLight{};
-        gltfLight.worldMatrix = worldMatrix;
-        // I'm using xzy coords with negative y pointing upwards, where as blender uses xyz with positive y upwards, so I need to convert them
-        gltfLight.position = {transform.pos.x, -transform.pos.z, transform.pos.y};
+        gltfLight.position = {transform.pos.x, -transform.pos.y, -transform.pos.z}; // Don't even bother asking. I don't know
         gltfLight.color = {light.color[0], light.color[1], light.color[2]};
         gltfLight.intensity = light.intensity;
         lights.push_back(gltfLight);
@@ -256,7 +253,7 @@ float GltfLoader::getFloat(const tinygltf::Value &value, const std::string &name
     if (value.Has(name)){
         return static_cast<float>(value.Get(name).Get<double>());
     }
-    throw std::runtime_error("Couldn't get float from tinygltf in scene.hpp. This probably should be handles, but I haven't figured out that yet");
+    throw std::runtime_error("Couldn't get float from tinygltf in scene.cpp. This probably should be handled, but I haven't figured out that yet");
 }
 
 template<class T>

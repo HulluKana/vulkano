@@ -57,8 +57,8 @@ void RenderSystem::createPipeline(std::string vertShaderName, std::string fragSh
     pipelineConfig.renderPass = nullptr; 
     pipelineConfig.pipelineLayout = pipelineLayout;
     if (!is2D){
-        pipelineConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32A32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32A32_SFLOAT, 0}, {2, 2, VK_FORMAT_R32G32_SFLOAT}};
-        pipelineConfig.bindingDescriptions = {{0, sizeof(glm::vec4), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec4), VK_VERTEX_INPUT_RATE_VERTEX}, {2, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
+        pipelineConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0}, {2, 2, VK_FORMAT_R32G32_SFLOAT}};
+        pipelineConfig.bindingDescriptions = {{0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {2, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
     } else{
         pipelineConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32_SFLOAT, 0}};
         pipelineConfig.bindingDescriptions = {{0, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};

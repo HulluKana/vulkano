@@ -76,5 +76,8 @@ void main()
     vec3 color = diffuseLight * rawColor + specularLight * rawColor;
     if (mat.emissiveStrength > 0.01) color += mat.emissiveColor * mat.emissiveStrength;
 
+    color.x = -1.0 / exp(color.x) + 1.0;
+    color.y = -1.0 / exp(color.y) + 1.0;
+    color.z = -1.0 / exp(color.z) + 1.0;
     FragColor = vec4(color, 1.0);
 }

@@ -23,16 +23,10 @@ void Scene::loadScene(std::string fileName)
     if (!context.LoadBinaryFromFile(&model, &err, &warn, fileName)) 
         throw std::runtime_error(std::string("Failed to load scene from file. File name is ") + fileName);
 
-    m_gltfLoader.importMaterials(model);
-    m_gltfLoader.importDrawableNodes(   model, GltfLoader::gltfAttribOr(GltfLoader::GltfAttributes::Normal, 
+    GltfLoader gltfLoader;
+    gltfLoader.importMaterials(model);
+    gltfLoader.importDrawableNodes(   model, GltfLoader::gltfAttribOr(GltfLoader::GltfAttributes::Normal, 
                                         GltfLoader::GltfAttributes::TexCoord));
-
-    std::vector<glm::vec4> alignedPositions(m_gltfLoader.positions.size());
-    std::vector<glm::vec4> alignedNormals(m_gltfLoader.normals.size());
-    for (size_t i = 0; i < m_gltfLoader.positions.size(); i++){
-        alignedPositions[i] = glm::vec4(m_gltfLoader.positions[i], 0.0f);
-        alignedNormals[i] = glm::vec4(m_gltfLoader.normals[i], 0.0f);
-    }
 
     struct alignedPrimInfo{
         uint32_t indexOffset;
@@ -41,7 +35,7 @@ void Scene::loadScene(std::string fileName)
         int padding;
     };
     std::vector<alignedPrimInfo> primLookup;
-    for (GltfLoader::GltfPrimMesh &primMesh : m_gltfLoader.primMeshes){
+    for (GltfLoader::GltfPrimMesh &primMesh : gltfLoader.primMeshes){
         alignedPrimInfo primInfo;
         primInfo.indexOffset = primMesh.firstIndex;
         primInfo.vertexOffset = primMesh.vertexOffset;
@@ -51,7 +45,7 @@ void Scene::loadScene(std::string fileName)
     }
 
     std::vector<PackedMaterial> packedMaterials;
-    for (const GltfLoader::Material &mat : m_gltfLoader.materials){
+    for (const GltfLoader::Material &mat : gltfLoader.materials){
         PackedMaterial packedMat;
         packedMat.colorFactor = mat.colorFactor;
         packedMat.emissiveFactor = glm::vec4(mat.emissiveFactor, mat.emissionStrength);
@@ -62,24 +56,15 @@ void Scene::loadScene(std::string fileName)
         packedMaterials.push_back(packedMat);
     }
 
-    indexBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, m_gltfLoader.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT); 
-    vertexBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, alignedPositions, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT); 
-    normalBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, alignedNormals, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    uvBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, m_gltfLoader.uvCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    indexBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, gltfLoader.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT); 
+    vertexBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, gltfLoader.positions, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT); 
+    normalBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, gltfLoader.normals, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+    uvBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, gltfLoader.uvCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
     materialBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, packedMaterials, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
     primInfoBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, primLookup, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
 
-    lights = m_gltfLoader.lights;
-    nodes = m_gltfLoader.nodes;
-    meshes = m_gltfLoader.primMeshes;
-    materials = m_gltfLoader.materials;
-
-    m_gltfLoader.lights.clear();
-    m_gltfLoader.nodes.clear();
-    m_gltfLoader.primMeshes.clear();
-    m_gltfLoader.materials.clear();
-    m_gltfLoader.lights.shrink_to_fit();
-    m_gltfLoader.nodes.shrink_to_fit();
-    m_gltfLoader.primMeshes.shrink_to_fit();
-    m_gltfLoader.materials.shrink_to_fit();
+    lights = gltfLoader.lights;
+    nodes = gltfLoader.nodes;
+    meshes = gltfLoader.primMeshes;
+    materials = gltfLoader.materials;
 }

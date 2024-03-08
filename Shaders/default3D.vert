@@ -4,8 +4,8 @@
 
 #include"../vulkano/Backend/Headers/vul_host_device.hpp"
 
-layout (location = 0) in vec4 alignedPosition;
-layout (location = 1) in vec4 alignedNormal;
+layout (location = 0) in vec3 position;
+layout (location = 1) in vec3 normal;
 layout (location = 2) in vec2 uv;
 
 layout (location = 0) out vec3 fragPosWorld;
@@ -18,9 +18,6 @@ layout (push_constant) uniform Push{PushConstant push;};
 
 void main()
 {
-    const vec3 position = alignedPosition.xyz;
-    const vec3 normal = alignedNormal.xyz;
-
     vec4 worldPosition = push.modelMatrix * vec4(position, 1.0);
     gl_Position = ubo.projectionMatrix * ubo.viewMatrix * push.modelMatrix * vec4(position, 1.0f);
     fragNormalWorld = normalize(mat3(push.normalMatrix) * normal);

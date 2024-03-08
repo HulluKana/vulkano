@@ -60,7 +60,6 @@ class GltfLoader
             int primMesh = 0;
         };
         struct GltfLight{
-            glm::mat4 worldMatrix{1.0f};
             glm::vec3 position{0.0f};
             glm::vec3 color{0.0f};
             double intensity = 0.0;

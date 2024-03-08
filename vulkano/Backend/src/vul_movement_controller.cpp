@@ -1,7 +1,5 @@
 #include"../Headers/vul_movement_controller.hpp"
 
-#include<iostream>
-
 using namespace vul;
 namespace vulB{
 
@@ -44,11 +42,14 @@ void MovementController::rotate(GLFWwindow *window, float dt, transform3D &trans
     if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS || hideGUI){
         double mouseX, mouseY;
         glfwGetCursorPos(window, &mouseX, &mouseY);
+        static double lastMouseX = mouseX;
+        static double lastMouseY = mouseY;
 
-        mouseRotate.x -= (float)(mouseY - (screenHeight / 2));
-        mouseRotate.y += (float)(mouseX - (screenWidth / 2));
+        mouseRotate.x -= (float)(mouseY - lastMouseY);
+        mouseRotate.y += (float)(mouseX - lastMouseX);
 
-        glfwSetCursorPos(window, screenWidth / 2, screenHeight / 2);
+        lastMouseX = mouseX;
+        lastMouseY = mouseY;
     }
 
     if (glm::dot(keyRotate, keyRotate) > std::numeric_limits<float>::epsilon())
