@@ -90,9 +90,7 @@ void GltfLoader::importDrawableNodes(const tinygltf::Model &model, GltfAttribute
     }
 
     for (int nodeIdx : scene.nodes){
-        // By default the loaded scenes are upside down. By rotating the matrix by PI, or 180 degrees, I can flip it back up to correct orientation
         glm::mat4 matrix = glm::mat4(1.0f);
-        matrix = glm::rotate(matrix, M_PIf, glm::vec3(1.0f, 0.0f, 0.0f));
         processNode(model, nodeIdx, matrix, {0.0f, 0.0f, 0.0f});
     }
 
@@ -212,8 +210,7 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
     }
     if (!node.rotation.empty()){
         glm::quat rotationQuaternion = glm::quat(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
-        glm::vec3 xyzRotation = glm::eulerAngles(rotationQuaternion);
-        transform.rot = glm::vec3(xyzRotation.y, xyzRotation.z, xyzRotation.x);
+        transform.rot = glm::eulerAngles(rotationQuaternion);
     }
     if (!node.scale.empty())
         transform.scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
@@ -237,7 +234,7 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
     else if (node.extensions.find("KHR_lights_punctual") != node.extensions.end()){
         const tinygltf::Light &light = model.lights[node.light];
         GltfLight gltfLight{};
-        gltfLight.position = {transform.pos.x, -transform.pos.y, -transform.pos.z}; // Don't even bother asking. I don't know
+        gltfLight.position = {transform.pos.x, transform.pos.y, transform.pos.z};
         gltfLight.color = {light.color[0], light.color[1], light.color[2]};
         gltfLight.intensity = light.intensity;
         lights.push_back(gltfLight);

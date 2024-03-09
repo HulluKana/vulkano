@@ -3,8 +3,6 @@
 #include"../../../3rdParty/imgui/imgui.h"
 #include <memory>
 #include <stdexcept>
-#include <variant>
-#include <vulkan/vulkan_core.h>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -87,7 +85,7 @@ VkCommandBuffer Vulkano::startFrame()
     else camera.setOrthographicProjection(settings::cameraProperties.leftPlane, settings::cameraProperties.rightPlane, settings::cameraProperties.topPlane,
                                             settings::cameraProperties.bottomPlane, settings::cameraProperties.nearPlane, settings::cameraProperties.farPlane);
 
-    camera.setViewYXZ(cameraTransform.pos, cameraTransform.rot);
+    camera.setViewXYZ(cameraTransform.pos, cameraTransform.rot);
 
     if (VkCommandBuffer commandBuffer = m_vulRenderer.beginFrame()){
         m_prevWindowSize = m_vulRenderer.getSwapChainExtent();

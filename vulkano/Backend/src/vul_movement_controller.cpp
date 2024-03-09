@@ -64,10 +64,10 @@ void MovementController::rotate(GLFWwindow *window, float dt, transform3D &trans
 
 void MovementController::move(GLFWwindow *window, float dt, transform3D &transform)
 {
-    float yaw = transform.rot.y;
+    float yaw = -transform.rot.y;
     const glm::vec3 forwardDir = glm::vec3(sin(yaw), 0.0f, cos(yaw));
-    const glm::vec3 rightDir = glm::vec3(forwardDir.z, 0.0f, -forwardDir.x);
-    const glm::vec3 upDir = glm::vec3(0.0f, -1.0f, 0.0f);
+    const glm::vec3 rightDir = glm::vec3(-forwardDir.z, 0.0f, forwardDir.x);
+    const glm::vec3 upDir = glm::vec3(0.0f, 1.0f, 0.0f);
 
     glm::vec3 moveDir = glm::vec3(0.0f);
     if (glfwGetKey(window, keys.moveForward) == GLFW_PRESS) moveDir += forwardDir; 
