@@ -1,5 +1,6 @@
 #include"../Headers/vul_image.hpp"
 #include"../Headers/vul_buffer.hpp"
+#include <cstring>
 #include <vulkan/vulkan_core.h>
 
 #define STB_IMAGE_IMPLEMENTATION
@@ -24,15 +25,13 @@ VulImage::~VulImage()
 
 void VulImage::loadFile(const std::string &fileName)
 {
-    stbi_uc* pixels = stbi_load(fileName.c_str(), (int *)&m_width, (int *)&m_height, (int *)&m_channels, STBI_rgb_alpha);
-    if (!pixels) throw std::runtime_error("failed to load image!");
-    m_data = pixels;
-    m_deleteDataAfterCreation = true;
+    m_data = stbi_load(fileName.c_str(), (int *)&m_width, (int *)&m_height, (int *)&m_channels, STBI_rgb_alpha);
+    if (!m_data) throw std::runtime_error("failed to load image!");
 }
 
-void VulImage::loadData(void *data, uint32_t width, uint32_t height, uint32_t channels)
+void VulImage::loadData(const void *data, uint32_t width, uint32_t height, uint32_t channels)
 {
-    m_data = data;
+    m_constData = data;
     keepEmpty(width, height, channels);
 }
 
@@ -49,6 +48,10 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorag
     if (createSampler && isStorageImage) throw std::runtime_error("Cannot create a sampler for a storage image");
     m_isLocal = isDeviceLocal;
     m_isStorage = isStorageImage;
+
+    const void *data = nullptr;
+    if (m_constData != nullptr) data = m_constData;
+    else if (m_data != nullptr) data = m_data;
 
     VkDeviceSize imageSize = m_width * m_height * m_channels;
     if (isStorageImage) imageSize *= sizeof(float);
@@ -79,21 +82,21 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorag
     if (isStorageImage) m_layout = VK_IMAGE_LAYOUT_GENERAL;
 
     createVkImage(m_format, tiling, usage, memoryProperties);
-    if (m_data != nullptr && isDeviceLocal){
+    if (data != nullptr && isDeviceLocal){
         vulB::VulBuffer stagingBuffer(m_vulDevice, imageSize, 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); 
         stagingBuffer.map(imageSize);
-        memcpy(stagingBuffer.getMappedMemory(), m_data, static_cast<size_t>(imageSize));
+        memcpy(stagingBuffer.getMappedMemory(), data, static_cast<size_t>(imageSize));
         stagingBuffer.unmap();
 
         transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         copyBufferToImage(stagingBuffer.getBuffer());
         transitionImageLayout(m_format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_layout);
     }
-    else if (m_data != nullptr && !isDeviceLocal){
+    else if (data != nullptr && !isDeviceLocal){
         transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
 
         vkMapMemory(m_vulDevice.device(), m_imageMemory, 0, imageSize, 0, &m_mappedMemory);
-        memcpy(m_mappedMemory, m_data, (size_t)imageSize);
+        memcpy(m_mappedMemory, data, (size_t)imageSize);
 
         if (!isStorageImage) transitionImageLayout(m_format, VK_IMAGE_LAYOUT_GENERAL, m_layout);
     }
@@ -102,7 +105,7 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorag
     createImageView();
     if (createSampler) createTextureSampler();
 
-    if (m_deleteDataAfterCreation) stbi_image_free(m_data);
+    if (m_data != nullptr) stbi_image_free(m_data);
 }
 
 void VulImage::addSampler(VkSampler sampler)
@@ -121,7 +124,7 @@ void VulImage::modifyImage(void *data)
     if (m_isLocal){
         vulB::VulBuffer stagingBuffer(m_vulDevice, imageSize, 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); 
         stagingBuffer.map(imageSize);
-        memcpy(stagingBuffer.getMappedMemory(), m_data, static_cast<size_t>(imageSize));
+        memcpy(stagingBuffer.getMappedMemory(), data, static_cast<size_t>(imageSize));
         stagingBuffer.unmap();
 
         transitionImageLayout(m_format, m_layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
@@ -130,7 +133,7 @@ void VulImage::modifyImage(void *data)
     }
     else {
         if (!m_isStorage) transitionImageLayout(m_format, m_layout, VK_IMAGE_LAYOUT_GENERAL);
-        memcpy(m_mappedMemory, m_data, (size_t)imageSize);
+        memcpy(m_mappedMemory, data, (size_t)imageSize);
         if (!m_isStorage) transitionImageLayout(m_format, VK_IMAGE_LAYOUT_GENERAL, m_layout);
     }
 }

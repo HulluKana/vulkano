@@ -13,7 +13,7 @@ class VulImage
         ~VulImage();
 
         void loadFile(const std::string &fileName);
-        void loadData(void *data, uint32_t width, uint32_t height, uint32_t channels);
+        void loadData(const void *data, uint32_t width, uint32_t height, uint32_t channels);
         void keepEmpty(uint32_t width, uint32_t height, uint32_t channels);
         void createImage(bool createSampler, bool isDeviceLocal, bool isStorageImage);
         void addSampler(VkSampler sampler);
@@ -59,7 +59,7 @@ class VulImage
         VkDescriptorSet m_descriptorSet;
 
         void *m_data = nullptr;
-        bool m_deleteDataAfterCreation = false;
+        const void *m_constData = nullptr;
         VkImageLayout m_layout;
         VkImage m_image;
         void *m_mappedMemory;

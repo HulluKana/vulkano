@@ -3,6 +3,7 @@
 #include <glm/ext/quaternion_float.hpp>
 #include <glm/ext/quaternion_transform.hpp>
 #include <limits>
+#include <memory>
 #include <set>
 #include <functional>
 #include <sstream>
@@ -12,6 +13,10 @@
 
 #include"../Headers/vul_gltf_loader.hpp"
 #include"../Headers/vul_transform.hpp"
+
+using namespace vul;
+namespace vulB
+{
 
 void GltfLoader::importMaterials(const tinygltf::Model &model)
 {
@@ -42,6 +47,16 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
     if (materials.empty()){
         Material mat;
         materials.emplace_back(mat);
+    }
+}
+
+void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
+{
+    for (const tinygltf::Image &image : model.images){
+        std::shared_ptr<VulImage> vulImage = std::make_shared<VulImage>(device);
+        vulImage->loadData(image.image.data(), image.width, image.height, image.image.size() / image.width / image.height);
+        vulImage->createImage(true, true, false);
+        images.push_back(vulImage);
     }
 }
 
@@ -204,7 +219,7 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
 {
     const tinygltf::Node &node = model.nodes[nodeIdx];
 
-    vul::transform3D transform;
+    transform3D transform;
     if (!node.translation.empty()){
         transform.pos = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
     }
@@ -300,4 +315,6 @@ bool GltfLoader::getAttribute(const tinygltf::Model &model, const tinygltf::Prim
     if (it == primitive.attributes.end()) return false;
     const tinygltf::Accessor &accessor = model.accessors[it->second];
     return getAccessorData(model, accessor, attribVec);
+}
+
 }

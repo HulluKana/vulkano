@@ -9,6 +9,10 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include"../../../3rdParty/tiny_gltf.h"
 
+using namespace vulB;
+namespace vul
+{
+
 Scene::Scene(vulB::VulDevice &vulDevice) : m_vulDevice{vulDevice}
 {
 
@@ -25,6 +29,7 @@ void Scene::loadScene(std::string fileName)
 
     GltfLoader gltfLoader;
     gltfLoader.importMaterials(model);
+    gltfLoader.importTextures(model, m_vulDevice);
     gltfLoader.importDrawableNodes(   model, GltfLoader::gltfAttribOr(GltfLoader::GltfAttributes::Normal, 
                                         GltfLoader::GltfAttributes::TexCoord));
 
@@ -67,4 +72,7 @@ void Scene::loadScene(std::string fileName)
     nodes = gltfLoader.nodes;
     meshes = gltfLoader.primMeshes;
     materials = gltfLoader.materials;
+    images = gltfLoader.images;
+}
+
 }

@@ -1,8 +1,11 @@
 #pragma once
 
+#include "vul_device.hpp"
+#include"vul_image.hpp"
 #include <cstdint>
 #include <string>
 #include <unordered_map>
+#include <memory>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -12,6 +15,9 @@
 #include <glm/gtx/quaternion.hpp>
 
 #include"../../../3rdParty/tiny_gltf.h"
+
+namespace vulB
+{
 
 class GltfLoader
 {
@@ -75,8 +81,10 @@ class GltfLoader
         std::vector<GltfNode> nodes;
         std::vector<GltfPrimMesh> primMeshes;
         std::vector<Material> materials;
+        std::vector<std::shared_ptr<vul::VulImage>> images;
 
         void importMaterials(const tinygltf::Model &model);
+        void importTextures(const tinygltf::Model &model, VulDevice &device);
         void importDrawableNodes(const tinygltf::Model &model, GltfAttributes requestedAttributes);
 
     private:
@@ -97,5 +105,6 @@ class GltfLoader
         
         std::unordered_map<int, std::vector<uint32_t>> m_meshToPrimMesh;
         std::unordered_map<std::string, GltfPrimMesh> m_cachePrimMesh;
-
 };
+
+}

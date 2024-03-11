@@ -21,6 +21,7 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 int main() {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
     vulkano.loadScene("../Models/Room.glb");
+    for (size_t i = 0; i < vulkano.scene.images.size(); i++) vulkano.images[i + vulkano.imageCount] = vulkano.scene.images[i];
     vul::defaults::createDefaultDescriptors(vulkano);
     vul::defaults::createDefault3dRenderSystem(vulkano);
     vulkano.initVulkano();

@@ -6,6 +6,9 @@
 #include"vul_gltf_loader.hpp"
 #include"vul_buffer.hpp"
 
+namespace vul
+{
+
 class Scene
 {
     public:
@@ -13,10 +16,11 @@ class Scene
 
         void loadScene(std::string fileName);
 
-        std::vector<GltfLoader::GltfLight> lights;
-        std::vector<GltfLoader::GltfNode> nodes;
-        std::vector<GltfLoader::GltfPrimMesh> meshes;
-        std::vector<GltfLoader::Material> materials;
+        std::vector<vulB::GltfLoader::GltfLight> lights;
+        std::vector<vulB::GltfLoader::GltfNode> nodes;
+        std::vector<vulB::GltfLoader::GltfPrimMesh> meshes;
+        std::vector<vulB::GltfLoader::Material> materials;
+        std::vector<std::shared_ptr<VulImage>> images;
 
         std::unique_ptr<vulB::VulBuffer> vertexBuffer;
         std::unique_ptr<vulB::VulBuffer> normalBuffer;
@@ -37,3 +41,5 @@ class Scene
             int materialIndex;
         };
 };
+
+}
