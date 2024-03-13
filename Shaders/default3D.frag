@@ -18,6 +18,28 @@ layout(set = 0, binding = 2) readonly buffer MaterialBuffer{PackedMaterial m[];}
 
 layout (push_constant) uniform Push{PushConstant push;};
 
+float lambda(vec3 someVector, vec3 surfaceNormal, float roughness)
+{
+    const float dotP = dot(surfaceNormal, someVector);
+    const float aPow2 = (dotP * dotP) / (roughness * roughness * (1.0 - dotP * dotP));
+    return (sqrt(1.0 + 1.0 / aPow2) - 1.0) / 2.0;
+}
+
+vec3 BRDF(vec3 surfaceNormal, vec3 viewDirection, vec3 lightDirection, vec3 specularColor, float roughness)
+{
+    if (dot(surfaceNormal, viewDirection) <= 0.0 || dot(surfaceNormal, lightDirection) <= 0.0) return vec3(0.0);
+    const float pi = 3.14159265359;
+    const vec3 halfVector = normalize(lightDirection + viewDirection);
+    const float dotHalfNorm = dot(halfVector, surfaceNormal);
+    if (dot(halfVector, viewDirection) <= 0.0 || dot(halfVector, lightDirection) <= 0.0 || dotHalfNorm <= 0.0) return vec3(0.0);
+    const vec3 freshnelColor = specularColor + (vec3(1.0) - specularColor) * pow((1.0 - max(0.0, dot(surfaceNormal, lightDirection))), 5.0);
+    const float visibleFraction = 1.0 / (lambda(viewDirection, surfaceNormal, roughness) + lambda(lightDirection, surfaceNormal, roughness));
+    const float roughnessPow2 = roughness * roughness;
+    const float whatDoICallThis = (1.0 + dotHalfNorm * dotHalfNorm * (roughnessPow2 - 1.0) * (roughnessPow2 - 1.0));
+    const float ggx = (1.0 * roughnessPow2) / (pi * whatDoICallThis);
+    return (freshnelColor * visibleFraction * ggx) / (4.0 * abs(dot(surfaceNormal, lightDirection) * abs(dot(surfaceNormal, viewDirection))));
+}
+
 void main()
 {
     Material mat;
@@ -43,12 +65,9 @@ void main()
     if (mat.colorTextureIndex >= 0 && mat.colorTextureIndex < MAX_TEXTURES) rawColor = texture(texSampler[mat.colorTextureIndex], fragTexCoord).xyz;
     else rawColor = mat.color;
 
-    vec3 diffuseLight = ubo.ambientLightColor.xyz * ubo.ambientLightColor.w;
-    vec3 specularLight = vec3(0.0);
     vec3 surfaceNormal = normalize(fragNormalWorld);
-
     vec3 viewDirection = normalize(ubo.cameraPosition.xyz - fragPosWorld);
-
+    vec3 color = vec3(0.0);
     for (int i = 0; i < ubo.numLights; i++){
         vec3 lightPos = ubo.lightPositions[i].xyz;
         vec4 lightColor = ubo.lightColors[i];
@@ -57,23 +76,12 @@ void main()
         float attenuation = 1.0 / dot(directionToLight, directionToLight);
         directionToLight = normalize(directionToLight);
 
-        float cosAngleIncidence = dot(surfaceNormal, directionToLight);
-        if (cosAngleIncidence > epsilon){
-            // Converts the roughness ranging from 0 to 1 into specular exponent ranging from 1 to roughly 5,9
-            const float specular = pow(mat.roughness + 0.2, 7.0) + pow(mat.roughness + 0.1, 3.0) + 1.0;
-
-            vec3 intensity = lightColor.xyz * lightColor.w * attenuation;
-            diffuseLight += intensity * cosAngleIncidence;
-
-            vec3 halfAngle = normalize(directionToLight + viewDirection);
-            float blinnTerm = dot(surfaceNormal, halfAngle);
-            blinnTerm = clamp(blinnTerm, 0, 1);
-            blinnTerm = pow(blinnTerm, specular);
-            specularLight += intensity * blinnTerm;
-        }
+        vec3 colorFromThisLight = BRDF(surfaceNormal, viewDirection, directionToLight, vec3(56.0 / 255.0), mat.roughness);
+        colorFromThisLight *= lightColor.xyz * lightColor.w * attenuation;
+        color += colorFromThisLight;
     }
 
-    vec3 color = diffuseLight * rawColor + specularLight * rawColor;
+    color += ubo.ambientLightColor.xyz * ubo.ambientLightColor.w;
     if (mat.emissiveStrength > 0.01) color += mat.emissiveColor * mat.emissiveStrength;
 
     color.x = -1.0 / exp(color.x) + 1.0;
