@@ -22,7 +22,8 @@ int main() {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
     vulkano.loadScene("../Models/Room.glb");
     for (size_t i = 0; i < vulkano.scene.images.size(); i++) vulkano.images[i + vulkano.imageCount] = vulkano.scene.images[i];
-    vul::defaults::createDefaultDescriptors(vulkano);
+    vul::defaults::Default3dInputData default3dInputData = vul::defaults::createDefault3dInputData(vulkano);
+    vul::defaults::createDefaultDescriptors(vulkano, default3dInputData);
     vul::defaults::createDefault3dRenderSystem(vulkano);
     vulkano.initVulkano();
     vul::settings::maxFps = 60.0f;

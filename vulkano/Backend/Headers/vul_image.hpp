@@ -15,7 +15,7 @@ class VulImage
         void loadFile(const std::string &fileName);
         void loadData(const void *data, uint32_t width, uint32_t height, uint32_t channels);
         void keepEmpty(uint32_t width, uint32_t height, uint32_t channels);
-        void createImage(bool createSampler, bool isDeviceLocal, bool isStorageImage);
+        void createImage(bool createSampler, bool isDeviceLocal, bool isStorageImage, int dimensions);
         void addSampler(VkSampler sampler);
         void modifyImage(void *data);
 
@@ -40,9 +40,9 @@ class VulImage
         VulImage(VulImage &&) = default;
         VulImage &operator=(VulImage &&) = default;
     private:
-        void createImageView();
+        void createImageView(VkImageViewType imageViewType);
         void createTextureSampler();
-        void createVkImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties);
+        void createVkImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageType imageType);
         void transitionImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
         void copyBufferToImage(VkBuffer buffer);
 

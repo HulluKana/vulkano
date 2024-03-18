@@ -42,6 +42,7 @@ class GltfLoader
             glm::vec4 colorFactor = glm::vec4(1.0f);
             int colorTextureIndex = -1;
             float roughness = 1.0f;
+            float metalliness = 0.0f;
             glm::vec3 emissiveFactor = glm::vec3(0.0f);
 
             // Stuff added by extensions

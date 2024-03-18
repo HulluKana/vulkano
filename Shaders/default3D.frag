@@ -15,6 +15,8 @@ layout(set = 0, binding = 0) uniform Ubo {GlobalUbo ubo;};
 
 layout (set = 0, binding = 1) uniform sampler2D texSampler[MAX_TEXTURES];
 layout(set = 0, binding = 2) readonly buffer MaterialBuffer{PackedMaterial m[];} matBuf;
+layout(set = 0, binding = 3) uniform sampler2D multipleBounce2dImg;
+layout(set = 0, binding = 4) uniform sampler1D multipleBounce1dImg;
 
 layout (push_constant) uniform Push{PushConstant push;};
 
@@ -52,6 +54,17 @@ vec3 BRDF(vec3 surfaceNormal, vec3 viewDirection, vec3 lightDirection, vec3 spec
     return (freshnelColor * visibleFraction * ggx) / (4.0 * dot(surfaceNormal, lightDirection * dot(surfaceNormal, viewDirection)));
 }
 
+vec3 multipleBounceBRDF(vec3 surfaceNormal, vec3 viewDirection, vec3 lightDirection, vec3 specularColor, float roughness)
+{
+    if (dot(surfaceNormal, viewDirection) <= 0.0 || dot(surfaceNormal, lightDirection) <= 0.0) return vec3(0.0);
+    const float pi = 3.14159265359;
+    const vec3 cosAvgFresnel = (specularColor * 20.0) / 21.0 + 1.0 / 21.0; 
+    const float dirAlbLight = texture(multipleBounce2dImg, vec2(acos(dot(surfaceNormal, lightDirection)) / (pi / 2.0), roughness)).x;
+    const float dirAlbView = texture(multipleBounce2dImg, vec2(acos(dot(surfaceNormal, viewDirection)) / (pi / 2.0), roughness)).x;
+    const float cosAvgDirAlb = texture(multipleBounce1dImg, roughness).x;
+    return (cosAvgFresnel * cosAvgDirAlb) / (pi * (1.0 - cosAvgDirAlb) * (1.0 - cosAvgFresnel * (1.0 - cosAvgDirAlb))) * (1.0 - dirAlbLight) * (1.0 - dirAlbView);
+}
+
 vec3 diffBRDF(vec3 surfaceNormal, vec3 viewDirection, vec3 lightDirection, vec3 specularColor, vec3 diffuseColor)
 {
     const float pi = 3.14159265359;
@@ -71,6 +84,7 @@ void main()
         mat.emissiveColor = packedMat.emissiveFactor.xyz;
         mat.emissiveStrength = packedMat.emissiveFactor.w;
         mat.roughness = packedMat.roughness;
+        mat.metalliness = packedMat.metalliness;
         mat.colorTextureIndex = packedMat.colorTextureIndex;
     } else{
         mat.color = vec3(0.8);
@@ -78,6 +92,7 @@ void main()
         mat.emissiveColor = vec3(0.0);
         mat.emissiveStrength = 0.0;
         mat.roughness = 0.5;
+        mat.metalliness = 0.0;
         mat.colorTextureIndex = -1;
     }
 
@@ -98,17 +113,21 @@ void main()
         directionToLight = normalize(directionToLight);
 
         const vec3 specularColor = vec3(0.03);
-        vec3 colorFromThisLight = BRDF(surfaceNormal, viewDirection, directionToLight, specularColor, mat.roughness);
-        colorFromThisLight += diffBRDF(surfaceNormal, viewDirection, directionToLight, specularColor, rawColor);
-        colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation * 5.0;
+        vec3 colorFromThisLight = vec3(0.0);
+        if (mat.metalliness < 0.5){
+            colorFromThisLight += BRDF(surfaceNormal, viewDirection, directionToLight, specularColor, mat.roughness);
+            colorFromThisLight += multipleBounceBRDF(surfaceNormal, viewDirection, directionToLight, specularColor, mat.roughness);
+            colorFromThisLight += diffBRDF(surfaceNormal, viewDirection, directionToLight, specularColor, rawColor);
+        } else {
+            colorFromThisLight += BRDF(surfaceNormal, viewDirection, directionToLight, rawColor, mat.roughness);
+            colorFromThisLight += multipleBounceBRDF(surfaceNormal, viewDirection, directionToLight, rawColor, mat.roughness);
+        }
+        colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation;
         color += colorFromThisLight;
     }
 
     color += sRGBToAlbedo(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w);
     if (mat.emissiveStrength > 0.01) color += sRGBToAlbedo(mat.emissiveColor * mat.emissiveStrength);
 
-    /* color.x = -1.0 / exp(color.x) + 1.0;
-    color.y = -1.0 / exp(color.y) + 1.0;
-    color.z = -1.0 / exp(color.z) + 1.0; */
     FragColor = vec4(albedoToSRGB(color), 1.0);
 }

@@ -47,9 +47,9 @@ struct PackedMaterial{
     vec4 colorFactor;
     vec4 emissiveFactor;
     float roughness;
+    float metalliness;
     int colorTextureIndex;
     float ior;
-    int padding;
 };
 
 #endif

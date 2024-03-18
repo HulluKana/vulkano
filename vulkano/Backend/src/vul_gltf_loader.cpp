@@ -31,6 +31,7 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
         omat.colorFactor = glm::vec4(pbr.baseColorFactor[0], pbr.baseColorFactor[1], pbr.baseColorFactor[2], pbr.baseColorFactor[3]);
         omat.colorTextureIndex = pbr.baseColorTexture.index;
         omat.roughness = pbr.roughnessFactor;
+        omat.metalliness = pbr.metallicFactor;
 
         if (tmat.extensions.find("KHR_materials_ior") != tmat.extensions.end()){
             const auto &ext = tmat.extensions.find("KHR_materials_ior")->second;
@@ -55,7 +56,7 @@ void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
     for (const tinygltf::Image &image : model.images){
         std::shared_ptr<VulImage> vulImage = std::make_shared<VulImage>(device);
         vulImage->loadData(image.image.data(), image.width, image.height, image.image.size() / image.width / image.height);
-        vulImage->createImage(true, true, false);
+        vulImage->createImage(true, true, false, 2);
         images.push_back(vulImage);
     }
 }

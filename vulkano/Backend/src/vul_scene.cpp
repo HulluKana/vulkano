@@ -55,9 +55,9 @@ void Scene::loadScene(std::string fileName)
         packedMat.colorFactor = mat.colorFactor;
         packedMat.emissiveFactor = glm::vec4(mat.emissiveFactor, mat.emissionStrength);
         packedMat.roughness = mat.roughness;
+        packedMat.metalliness = mat.metalliness;
         packedMat.colorTextureIndex = mat.colorTextureIndex;
         packedMat.ior = mat.ior;
-        packedMat.padding = 69;
         packedMaterials.push_back(packedMat);
     }
 

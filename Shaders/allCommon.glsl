@@ -4,6 +4,7 @@ struct Material{
     vec3 emissiveColor;
     float emissiveStrength;
     float roughness;
+    float metalliness;
     float ior;
     int colorTextureIndex; 
 };

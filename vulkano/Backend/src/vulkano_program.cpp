@@ -27,7 +27,7 @@ Vulkano::Vulkano(uint32_t width, uint32_t height, std::string name) : m_vulWindo
     uint8_t *data = new uint8_t[16]{255, 0, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 0, 255, 255};
     std::shared_ptr<VulImage> emptyImage = std::make_shared<VulImage>(m_vulDevice);
     emptyImage->loadData(data, 2, 2, 4);
-    emptyImage->createImage(true, true, false);
+    emptyImage->createImage(true, true, false, 2);
     for (uint32_t i = 0; i < MAX_TEXTURES; i++)
         images[i] = emptyImage;
 }

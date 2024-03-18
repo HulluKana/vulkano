@@ -43,8 +43,9 @@ void VulImage::keepEmpty(uint32_t width, uint32_t height, uint32_t channels)
     m_channels = channels;
 }
 
-void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorageImage)
+void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorageImage, int dimensions)
 {
+    if (dimensions < 1 || dimensions > 3) throw std::runtime_error("Vul image must have between 1 and 3 dimensions");
     if (createSampler && isStorageImage) throw std::runtime_error("Cannot create a sampler for a storage image");
     m_isLocal = isDeviceLocal;
     m_isStorage = isStorageImage;
@@ -81,7 +82,18 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorag
     m_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     if (isStorageImage) m_layout = VK_IMAGE_LAYOUT_GENERAL;
 
-    createVkImage(m_format, tiling, usage, memoryProperties);
+    VkImageType imageType = VK_IMAGE_TYPE_2D;
+    VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D;
+    if (dimensions == 1){
+        imageType = VK_IMAGE_TYPE_1D;
+        imageViewType = VK_IMAGE_VIEW_TYPE_1D;
+    }
+    if (dimensions == 3){
+        imageType = VK_IMAGE_TYPE_3D;
+        imageViewType = VK_IMAGE_VIEW_TYPE_3D;
+    }
+
+    createVkImage(m_format, tiling, usage, memoryProperties, imageType);
     if (data != nullptr && isDeviceLocal){
         vulB::VulBuffer stagingBuffer(m_vulDevice, imageSize, 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); 
         stagingBuffer.map(imageSize);
@@ -102,7 +114,7 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorag
     }
     else transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, m_layout);
     
-    createImageView();
+    createImageView(imageViewType);
     if (createSampler) createTextureSampler();
 
     if (m_data != nullptr) stbi_image_free(m_data);
@@ -138,12 +150,12 @@ void VulImage::modifyImage(void *data)
     }
 }
 
-void VulImage::createImageView()
+void VulImage::createImageView(VkImageViewType imageViewType)
 {
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = m_image;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+    viewInfo.viewType = imageViewType;
     viewInfo.format = m_format;
     viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     viewInfo.subresourceRange.baseMipLevel = 0;
@@ -182,11 +194,11 @@ void VulImage::createTextureSampler()
     m_hasSampler = true;
 }
 
-void VulImage::createVkImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties)
+void VulImage::createVkImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageType imageType)
 {
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
-    imageInfo.imageType = VK_IMAGE_TYPE_2D;
+    imageInfo.imageType = imageType;
     imageInfo.extent.width = m_width;
     imageInfo.extent.height = m_height;
     imageInfo.extent.depth = 1;
