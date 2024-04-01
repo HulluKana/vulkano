@@ -1,8 +1,8 @@
-#include"../../vulkano_defaults.hpp"
+#include "vul_host_device.hpp"
+#include<vulkano_defaults.hpp>
 
 #include <cstdint>
 #include <cstring>
-#include <functional>
 #include <glm/common.hpp>
 #include <glm/ext/scalar_constants.hpp>
 #include <glm/gtc/constants.hpp>
@@ -120,10 +120,10 @@ defaults::Default3dInputData defaults::createDefault3dInputData(Vulkano &vulkano
 void defaults::createDefaultDescriptors(Vulkano &vulkano, Default3dInputData inputData)
 {
     for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-        std::unique_ptr<VulBuffer> globalBuffer;
-        globalBuffer = std::make_unique<VulBuffer>  (vulkano.getVulDevice(), sizeof(GlobalUbo), 1, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | 
-                                                    VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, 0, vulkano.getVulDevice().properties.limits.minUniformBufferOffsetAlignment);
-        globalBuffer->map();
+        std::unique_ptr<VulBuffer> globalBuffer = std::make_unique<VulBuffer>(vulkano.getVulDevice());
+        globalBuffer->keepEmpty(sizeof(GlobalUbo), 1);
+        globalBuffer->createBuffer(false, VulBuffer::usage_ubo);
+        globalBuffer->mapAll();
         vulkano.buffers.push_back(std::move(globalBuffer));
     }
 
@@ -197,7 +197,7 @@ void defaults::updateDefault3dInputValues(Vulkano &vulkano)
         ubo.lightColors[i] = glm::vec4(scene.lights[i].color, scene.lights[i].intensity);
     }
 
-    vulkano.buffers[vulkano.getFrameIdx()]->writeToBuffer(&ubo, sizeof(ubo));
+    vulkano.buffers[vulkano.getFrameIdx()]->writeData(&ubo, sizeof(ubo), 0);
 
     struct DefaultPushConstantInputData{
         glm::mat4 modelMatrix;

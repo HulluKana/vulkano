@@ -1,10 +1,10 @@
-#include"../Headers/vul_image.hpp"
-#include"../Headers/vul_buffer.hpp"
+#include<vul_image.hpp>
+#include<vul_buffer.hpp>
 #include <cstring>
 #include <vulkan/vulkan_core.h>
 
 #define STB_IMAGE_IMPLEMENTATION
-#include"../../../3rdParty/stb_image.h"
+#include<stb_image.h>
 
 #include<stdexcept>
 
@@ -95,10 +95,9 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorag
 
     createVkImage(m_format, tiling, usage, memoryProperties, imageType);
     if (data != nullptr && isDeviceLocal){
-        vulB::VulBuffer stagingBuffer(m_vulDevice, imageSize, 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); 
-        stagingBuffer.map(imageSize);
-        memcpy(stagingBuffer.getMappedMemory(), data, static_cast<size_t>(imageSize));
-        stagingBuffer.unmap();
+        vulB::VulBuffer stagingBuffer(m_vulDevice);
+        stagingBuffer.loadData(data, 1, imageSize);
+        stagingBuffer.createBuffer(false, vulB::VulBuffer::usage_transferSrc);
 
         transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         copyBufferToImage(stagingBuffer.getBuffer());
@@ -134,10 +133,9 @@ void VulImage::modifyImage(void *data)
     if (m_isStorage) imageSize *= sizeof(float);
 
     if (m_isLocal){
-        vulB::VulBuffer stagingBuffer(m_vulDevice, imageSize, 1, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT); 
-        stagingBuffer.map(imageSize);
-        memcpy(stagingBuffer.getMappedMemory(), data, static_cast<size_t>(imageSize));
-        stagingBuffer.unmap();
+        vulB::VulBuffer stagingBuffer(m_vulDevice);
+        stagingBuffer.loadData(data, 1, imageSize);
+        stagingBuffer.createBuffer(false, vulB::VulBuffer::usage_transferSrc);
 
         transitionImageLayout(m_format, m_layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
         copyBufferToImage(stagingBuffer.getBuffer());

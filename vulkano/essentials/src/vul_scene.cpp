@@ -1,5 +1,6 @@
-#include"../Headers/vul_scene.hpp"
-#include"../Headers/vul_host_device.hpp"
+#include "vul_buffer.hpp"
+#include<vul_scene.hpp>
+#include<vul_host_device.hpp>
 #include <memory>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
@@ -7,7 +8,7 @@
 
 #define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
-#include"../../../3rdParty/tiny_gltf.h"
+#include<tiny_gltf.h>
 
 using namespace vulB;
 namespace vul
@@ -33,22 +34,6 @@ void Scene::loadScene(std::string fileName)
     gltfLoader.importDrawableNodes(   model, GltfLoader::gltfAttribOr(GltfLoader::GltfAttributes::Normal, 
                                         GltfLoader::GltfAttributes::TexCoord));
 
-    struct alignedPrimInfo{
-        uint32_t indexOffset;
-        uint32_t vertexOffset;
-        int materialIndex;
-        int padding;
-    };
-    std::vector<alignedPrimInfo> primLookup;
-    for (GltfLoader::GltfPrimMesh &primMesh : gltfLoader.primMeshes){
-        alignedPrimInfo primInfo;
-        primInfo.indexOffset = primMesh.firstIndex;
-        primInfo.vertexOffset = primMesh.vertexOffset;
-        primInfo.materialIndex = primMesh.materialIndex;
-        primInfo.padding = 69;
-        primLookup.push_back(primInfo);
-    }
-
     std::vector<PackedMaterial> packedMaterials;
     for (const GltfLoader::Material &mat : gltfLoader.materials){
         PackedMaterial packedMat;
@@ -61,12 +46,23 @@ void Scene::loadScene(std::string fileName)
         packedMaterials.push_back(packedMat);
     }
 
-    indexBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, gltfLoader.indices, VK_BUFFER_USAGE_INDEX_BUFFER_BIT); 
-    vertexBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, gltfLoader.positions, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT); 
-    normalBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, gltfLoader.normals, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    uvBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, gltfLoader.uvCoords, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
-    materialBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, packedMaterials, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
-    primInfoBuffer = vulB::VulBuffer::createLocalBufferFromData(m_vulDevice, primLookup, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT);
+    indexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+    vertexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+    normalBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+    uvBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+    materialBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+
+    indexBuffer->loadVector(gltfLoader.indices);
+    vertexBuffer->loadVector(gltfLoader.positions);
+    normalBuffer->loadVector(gltfLoader.normals);
+    uvBuffer->loadVector(gltfLoader.uvCoords);
+    materialBuffer->loadVector(packedMaterials);
+
+    indexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_indexBuffer | VulBuffer::usage_transferDst));
+    vertexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
+    normalBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
+    uvBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
+    materialBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_transferDst));
 
     lights = gltfLoader.lights;
     nodes = gltfLoader.nodes;

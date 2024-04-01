@@ -1,5 +1,5 @@
-#include "../Headers/vul_device.hpp"
-#include "../Headers/vul_settings.hpp"
+#include<vul_device.hpp>
+#include<vul_settings.hpp>
 
 // std headers
 #include <cstring>

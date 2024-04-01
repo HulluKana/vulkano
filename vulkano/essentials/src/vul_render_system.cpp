@@ -1,5 +1,5 @@
-#include"../Headers/vul_render_system.hpp"
-#include"../Headers/vul_settings.hpp"
+#include<vul_render_system.hpp>
+#include<vul_settings.hpp>
 #include <vulkan/vulkan_core.h>
 
 #define GLM_FORCE_RADIANS

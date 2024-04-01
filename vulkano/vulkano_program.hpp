@@ -1,19 +1,19 @@
 #pragma once
 
-#include "Backend/Headers/vul_buffer.hpp"
-#include"Backend/Headers/vul_device.hpp"
-#include"Backend/Headers/vul_descriptors.hpp"
-#include"Backend/Headers/vul_GUI.hpp"
-#include"Backend/Headers/vul_render_system.hpp"
-#include"Backend/Headers/vul_movement_controller.hpp"
-#include"Backend/Headers/vul_image.hpp"
-#include"Backend/Headers/vul_settings.hpp"
+#include<vul_buffer.hpp>
+#include<vul_device.hpp>
+#include<vul_descriptors.hpp>
+#include<vul_GUI.hpp>
+#include<vul_render_system.hpp>
+#include<vul_movement_controller.hpp>
+#include<vul_image.hpp>
+#include<vul_settings.hpp>
 
-#include"Backend/Headers/vul_host_device.hpp"
-#include"Backend/Headers/vul_2d_object.hpp"
-#include "Backend/Headers/vul_swap_chain.hpp"
-#include"Backend/Headers/vul_transform.hpp"
-#include"Backend/Headers/vul_comp_pipeline.hpp"
+#include<vul_host_device.hpp>
+#include<vul_2d_object.hpp>
+#include<vul_swap_chain.hpp>
+#include<vul_transform.hpp>
+#include<vul_comp_pipeline.hpp>
 
 #include<memory>
 #include<array>

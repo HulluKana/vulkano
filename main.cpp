@@ -1,7 +1,7 @@
-#include "vulkano/vulkano_program.hpp"
-#include "vulkano/vulkano_defaults.hpp"
+#include<vulkano_program.hpp>
+#include<vulkano_defaults.hpp>
 
-#include "3rdParty/imgui/imgui.h"
+#include<imgui.h>
 
 void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
     ImGui::Begin("Performance");

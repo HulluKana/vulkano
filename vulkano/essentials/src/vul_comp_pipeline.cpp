@@ -1,6 +1,6 @@
-#include"../Headers/vul_comp_pipeline.hpp"
-#include"../Headers/vul_pipeline.hpp"
-#include"../Headers/vul_swap_chain.hpp"
+#include<vul_comp_pipeline.hpp>
+#include<vul_pipeline.hpp>
+#include<vul_swap_chain.hpp>
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 

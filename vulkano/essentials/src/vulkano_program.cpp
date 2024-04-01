@@ -1,6 +1,6 @@
-#include"../../vulkano_program.hpp"
+#include<vulkano_program.hpp>
 
-#include"../../../3rdParty/imgui/imgui.h"
+#include<imgui.h>
 #include <memory>
 #include <stdexcept>
 
@@ -155,7 +155,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
         int stageFlags = 0;
         for (size_t j = 0; j < descriptors[i].stages.size(); j++)
             stageFlags |= static_cast<int>(descriptors[i].stages[j]);
-        VkDescriptorType type;
+        VkDescriptorType type{};
         if (descriptors[i].type == DescriptorType::ubo) type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         else if (descriptors[i].type == DescriptorType::ssbo) type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         else if (descriptors[i].type == DescriptorType::combinedTexSampler ||
@@ -175,7 +175,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
             VulBuffer *buffer = static_cast<VulBuffer *>(desc.content);
             std::vector<VkDescriptorBufferInfo> bufferInfos(desc.count);
             for (uint32_t j = 0; j < desc.count; j++)
-                bufferInfos[j] = buffer[j].descriptorInfo();
+                bufferInfos[j] = buffer[j].getDescriptorInfo();
             bufferInfosStorage.push_back(bufferInfos);
             set.writeBuffer(i, bufferInfosStorage[bufferInfosStorage.size() - 1].data(), desc.count);
         }

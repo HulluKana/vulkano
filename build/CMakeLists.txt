@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION "3.22.1")
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
 
 add_custom_target(shaders)
@@ -23,7 +24,7 @@ endforeach(FILE)
 project(vulkano)
 project(debugVulkano)
 
-file(GLOB_RECURSE SRC "../vulkano/Backend/src/*.cpp")
+file(GLOB_RECURSE SRC "../vulkano/essentials/src/*.cpp" "../vulkano/optionals/src/*.cpp")
 add_executable(vulkano "../main.cpp" "${SRC}")
 add_executable(debugVulkano "../main.cpp" "${SRC}")
 add_dependencies(vulkano shaders)
@@ -44,5 +45,5 @@ target_include_directories("ImGui" PUBLIC ${IMGUI_PATH})
 target_link_libraries(vulkano ImGui)
 target_link_libraries(debugVulkano ImGui)
 
-target_include_directories(vulkano PUBLIC "3rdParty" "../vulkano/" "../vulkano/Backend/Headers/")
-target_include_directories(debugVulkano PUBLIC "3rdParty" "../vulkano/" "../vulkano/Backend/Headers/")
+target_include_directories(vulkano PUBLIC "../3rdParty/" "../vulkano/" "../vulkano/essentials/include/" "../vulkano/optionals/include/")
+target_include_directories(debugVulkano PUBLIC "../3rdParty/" "../vulkano/"  "../vulkano/essentials/include/" "../vulkano/optionals/include/")

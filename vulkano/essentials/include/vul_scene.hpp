@@ -27,7 +27,6 @@ class Scene
         std::unique_ptr<vulB::VulBuffer> uvBuffer;
         std::unique_ptr<vulB::VulBuffer> indexBuffer;
         std::unique_ptr<vulB::VulBuffer> materialBuffer;
-        std::unique_ptr<vulB::VulBuffer> primInfoBuffer;
 
         std::vector<std::shared_ptr<void>> pPushDatas;
         uint32_t pushDataSize;

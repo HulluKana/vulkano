@@ -11,8 +11,8 @@
 #include <string>
 #include <iostream>
 
-#include"../Headers/vul_gltf_loader.hpp"
-#include"../Headers/vul_transform.hpp"
+#include<vul_gltf_loader.hpp>
+#include<vul_transform.hpp>
 
 using namespace vul;
 namespace vulB

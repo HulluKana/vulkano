@@ -1,9 +1,11 @@
-/bin
+/.cache/
+/bin/
 /Models/
 /Textures/
 /build/CMakeFiles
 /build/cmake_install.cmake
 /build/CMakeCache.txt
+/build/compile_commands.json
 /build/Makefile
 /build/libImGui.a
 /3rdParty/GLFW/CMakeFiles
@@ -18,3 +20,4 @@
 /cr
 /d
 /cd
+/clear

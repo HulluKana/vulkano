@@ -1,4 +1,4 @@
-#include"../Headers/vul_window.hpp"
+#include<vul_window.hpp>
 #include <GLFW/glfw3.h>
 #include<stdexcept>
 
