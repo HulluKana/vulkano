@@ -507,19 +507,6 @@ void VulDevice::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
   vkFreeCommandBuffers(device_, commandPool, 1, &commandBuffer);
 }
 
-void VulDevice::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer,
-                           VkDeviceSize size) {
-  VkCommandBuffer commandBuffer = beginSingleTimeCommands();
-
-  VkBufferCopy copyRegion{};
-  copyRegion.srcOffset = 0; // Optional
-  copyRegion.dstOffset = 0; // Optional
-  copyRegion.size = size;
-  vkCmdCopyBuffer(commandBuffer, srcBuffer, dstBuffer, 1, &copyRegion);
-
-  endSingleTimeCommands(commandBuffer);
-}
-
 void VulDevice::copyBufferToImage(VkBuffer buffer, VkImage image,
                                   uint32_t width, uint32_t height,
                                   uint32_t layerCount) {
@@ -541,33 +528,6 @@ void VulDevice::copyBufferToImage(VkBuffer buffer, VkImage image,
   vkCmdCopyBufferToImage(commandBuffer, buffer, image,
                          VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
   endSingleTimeCommands(commandBuffer);
-}
-
-void VulDevice::createImageWithInfo(const VkImageCreateInfo &imageInfo,
-                                    VkMemoryPropertyFlags properties,
-                                    VkImage &image,
-                                    VkDeviceMemory &imageMemory) {
-  if (vkCreateImage(device_, &imageInfo, nullptr, &image) != VK_SUCCESS) {
-    throw std::runtime_error("failed to create image!");
-  }
-
-  VkMemoryRequirements memRequirements;
-  vkGetImageMemoryRequirements(device_, image, &memRequirements);
-
-  VkMemoryAllocateInfo allocInfo{};
-  allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-  allocInfo.allocationSize = memRequirements.size;
-  allocInfo.memoryTypeIndex =
-      findMemoryType(memRequirements.memoryTypeBits, properties);
-
-  if (vkAllocateMemory(device_, &allocInfo, nullptr, &imageMemory) !=
-      VK_SUCCESS) {
-    throw std::runtime_error("failed to allocate image memory!");
-  }
-
-  if (vkBindImageMemory(device_, image, imageMemory, 0) != VK_SUCCESS) {
-    throw std::runtime_error("failed to bind image memory!");
-  }
 }
 
 } // namespace vulB

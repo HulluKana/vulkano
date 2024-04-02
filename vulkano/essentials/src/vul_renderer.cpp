@@ -1,3 +1,4 @@
+#include "vul_attachment_image.hpp"
 #include<vul_renderer.hpp>
 
 #include<imgui.h>
@@ -39,8 +40,17 @@ void VulRenderer::recreateSwapChain()
         vulSwapChain = std::make_unique<VulSwapChain>(vulDevice, extent, oldSwapChain);
 
         if (!oldSwapChain->compareSwapFormats(*vulSwapChain.get())){
-            throw std::runtime_error("Swap chain image or depth format has changed");
+            throw std::runtime_error("Swap chain image format has changed");
         }
+    }
+
+    m_depthFormat = vulDevice.findSupportedFormat({  VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT}, 
+                                                            VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    m_depthImages.resize(vulSwapChain->imageCount());
+    for (size_t i = 0; i < vulSwapChain->imageCount(); i++) {
+        m_depthImages[i] = std::make_unique<VulAttachmentImage>(vulDevice);
+        if (m_depthImages[i]->createEmptyImage( VulAttachmentImage::ImageType::depthAttachment, m_depthFormat, vulSwapChain->getSwapChainExtent()) != VK_SUCCESS)
+            throw std::runtime_error("Failed to create depth image");
     }
 }
 
@@ -124,39 +134,8 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, uint32_t renderW
     renderArea.width = renderWidth > 0 ? renderWidth : vulSwapChain->getSwapChainExtent().width;
     renderArea.height = renderHeight > 0 ? renderHeight : vulSwapChain->getSwapChainExtent().height;
 
-    VkImageSubresourceRange subResourceRange{};
-    subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    subResourceRange.baseMipLevel = 0;
-    subResourceRange.levelCount = 1;
-    subResourceRange.baseArrayLayer = 0;
-    subResourceRange.layerCount = 1;
-
-    VkImageMemoryBarrier imageMemoryBarrier{};
-    imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    imageMemoryBarrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    imageMemoryBarrier.image = vulSwapChain->getImage(currentImageIndex);
-    imageMemoryBarrier.subresourceRange = subResourceRange;
-
-    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
-
-    VkRenderingAttachmentInfo colorAttachmentInfo{};
-    colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    colorAttachmentInfo.imageView = vulSwapChain->getImageView(currentImageIndex);
-    colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
-    colorAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-    colorAttachmentInfo.clearValue = {0.0f, 0.0f, 0.0f, 1.0f};
-
-    VkRenderingAttachmentInfo depthAttachmentInfo{};
-    depthAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-    depthAttachmentInfo.imageView = vulSwapChain->getDepthImageView(currentImageIndex);
-    depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
-    depthAttachmentInfo.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-    depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-    depthAttachmentInfo.clearValue = {1.0f};
-
+    VkRenderingAttachmentInfo colorAttachmentInfo = vulSwapChain->getImage(currentImageIndex)->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}});
+    VkRenderingAttachmentInfo depthAttachmentInfo = m_depthImages[currentImageIndex]->getAttachmentInfo({{{1.0f}}});
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea.offset = {0, 0};
@@ -166,6 +145,7 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, uint32_t renderW
     renderingInfo.pColorAttachments = &colorAttachmentInfo;
     renderingInfo.pDepthAttachment = &depthAttachmentInfo;
 
+    vulSwapChain->getImage(currentImageIndex)->establishPreAttachmentPipelineBarrier(commandBuffer);
     vkCmdBeginRendering(commandBuffer, &renderingInfo);
 
     VkViewport viewport{};
@@ -188,23 +168,7 @@ void VulRenderer::stopRendering(VkCommandBuffer commandBuffer)
     assert(commandBuffer == getCurrentCommandBuffer() && "Can't end a render pass on a command buffer from a different frame");
 
     vkCmdEndRendering(commandBuffer);
-
-    VkImageSubresourceRange subResourceRange{};
-    subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    subResourceRange.baseMipLevel = 0;
-    subResourceRange.levelCount = 1;
-    subResourceRange.baseArrayLayer = 0;
-    subResourceRange.layerCount = 1;
-
-    VkImageMemoryBarrier imageMemoryBarrier{};
-    imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    imageMemoryBarrier.srcAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    imageMemoryBarrier.image = vulSwapChain->getImage(currentImageIndex);
-    imageMemoryBarrier.subresourceRange = subResourceRange;
-
-    vkCmdPipelineBarrier(commandBuffer, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
+    vulSwapChain->getImage(currentImageIndex)->establishPostAttachmentPipelineBarrier(commandBuffer);
 }
 
 }

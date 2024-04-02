@@ -1,13 +1,11 @@
 #pragma once
 
-#include "vul_device.hpp"
+#include"vul_attachment_image.hpp"
 
 // vulkan headers
 #include <vulkan/vulkan.h>
 
-// std lib headers
 #include <memory>
-#include <string>
 #include <vector>
 
 namespace vulB {
@@ -23,14 +21,9 @@ class VulSwapChain {
   VulSwapChain(const VulSwapChain &) = delete;
   VulSwapChain &operator=(const VulSwapChain &) = delete;
 
-  VkFramebuffer getFrameBuffer(int index) { return swapChainFramebuffers[index]; }
-  VkRenderPass getRenderPass() { return renderPass; }
-  VkImageView getImageView(int index) { return swapChainImageViews[index]; }
-  VkImageView getDepthImageView(int index) {return depthImageViews[index];}
   size_t imageCount() { return swapChainImages.size(); }
-  VkImage getImage(uint32_t index) {return swapChainImages[index];}
+  std::shared_ptr<VulAttachmentImage> getImage(uint32_t index) {return swapChainImages[index];}
   VkFormat getSwapChainImageFormat() { return swapChainImageFormat; }
-  VkFormat getSwapChainImageDepthFormat() {return swapChainDepthFormat;}
   VkExtent2D getSwapChainExtent() { return swapChainExtent; }
   uint32_t width() { return swapChainExtent.width; }
   uint32_t height() { return swapChainExtent.height; }
@@ -38,23 +31,18 @@ class VulSwapChain {
   float extentAspectRatio() {
     return static_cast<float>(swapChainExtent.width) / static_cast<float>(swapChainExtent.height);
   }
-  VkFormat findDepthFormat();
 
   VkResult acquireNextImage(uint32_t *imageIndex);
   VkResult submitCommandBuffers(const VkCommandBuffer *buffers, uint32_t *imageIndex);
 
   bool compareSwapFormats(const VulSwapChain &swapChain)
   {
-    return swapChain.swapChainDepthFormat == swapChainDepthFormat && swapChain.swapChainImageFormat == swapChainImageFormat;
+    return swapChain.swapChainImageFormat == swapChainImageFormat;
   }
 
  private:
   void init();
   void createSwapChain();
-  void createImageViews();
-  void createDepthResources();
-  void createRenderPass();
-  void createFramebuffers();
   void createSyncObjects();
 
   // Helper functions
@@ -65,17 +53,9 @@ class VulSwapChain {
   VkExtent2D chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabilities);
 
   VkFormat swapChainImageFormat;
-  VkFormat swapChainDepthFormat;
   VkExtent2D swapChainExtent;
 
-  std::vector<VkFramebuffer> swapChainFramebuffers;
-  VkRenderPass renderPass;
-
-  std::vector<VkImage> depthImages;
-  std::vector<VkDeviceMemory> depthImageMemorys;
-  std::vector<VkImageView> depthImageViews;
-  std::vector<VkImage> swapChainImages;
-  std::vector<VkImageView> swapChainImageViews;
+  std::vector<std::shared_ptr<VulAttachmentImage>> swapChainImages;
 
   VulDevice &device;
   VkExtent2D windowExtent;

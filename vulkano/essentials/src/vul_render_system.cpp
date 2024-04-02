@@ -54,7 +54,6 @@ void RenderSystem::createPipeline(std::string vertShaderName, std::string fragSh
     PipelineConfigInfo pipelineConfig{};
     VulPipeline::defaultPipeLineConfigInfo(pipelineConfig); 
 
-    pipelineConfig.renderPass = nullptr; 
     pipelineConfig.pipelineLayout = pipelineLayout;
     if (!is2D){
         pipelineConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0}, {2, 2, VK_FORMAT_R32G32_SFLOAT}};

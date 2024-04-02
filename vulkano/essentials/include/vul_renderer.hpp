@@ -1,5 +1,6 @@
 #pragma once
 
+#include "vul_attachment_image.hpp"
 #include"vul_device.hpp"
 #include"vul_swap_chain.hpp"
 #include"vul_window.hpp"
@@ -20,11 +21,10 @@ class VulRenderer{
         VulRenderer(const VulRenderer &) = delete;
         VulRenderer &operator=(const VulRenderer &) = delete;
 
-        VkRenderPass getSwapChainRenderPass() const {return vulSwapChain->getRenderPass();}
         float getAspectRatio() const {return vulSwapChain->extentAspectRatio();}
         VkExtent2D getSwapChainExtent() const {return vulSwapChain->getSwapChainExtent();}
         VkFormat getSwapChainColorFormat() const {return vulSwapChain->getSwapChainImageFormat();}
-        VkFormat getSwapChainDepthFormat() const {return vulSwapChain->getSwapChainImageDepthFormat();}
+        VkFormat getDepthFormat() const {return m_depthFormat;}
         bool isFrameInProgress() const {return isFrameStarted;}
 
         VkCommandBuffer getCurrentCommandBuffer() const {
@@ -51,6 +51,9 @@ class VulRenderer{
         VulDevice& vulDevice;
         std::unique_ptr<VulSwapChain> vulSwapChain;
         std::vector<VkCommandBuffer> commandBuffers;
+
+        std::vector<std::unique_ptr<VulAttachmentImage>> m_depthImages;
+        VkFormat m_depthFormat;
 
         uint32_t currentImageIndex;
         int currentFrameIndex{0};

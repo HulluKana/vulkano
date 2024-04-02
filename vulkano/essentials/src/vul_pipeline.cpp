@@ -90,7 +90,7 @@ void VulPipeline::createGraphicsPipeline(const std::string& vertFile, const std:
 
     pipelineInfo.layout = configInfo.pipelineLayout;
     pipelineInfo.renderPass = nullptr;
-    pipelineInfo.subpass = configInfo.subpass;
+    pipelineInfo.subpass = 0;
 
     pipelineInfo.basePipelineIndex = -1;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;

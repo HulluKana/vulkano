@@ -220,7 +220,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
 std::unique_ptr<RenderSystem> Vulkano::createNewRenderSystem(const std::vector<VkDescriptorSetLayout> &setLayouts, std::string vertShaderName, std::string fragShaderName, bool is2D)
 {
     std::unique_ptr<RenderSystem> renderSystem = std::make_unique<RenderSystem>(m_vulDevice);
-    renderSystem->init(setLayouts, vertShaderName, fragShaderName, m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getSwapChainDepthFormat(), is2D);
+    renderSystem->init(setLayouts, vertShaderName, fragShaderName, m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getDepthFormat(), is2D);
     return renderSystem;
 }
         
