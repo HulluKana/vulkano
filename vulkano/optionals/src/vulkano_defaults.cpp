@@ -1,4 +1,6 @@
 #include "vul_host_device.hpp"
+#include "vul_pipeline.hpp"
+#include <vulkan/vulkan_core.h>
 #include<vulkano_defaults.hpp>
 
 #include <cstdint>
@@ -173,12 +175,14 @@ void defaults::createDefaultDescriptors(Vulkano &vulkano, Default3dInputData inp
 
 void defaults::createDefault3dRenderSystem(Vulkano &vulkano)
 {
-    vulkano.renderSystem3D = vulkano.createNewRenderSystem({vulkano.mainSetLayout->getDescriptorSetLayout()}, "default3D.vert.spv", "default3D.frag.spv", false);
-}
-
-void defaults::createDefault2dRenderSystem(Vulkano &vulkano)
-{
-    vulkano.renderSystem2D = vulkano.createNewRenderSystem({vulkano.mainSetLayout->getDescriptorSetLayout()}, "default2D.vert.spv", "default2D.frag.spv", true);
+    VulPipeline::PipelineConfigInfo config{};
+    config.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0}, {2, 2, VK_FORMAT_R32G32_SFLOAT}};
+    config.bindingDescriptions = {  {0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX},
+                                    {2, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
+    config.setLayouts = {vulkano.mainSetLayout->getDescriptorSetLayout()};
+    config.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
+    config.cullMode = VK_CULL_MODE_NONE;
+    vulkano.pipeline3d = std::make_unique<VulPipeline>(vulkano.getVulDevice(), "default3D.vert.spv", "default3D.frag.spv", config);
 }
 
 void defaults::updateDefault3dInputValues(Vulkano &vulkano)

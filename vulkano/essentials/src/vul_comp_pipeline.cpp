@@ -13,8 +13,7 @@ VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vecto
     if (maxFramesInFlight == 0) throw std::runtime_error("Max frames in flight for compute pipelines must be at least 1");
     m_maxFramesInFlight = maxFramesInFlight;
 
-    std::vector<char> shaderCode = VulPipeline::readFile(shaderName);
-    VulPipeline::createShaderModule(m_vulDevice, shaderCode, &m_shader);
+    VulPipeline::createShaderModule(m_vulDevice, shaderName, &m_shader);
 
     VkPipelineShaderStageCreateInfo stageInfo{};
     stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;

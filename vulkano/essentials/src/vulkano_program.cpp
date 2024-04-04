@@ -1,3 +1,4 @@
+#include "vul_gltf_loader.hpp"
 #include<vulkano_program.hpp>
 
 #include<imgui.h>
@@ -54,10 +55,10 @@ void Vulkano::initVulkano()
         m_imGuiDescriptorSets.push_back(std::move(retVal.set));
     }
 
-    m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), m_vulRenderer, m_vulDevice);
+    m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), vulRenderer, m_vulDevice);
 
     m_currentTime = glfwGetTime();
-    m_prevWindowSize = m_vulRenderer.getSwapChainExtent();
+    m_prevWindowSize = vulRenderer.getSwapChainExtent();
 }
 
 VkCommandBuffer Vulkano::startFrame()
@@ -77,20 +78,20 @@ VkCommandBuffer Vulkano::startFrame()
 
     ImGuiIO &io = ImGui::GetIO(); (void)io;
     if (!io.WantCaptureKeyboard) cameraController.modifyValues(m_vulWindow.getGLFWwindow(), cameraTransform);
-    if (!io.WantCaptureMouse && !io.WantCaptureKeyboard) cameraController.rotate(m_vulWindow.getGLFWwindow(), m_frameTime, cameraTransform, m_vulRenderer.getSwapChainExtent().width, m_vulRenderer.getSwapChainExtent().height);
+    if (!io.WantCaptureMouse && !io.WantCaptureKeyboard) cameraController.rotate(m_vulWindow.getGLFWwindow(), m_frameTime, cameraTransform, vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height);
     if (!io.WantCaptureKeyboard) cameraController.move(m_vulWindow.getGLFWwindow(), m_frameTime, cameraTransform);
 
-    float aspect = m_vulRenderer.getAspectRatio();
+    float aspect = vulRenderer.getAspectRatio();
     if (settings::cameraProperties.hasPerspective) camera.setPerspectiveProjection(settings::cameraProperties.fovY, aspect, settings::cameraProperties.nearPlane, settings::cameraProperties.farPlane);
     else camera.setOrthographicProjection(settings::cameraProperties.leftPlane, settings::cameraProperties.rightPlane, settings::cameraProperties.topPlane,
                                             settings::cameraProperties.bottomPlane, settings::cameraProperties.nearPlane, settings::cameraProperties.farPlane);
 
     camera.setViewXYZ(cameraTransform.pos, cameraTransform.rot);
 
-    if (VkCommandBuffer commandBuffer = m_vulRenderer.beginFrame()){
-        m_prevWindowSize = m_vulRenderer.getSwapChainExtent();
+    if (VkCommandBuffer commandBuffer = vulRenderer.beginFrame()){
+        m_prevWindowSize = vulRenderer.getSwapChainExtent();
 
-        m_vulRenderer.beginRendering(commandBuffer, settings::renderWidth, settings::renderHeight);
+        vulRenderer.beginRendering(commandBuffer, settings::renderWidth, settings::renderHeight);
         if (!cameraController.hideGUI) m_vulGUI.startFrame();
 
         m_renderPreparationTime = glfwGetTime() - renderPreparationStartTime;
@@ -102,23 +103,23 @@ VkCommandBuffer Vulkano::startFrame()
 
 bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 {
-    int frameIdx = m_vulRenderer.getFrameIndex();
+    int frameIdx = vulRenderer.getFrameIndex();
 
     double objRenderStartTime = glfwGetTime();
     if (hasScene){
         std::vector<VkDescriptorSet> defaultDescriptorSets;
         defaultDescriptorSets.push_back(mainDescriptorSets[frameIdx].getSet());
-        renderSystem3D->render(scene, defaultDescriptorSets, commandBuffer);
-    }
-    if (object2Ds.size() > 0){
-        std::vector<VkDescriptorSet> defaultDescriptorSets;
-        defaultDescriptorSets.push_back(mainDescriptorSets[frameIdx].getSet());
-        if (vul::settings::batchRender2Ds) renderSystem2D->render(object2Ds, defaultDescriptorSets, commandBuffer);
-        else{
-            for (Object2D &obj : object2Ds){
-                renderSystem2D->render(obj, defaultDescriptorSets, commandBuffer);
-            }
+        std::vector<VkBuffer> vertexBuffers = {scene.vertexBuffer->getBuffer(), scene.normalBuffer->getBuffer(), scene.uvBuffer->getBuffer()};
+        std::vector<vulB::VulPipeline::DrawData> drawDatas(scene.nodes.size());
+        for (size_t i = 0; i < scene.nodes.size(); i++) {
+            const GltfLoader::GltfPrimMesh &mesh = scene.meshes[scene.nodes[i].primMesh];
+            drawDatas[i].indexCount = mesh.indexCount;
+            drawDatas[i].firstIndex = mesh.firstIndex;
+            drawDatas[i].vertexOffset = mesh.vertexOffset;
+            drawDatas[i].pPushData = scene.pPushDatas[i].get();
+            drawDatas[i].pushDataSize = scene.pushDataSize;
         }
+        pipeline3d->draw(commandBuffer, defaultDescriptorSets, vertexBuffers, scene.indexBuffer->getBuffer(), drawDatas);
     }
     m_objRenderTime = glfwGetTime() - objRenderStartTime;
 
@@ -127,8 +128,8 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
     m_GuiRenderTime = glfwGetTime() - guiRenderStartTime;
 
     double renderFinishStartTime = glfwGetTime();
-    m_vulRenderer.stopRendering(commandBuffer);
-    m_vulRenderer.endFrame();
+    vulRenderer.stopRendering(commandBuffer);
+    vulRenderer.endFrame();
     m_renderFinishingTime = glfwGetTime() - renderFinishStartTime;
 
     return m_vulWindow.shouldClose();
@@ -215,13 +216,6 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
     set.build();
 
     return {std::move(set), std::move(layout), set.hasSet()};
-}
-
-std::unique_ptr<RenderSystem> Vulkano::createNewRenderSystem(const std::vector<VkDescriptorSetLayout> &setLayouts, std::string vertShaderName, std::string fragShaderName, bool is2D)
-{
-    std::unique_ptr<RenderSystem> renderSystem = std::make_unique<RenderSystem>(m_vulDevice);
-    renderSystem->init(setLayouts, vertShaderName, fragShaderName, m_vulRenderer.getSwapChainColorFormat(), m_vulRenderer.getDepthFormat(), is2D);
-    return renderSystem;
 }
         
 VulCompPipeline Vulkano::createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight)

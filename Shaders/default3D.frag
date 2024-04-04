@@ -3,7 +3,6 @@
 #extension GL_GOOGLE_include_directive : enable
 
 #include"../vulkano/essentials/include/vul_host_device.hpp"
-#include"allCommon.glsl"
 
 layout (location = 0) in vec3 fragPosWorld;
 layout (location = 1) in vec3 fragNormalWorld;
@@ -76,7 +75,16 @@ vec3 diffBRDF(vec3 surfaceNormal, vec3 viewDirection, vec3 lightDirection, vec3 
 
 void main()
 {
-    Material mat;
+    struct Material{
+        vec3 color;
+        float alpha;
+        vec3 emissiveColor;
+        float emissiveStrength;
+        float roughness;
+        float metalliness;
+        float ior;
+        int colorTextureIndex; 
+    } mat;
     if (push.matIdx > -1){
         PackedMaterial packedMat = matBuf.m[push.matIdx];
         mat.color = packedMat.colorFactor.xyz;

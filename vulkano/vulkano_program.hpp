@@ -4,21 +4,21 @@
 #include<vul_device.hpp>
 #include<vul_descriptors.hpp>
 #include<vul_GUI.hpp>
-#include<vul_render_system.hpp>
 #include<vul_movement_controller.hpp>
 #include<vul_image.hpp>
 #include<vul_settings.hpp>
-
 #include<vul_host_device.hpp>
 #include<vul_2d_object.hpp>
 #include<vul_swap_chain.hpp>
 #include<vul_transform.hpp>
 #include<vul_comp_pipeline.hpp>
+#include<vul_scene.hpp>
+#include<vul_camera.hpp>
+#include<vul_pipeline.hpp>
 
 #include<memory>
 #include<array>
 #include<variant>
-#include <vulkan/vulkan_core.h>
 
 namespace vul{
 
@@ -50,7 +50,7 @@ class Vulkano{
         float getGuiRenderTime() const {return m_GuiRenderTime;}
         float getRenderFinishingTime() const {return m_renderFinishingTime;}
 
-        int getFrameIdx() const {return m_vulRenderer.getFrameIndex();}
+        int getFrameIdx() const {return vulRenderer.getFrameIndex();}
 
         bool shouldShowGUI() const {return !cameraController.hideGUI;}
         bool windowWasResized() {return m_vulWindow.wasWindowResized();}
@@ -64,7 +64,7 @@ class Vulkano{
         }
         
         vulB::VulDevice &getVulDevice() {return m_vulDevice;}
-        VkExtent2D getSwapChainExtent() const {return m_vulRenderer.getSwapChainExtent();}
+        VkExtent2D getSwapChainExtent() const {return vulRenderer.getSwapChainExtent();}
 
         enum class DescriptorType{
             ubo,
@@ -91,14 +91,11 @@ class Vulkano{
         };
 
         descSetReturnVal createDescriptorSet(const std::vector<Descriptor> &descriptors);
-        std::unique_ptr<RenderSystem> createNewRenderSystem(const std::vector<VkDescriptorSetLayout> &setLayouts, std::string vertShaderName, std::string fragShaderName, bool is2D); 
         VulCompPipeline createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight);        
 
         Scene scene{m_vulDevice};
         bool hasScene = false;
 
-        std::unique_ptr<RenderSystem> renderSystem3D;
-        std::unique_ptr<RenderSystem> renderSystem2D;
         std::vector<vulB::VulDescriptorSet> mainDescriptorSets;
         std::unique_ptr<vulB::VulDescriptorSetLayout> mainSetLayout;
         std::vector<std::unique_ptr<vulB::VulBuffer>> buffers;
@@ -107,6 +104,8 @@ class Vulkano{
         std::array<std::shared_ptr<VulImage>, MAX_TEXTURES> images;
         uint32_t imageCount = 0u;
 
+        std::unique_ptr<vulB::VulPipeline> pipeline3d;
+        vulB::VulRenderer vulRenderer{m_vulWindow, m_vulDevice};
         vulB::VulCamera camera{};
         transform3D cameraTransform;
         vulB::MovementController cameraController;
@@ -121,7 +120,6 @@ class Vulkano{
 
         VkExtent2D m_prevWindowSize;
 
-        vulB::VulRenderer m_vulRenderer{m_vulWindow, m_vulDevice};
         vulB::VulGUI m_vulGUI;
 
         std::unique_ptr<vulB::VulDescriptorPool> m_globalPool{};

@@ -3,27 +3,21 @@
 #include"vul_device.hpp"
 #include<string>
 #include<vector>
+#include <vulkan/vulkan_core.h>
 
 namespace vulB{
 
-struct PipelineConfigInfo {
-    VkPipelineViewportStateCreateInfo viewportInfo;
-    VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo;
-    VkPipelineRasterizationStateCreateInfo rasterizationInfo;
-    VkPipelineMultisampleStateCreateInfo multisampleInfo;
-    VkPipelineColorBlendAttachmentState colorBlendAttachment;
-    VkPipelineColorBlendStateCreateInfo colorBlendInfo;
-    VkPipelineDepthStencilStateCreateInfo depthStencilInfo;
-    std::vector<VkDynamicState> dynamicStateEnables;
-    VkPipelineDynamicStateCreateInfo dynamicStateInfo;
-    VkPipelineLayout pipelineLayout = nullptr;
-    std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
-    std::vector<VkVertexInputBindingDescription> bindingDescriptions;
-};
-
 class VulPipeline{
     public:
-        VulPipeline(VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat);
+        struct PipelineConfigInfo {
+            std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
+            std::vector<VkVertexInputBindingDescription> bindingDescriptions;
+            std::vector<VkDescriptorSetLayout> setLayouts;
+            VkFormat depthAttachmentFormat = VK_FORMAT_UNDEFINED;
+            VkCullModeFlagBits cullMode = VK_CULL_MODE_NONE;
+        };
+
+        VulPipeline(VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo);
         ~VulPipeline();
 
         /* These 2 lines remove the copy constructor and operator from VulPipeline class.
@@ -32,18 +26,25 @@ class VulPipeline{
         VulPipeline(const VulPipeline &) = delete;
         VulPipeline &operator=(const VulPipeline &) = delete;
 
-        void bind(VkCommandBuffer commandBuffer);
+        struct DrawData {
+            uint32_t indexCount = 0;
+            uint32_t firstIndex = 0;
+            int32_t vertexOffset = 0;
+            void *pPushData = nullptr;
+            uint32_t pushDataSize = 0;
+        };
+        void draw(  VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSet> &descriptorSets, const std::vector<VkBuffer> &vertexBuffers,
+                    VkBuffer indexBuffer, const std::vector<DrawData> &drawDatas);
 
-        static void defaultPipeLineConfigInfo(PipelineConfigInfo &configInfo);
-    
-        static std::vector<char> readFile(const std::string& filePath);
-        static void createShaderModule(VulDevice &vulDevice, const std::vector<char>& code, VkShaderModule* shaderModule);
+        static void createShaderModule(VulDevice &vulDevice, const std::string &filePath, VkShaderModule* shaderModule);
+
+        VkPipeline getPipeline() const {return m_pipeline;}
+        VkPipelineLayout getPipelineLayout() const {return m_layout;}
     private:
-        void createGraphicsPipeline(const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo, VkFormat colorAttachmentFormat, VkFormat depthAttachmentFormat);
-
-        VulDevice& vulDevice;
-        VkPipeline graphicsPipeline;
-        VkShaderModule vertShaderModule;
-        VkShaderModule fragShaderModule;
+        VulDevice& m_vulDevice;
+        VkPipeline m_pipeline;
+        VkPipelineLayout m_layout;
+        VkShaderModule m_vertShaderModule;
+        VkShaderModule m_fragShaderModule;
 };
 }

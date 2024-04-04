@@ -1,9 +1,7 @@
-#include "vul_buffer.hpp"
 #include<vul_scene.hpp>
 #include<vul_host_device.hpp>
 #include <memory>
 #include <stdexcept>
-#include <vulkan/vulkan_core.h>
 #include <iostream>
 
 #define TINYGLTF_IMPLEMENTATION
