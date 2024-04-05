@@ -1,4 +1,7 @@
 #include "vul_attachment_image.hpp"
+#include <cstddef>
+#include <cstdlib>
+#include <memory>
 #include<vul_renderer.hpp>
 
 #include<imgui.h>
@@ -21,7 +24,7 @@ VulRenderer::VulRenderer(VulWindow &window, VulDevice &device) : vulWindow{windo
 
 VulRenderer::~VulRenderer()
 {
-    freeCommandBuffers();
+    vkFreeCommandBuffers(vulDevice.device(), vulDevice.getCommandPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 }
 
 void VulRenderer::recreateSwapChain()
@@ -69,19 +72,16 @@ void VulRenderer::createCommandBuffers()
     }
 }
 
-void VulRenderer::freeCommandBuffers(){
-    vkFreeCommandBuffers(vulDevice.device(), vulDevice.getCommandPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
-    commandBuffers.clear();
-}
-
 VkCommandBuffer VulRenderer::beginFrame()
 {
     assert(!isFrameStarted && "Can't call beginFrame while frame is already in progress");
 
     VkResult result = vulSwapChain->acquireNextImage(&currentImageIndex);
 
+    m_swapchainRecreated = false;
     if (result == VK_ERROR_OUT_OF_DATE_KHR){
         recreateSwapChain();
+        m_swapchainRecreated = true;
         return nullptr;
     }
 
@@ -91,7 +91,7 @@ VkCommandBuffer VulRenderer::beginFrame()
 
     isFrameStarted = true;
 
-    VkCommandBuffer commandBuffer = getCurrentCommandBuffer();
+   VkCommandBuffer commandBuffer = getCurrentCommandBuffer();
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
@@ -115,6 +115,7 @@ void VulRenderer::endFrame()
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || vulWindow.wasWindowResized()){
         vulWindow.resetWindowResizedFlag();
         recreateSwapChain();
+        m_swapchainRecreated = true;
     }
 
     else if (result != VK_SUCCESS){
@@ -125,7 +126,7 @@ void VulRenderer::endFrame()
     currentFrameIndex = (currentFrameIndex + 1) % VulSwapChain::MAX_FRAMES_IN_FLIGHT;
 }
 
-void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, uint32_t renderWidth, uint32_t renderHeight)
+void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulAttachmentImage>> &attachmentImages, bool preservePreviousSwapchainImageContents, uint32_t renderWidth, uint32_t renderHeight)
 {
     assert(isFrameStarted && "Can't call beginRendering if the frame hasn't been started either");
     assert(commandBuffer == getCurrentCommandBuffer() && "Can't begin rendering on a command buffer from a different frame");
@@ -134,15 +135,18 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, uint32_t renderW
     renderArea.width = renderWidth > 0 ? renderWidth : vulSwapChain->getSwapChainExtent().width;
     renderArea.height = renderHeight > 0 ? renderHeight : vulSwapChain->getSwapChainExtent().height;
 
-    VkRenderingAttachmentInfo colorAttachmentInfo = vulSwapChain->getImage(currentImageIndex)->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}});
+    std::vector<VkRenderingAttachmentInfo> colorAttachmentInfos(attachmentImages.size() + 1);
+    vulSwapChain->getImage(currentImageIndex)->preservePreviousContents = preservePreviousSwapchainImageContents;
+    colorAttachmentInfos[0] = vulSwapChain->getImage(currentImageIndex)->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}});
+    for (size_t i = 0; i < attachmentImages.size(); i++) colorAttachmentInfos[i + 1] = attachmentImages[i]->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}});
     VkRenderingAttachmentInfo depthAttachmentInfo = m_depthImages[currentImageIndex]->getAttachmentInfo({{{1.0f}}});
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea.offset = {0, 0};
     renderingInfo.renderArea.extent = vulSwapChain->getSwapChainExtent();
     renderingInfo.layerCount = 1;
-    renderingInfo.colorAttachmentCount = 1;
-    renderingInfo.pColorAttachments = &colorAttachmentInfo;
+    renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachmentInfos.size());
+    renderingInfo.pColorAttachments = colorAttachmentInfos.data();
     renderingInfo.pDepthAttachment = &depthAttachmentInfo;
 
     vulSwapChain->getImage(currentImageIndex)->establishPreAttachmentPipelineBarrier(commandBuffer);

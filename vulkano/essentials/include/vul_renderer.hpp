@@ -24,6 +24,7 @@ class VulRenderer{
         float getAspectRatio() const {return vulSwapChain->extentAspectRatio();}
         VkExtent2D getSwapChainExtent() const {return vulSwapChain->getSwapChainExtent();}
         VkFormat getSwapChainColorFormat() const {return vulSwapChain->getSwapChainImageFormat();}
+        bool wasSwapChainRecreated() const {return m_swapchainRecreated;}
         VkFormat getDepthFormat() const {return m_depthFormat;}
         bool isFrameInProgress() const {return isFrameStarted;}
 
@@ -39,12 +40,11 @@ class VulRenderer{
 
         VkCommandBuffer beginFrame();
         void endFrame();
-        void beginRendering(VkCommandBuffer commandBuffer, uint32_t renderWidth = 0, uint32_t renderHeight = 0);
+        void beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulAttachmentImage>> &attachmentImages, bool preservePreviousSwapchainImageContents, uint32_t renderWidth, uint32_t renderHeight);
         void stopRendering(VkCommandBuffer commandBuffer);
         
     private:
         void createCommandBuffers();
-        void freeCommandBuffers();
         void recreateSwapChain();
 
         VulWindow& vulWindow;
@@ -58,5 +58,6 @@ class VulRenderer{
         uint32_t currentImageIndex;
         int currentFrameIndex{0};
         bool isFrameStarted = false;
+        bool m_swapchainRecreated = false;
 };
 }

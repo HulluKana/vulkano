@@ -1,5 +1,7 @@
+#include "vul_attachment_image.hpp"
 #include "vul_host_device.hpp"
 #include "vul_pipeline.hpp"
+#include "vul_swap_chain.hpp"
 #include <vulkan/vulkan_core.h>
 #include<vulkano_defaults.hpp>
 
@@ -10,6 +12,7 @@
 #include <glm/gtc/constants.hpp>
 #include <memory>
 #include<stdexcept>
+#include <iostream>
 
 using namespace vulB;
 namespace vul
@@ -180,9 +183,20 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano)
     config.bindingDescriptions = {  {0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX},
                                     {2, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
     config.setLayouts = {vulkano.mainSetLayout->getDescriptorSetLayout()};
+    config.colorAttachmentFormats = {vulkano.vulRenderer.getSwapChainColorFormat(), vulkano.vulRenderer.getSwapChainColorFormat()};
     config.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
     config.cullMode = VK_CULL_MODE_NONE;
     vulkano.pipeline3d = std::make_unique<VulPipeline>(vulkano.getVulDevice(), "default3D.vert.spv", "default3D.frag.spv", config);
+}
+
+void defaults::createDefaultAttachmentImages(Vulkano &vulkano)
+{
+    vulkano.attachmentImages.resize(VulSwapChain::MAX_FRAMES_IN_FLIGHT);
+    for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
+        std::shared_ptr<VulAttachmentImage> attachmentImage = std::make_shared<VulAttachmentImage>(vulkano.getVulDevice());
+        attachmentImage->createEmptyImage(VulAttachmentImage::ImageType::colorAttachment, vulkano.vulRenderer.getSwapChainColorFormat(), vulkano.vulRenderer.getSwapChainExtent());
+        vulkano.attachmentImages[i] = {attachmentImage};
+    }
 }
 
 void defaults::updateDefault3dInputValues(Vulkano &vulkano)

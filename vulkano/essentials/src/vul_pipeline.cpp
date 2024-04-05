@@ -38,6 +38,8 @@ VulPipeline::VulPipeline(VulDevice& device, const std::string& vertFile, const s
 
     VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
     pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+    pipelineRenderingInfo.colorAttachmentCount = static_cast<uint32_t>(configInfo.colorAttachmentFormats.size());
+    pipelineRenderingInfo.pColorAttachmentFormats = configInfo.colorAttachmentFormats.data();
     pipelineRenderingInfo.depthAttachmentFormat = configInfo.depthAttachmentFormat;
 
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{};
@@ -86,12 +88,14 @@ VulPipeline::VulPipeline(VulDevice& device, const std::string& vertFile, const s
     colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;  // Optional
     colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;              // Optional
     
+    std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments(configInfo.colorAttachmentFormats.size());
+    for (size_t i = 0; i < configInfo.colorAttachmentFormats.size(); i++) colorBlendAttachments[i] = colorBlendAttachment;
     VkPipelineColorBlendStateCreateInfo colorBlendInfo{};
     colorBlendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlendInfo.logicOpEnable = VK_FALSE;
     colorBlendInfo.logicOp = VK_LOGIC_OP_COPY;  // Optional
-    colorBlendInfo.attachmentCount = 1;
-    colorBlendInfo.pAttachments = &colorBlendAttachment;
+    colorBlendInfo.attachmentCount = static_cast<uint32_t>(colorBlendAttachments.size());
+    colorBlendInfo.pAttachments = colorBlendAttachments.data();
     colorBlendInfo.blendConstants[0] = 0.0f;  // Optional
     colorBlendInfo.blendConstants[1] = 0.0f;  // Optional
     colorBlendInfo.blendConstants[2] = 0.0f;  // Optional

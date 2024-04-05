@@ -9,6 +9,7 @@ layout (location = 1) in vec3 fragNormalWorld;
 layout (location = 2) in vec2 fragTexCoord;
 
 layout (location = 0) out vec4 FragColor;
+layout (location = 1) out vec4 FragColor2;
 
 layout(set = 0, binding = 0) uniform Ubo {GlobalUbo ubo;};
 
@@ -138,4 +139,5 @@ void main()
     if (mat.emissiveStrength > 0.01) color += sRGBToAlbedo(mat.emissiveColor * mat.emissiveStrength);
 
     FragColor = vec4(albedoToSRGB(color), 1.0);
+    FragColor2 = vec4(color, 1.0);
 }

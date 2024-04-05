@@ -1,4 +1,6 @@
 #include "vul_gltf_loader.hpp"
+#include "vul_swap_chain.hpp"
+#include <cstdlib>
 #include<vulkano_program.hpp>
 
 #include<imgui.h>
@@ -91,14 +93,15 @@ VkCommandBuffer Vulkano::startFrame()
     if (VkCommandBuffer commandBuffer = vulRenderer.beginFrame()){
         m_prevWindowSize = vulRenderer.getSwapChainExtent();
 
-        vulRenderer.beginRendering(commandBuffer, settings::renderWidth, settings::renderHeight);
+        if (attachmentImages.size() >= VulSwapChain::MAX_FRAMES_IN_FLIGHT) vulRenderer.beginRendering(commandBuffer, attachmentImages[vulRenderer.getFrameIndex()], false, settings::renderWidth, settings::renderHeight);
+        else vulRenderer.beginRendering(commandBuffer, {}, false, settings::renderWidth, settings::renderHeight);
         if (!cameraController.hideGUI) m_vulGUI.startFrame();
 
         m_renderPreparationTime = glfwGetTime() - renderPreparationStartTime;
         return commandBuffer;
     }
 
-    return NULL;
+    return nullptr;
 }
 
 bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
@@ -121,9 +124,11 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
         }
         pipeline3d->draw(commandBuffer, defaultDescriptorSets, vertexBuffers, scene.indexBuffer->getBuffer(), drawDatas);
     }
+    vulRenderer.stopRendering(commandBuffer);
     m_objRenderTime = glfwGetTime() - objRenderStartTime;
 
     double guiRenderStartTime = glfwGetTime();
+    vulRenderer.beginRendering(commandBuffer, {}, true, settings::renderWidth, settings::renderHeight);
     if (!cameraController.hideGUI) m_vulGUI.endFrame(commandBuffer);
     m_GuiRenderTime = glfwGetTime() - guiRenderStartTime;
 

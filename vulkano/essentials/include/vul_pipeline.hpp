@@ -13,6 +13,7 @@ class VulPipeline{
             std::vector<VkVertexInputAttributeDescription> attributeDescriptions;
             std::vector<VkVertexInputBindingDescription> bindingDescriptions;
             std::vector<VkDescriptorSetLayout> setLayouts;
+            std::vector<VkFormat> colorAttachmentFormats;
             VkFormat depthAttachmentFormat = VK_FORMAT_UNDEFINED;
             VkCullModeFlagBits cullMode = VK_CULL_MODE_NONE;
         };

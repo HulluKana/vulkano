@@ -1,5 +1,6 @@
 #pragma once
 
+#include "vul_attachment_image.hpp"
 #include<vul_buffer.hpp>
 #include<vul_device.hpp>
 #include<vul_descriptors.hpp>
@@ -105,6 +106,7 @@ class Vulkano{
         uint32_t imageCount = 0u;
 
         std::unique_ptr<vulB::VulPipeline> pipeline3d;
+        std::vector<std::vector<std::shared_ptr<vulB::VulAttachmentImage>>> attachmentImages;
         vulB::VulRenderer vulRenderer{m_vulWindow, m_vulDevice};
         vulB::VulCamera camera{};
         transform3D cameraTransform;

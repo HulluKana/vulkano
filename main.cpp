@@ -1,7 +1,9 @@
+#include <vulkan/vulkan_core.h>
 #include<vulkano_program.hpp>
 #include<vulkano_defaults.hpp>
 
 #include<imgui.h>
+#include <iostream>
 
 void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
     ImGui::Begin("Performance");
@@ -19,19 +21,22 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 }
 
 int main() {
-    vul::Vulkano vulkano(2560, 1440, "Vulkano");
+    vul::Vulkano vulkano(500, 500, "Vulkano");
     vulkano.loadScene("../Models/Room.glb");
     for (size_t i = 0; i < vulkano.scene.images.size(); i++) vulkano.images[i + vulkano.imageCount] = vulkano.scene.images[i];
     vul::defaults::Default3dInputData default3dInputData = vul::defaults::createDefault3dInputData(vulkano);
     vul::defaults::createDefaultDescriptors(vulkano, default3dInputData);
     vul::defaults::createDefault3dRenderSystem(vulkano);
+    vul::defaults::createDefaultAttachmentImages(vulkano);
     vulkano.initVulkano();
     vul::settings::maxFps = 60.0f;
 
     bool stop = false;
     float ownStuffTime = 0.0f;
     while (!stop) {
+        if (vulkano.vulRenderer.wasSwapChainRecreated()) vul::defaults::createDefaultAttachmentImages(vulkano);
         VkCommandBuffer commandBuffer = vulkano.startFrame();
+        if (commandBuffer == nullptr) continue;
         double ownStuffStartTime = glfwGetTime();
 
         vul::defaults::updateDefault3dInputValues(vulkano);
