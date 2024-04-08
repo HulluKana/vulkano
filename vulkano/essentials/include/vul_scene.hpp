@@ -27,18 +27,8 @@ class Scene
         std::unique_ptr<vulB::VulBuffer> uvBuffer;
         std::unique_ptr<vulB::VulBuffer> indexBuffer;
         std::unique_ptr<vulB::VulBuffer> materialBuffer;
-
-        std::vector<std::shared_ptr<void>> pPushDatas;
-        uint32_t pushDataSize;
-        
     private:
         vulB::VulDevice &m_vulDevice; 
-
-        struct PrimitiveInfo{
-            uint32_t indexOffset;
-            uint32_t vertexOffset;
-            int materialIndex;
-        };
 };
 
 }

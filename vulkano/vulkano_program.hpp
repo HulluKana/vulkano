@@ -46,10 +46,6 @@ class Vulkano{
 
         float getFrameTime() const {return m_frameTime;}
         float getIdleTime() const {return m_idleTime;}
-        float getRenderPreparationTime() const {return m_renderPreparationTime;}
-        float getObjRenderTime() const {return m_objRenderTime;}
-        float getGuiRenderTime() const {return m_GuiRenderTime;}
-        float getRenderFinishingTime() const {return m_renderFinishingTime;}
 
         int getFrameIdx() const {return vulRenderer.getFrameIndex();}
 
@@ -86,7 +82,7 @@ class Vulkano{
             uint32_t count = 1;
         };
         struct descSetReturnVal{
-            vulB::VulDescriptorSet set;
+            std::unique_ptr<vulB::VulDescriptorSet> set;
             std::unique_ptr<vulB::VulDescriptorSetLayout> layout;
             bool succeeded;
         };
@@ -94,37 +90,38 @@ class Vulkano{
         descSetReturnVal createDescriptorSet(const std::vector<Descriptor> &descriptors);
         VulCompPipeline createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight);        
 
+        struct RenderData {
+            std::shared_ptr<vulB::VulPipeline> pipeline;
+            std::vector<vulB::VulPipeline::DrawData> drawDatas;
+            std::array<std::vector<std::shared_ptr<vulB::VulDescriptorSet>>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descriptorSets;
+            std::array<std::vector<std::shared_ptr<vulB::VulAttachmentImage>>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> attachmentImages;
+        };
+        std::vector<RenderData> renderDatas;
+        std::vector<std::unique_ptr<vulB::VulDescriptorSetLayout>> descriptorSetLayouts;
+
         Scene scene{m_vulDevice};
         bool hasScene = false;
 
-        std::vector<vulB::VulDescriptorSet> mainDescriptorSets;
-        std::unique_ptr<vulB::VulDescriptorSetLayout> mainSetLayout;
         std::vector<std::unique_ptr<vulB::VulBuffer>> buffers;
 
         std::vector<Object2D> object2Ds;
         std::array<std::shared_ptr<VulImage>, MAX_TEXTURES> images;
         uint32_t imageCount = 0u;
 
-        std::unique_ptr<vulB::VulPipeline> pipeline3d;
-        std::vector<std::vector<std::shared_ptr<vulB::VulAttachmentImage>>> attachmentImages;
         vulB::VulRenderer vulRenderer{m_vulWindow, m_vulDevice};
         vulB::VulCamera camera{};
         transform3D cameraTransform;
         vulB::MovementController cameraController;
     private:
         double m_currentTime;
-        float m_frameTime;
-        float m_idleTime;
-        float m_renderPreparationTime;
-        float m_objRenderTime;
-        float m_GuiRenderTime;
-        float m_renderFinishingTime;
+        double m_frameTime;
+        double m_idleTime;
 
         VkExtent2D m_prevWindowSize;
 
         vulB::VulGUI m_vulGUI;
 
         std::unique_ptr<vulB::VulDescriptorPool> m_globalPool{};
-        std::vector<vulB::VulDescriptorSet> m_imGuiDescriptorSets;
+        std::vector<std::unique_ptr<vulB::VulDescriptorSet>> m_imGuiDescriptorSets;
    };
 }

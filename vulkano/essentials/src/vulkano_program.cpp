@@ -1,3 +1,4 @@
+#include "vul_descriptors.hpp"
 #include "vul_gltf_loader.hpp"
 #include "vul_swap_chain.hpp"
 #include <cstdlib>
@@ -53,7 +54,7 @@ void Vulkano::initVulkano()
 
         descSetReturnVal retVal = createDescriptorSet({image});
         if (!retVal.succeeded) throw std::runtime_error("Failed to create imgui image descriptor sets");
-        images[i]->setDescriptorSet(retVal.set.getSet());
+        images[i]->setDescriptorSet(retVal.set->getSet());
         m_imGuiDescriptorSets.push_back(std::move(retVal.set));
     }
 
@@ -76,7 +77,6 @@ VkCommandBuffer Vulkano::startFrame()
     m_idleTime = glfwGetTime() - idleStartTime;
     m_frameTime = newTime - m_currentTime;
     m_currentTime = newTime;
-    double renderPreparationStartTime = glfwGetTime();
 
     ImGuiIO &io = ImGui::GetIO(); (void)io;
     if (!io.WantCaptureKeyboard) cameraController.modifyValues(m_vulWindow.getGLFWwindow(), cameraTransform);
@@ -93,11 +93,8 @@ VkCommandBuffer Vulkano::startFrame()
     if (VkCommandBuffer commandBuffer = vulRenderer.beginFrame()){
         m_prevWindowSize = vulRenderer.getSwapChainExtent();
 
-        if (attachmentImages.size() >= VulSwapChain::MAX_FRAMES_IN_FLIGHT) vulRenderer.beginRendering(commandBuffer, attachmentImages[vulRenderer.getFrameIndex()], false, settings::renderWidth, settings::renderHeight);
-        else vulRenderer.beginRendering(commandBuffer, {}, false, settings::renderWidth, settings::renderHeight);
         if (!cameraController.hideGUI) m_vulGUI.startFrame();
 
-        m_renderPreparationTime = glfwGetTime() - renderPreparationStartTime;
         return commandBuffer;
     }
 
@@ -106,36 +103,23 @@ VkCommandBuffer Vulkano::startFrame()
 
 bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 {
-    int frameIdx = vulRenderer.getFrameIndex();
-
-    double objRenderStartTime = glfwGetTime();
+    bool preservePreviousContents = false;
     if (hasScene){
-        std::vector<VkDescriptorSet> defaultDescriptorSets;
-        defaultDescriptorSets.push_back(mainDescriptorSets[frameIdx].getSet());
-        std::vector<VkBuffer> vertexBuffers = {scene.vertexBuffer->getBuffer(), scene.normalBuffer->getBuffer(), scene.uvBuffer->getBuffer()};
-        std::vector<vulB::VulPipeline::DrawData> drawDatas(scene.nodes.size());
-        for (size_t i = 0; i < scene.nodes.size(); i++) {
-            const GltfLoader::GltfPrimMesh &mesh = scene.meshes[scene.nodes[i].primMesh];
-            drawDatas[i].indexCount = mesh.indexCount;
-            drawDatas[i].firstIndex = mesh.firstIndex;
-            drawDatas[i].vertexOffset = mesh.vertexOffset;
-            drawDatas[i].pPushData = scene.pPushDatas[i].get();
-            drawDatas[i].pushDataSize = scene.pushDataSize;
+        for (const RenderData &renderData : renderDatas){
+            vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], preservePreviousContents, settings::renderWidth, settings::renderHeight);
+            preservePreviousContents = true;
+            std::vector<VkDescriptorSet> descriptorSets;
+            for (const std::shared_ptr<VulDescriptorSet> &descriptorSet : renderData.descriptorSets[vulRenderer.getFrameIndex()]) descriptorSets.push_back(descriptorSet->getSet());
+            std::vector<VkBuffer> vertexBuffers = {scene.vertexBuffer->getBuffer(), scene.normalBuffer->getBuffer(), scene.uvBuffer->getBuffer()};
+            renderData.pipeline->draw(commandBuffer, descriptorSets, vertexBuffers, scene.indexBuffer->getBuffer(), renderData.drawDatas);
+            vulRenderer.stopRendering(commandBuffer);
         }
-        pipeline3d->draw(commandBuffer, defaultDescriptorSets, vertexBuffers, scene.indexBuffer->getBuffer(), drawDatas);
     }
-    vulRenderer.stopRendering(commandBuffer);
-    m_objRenderTime = glfwGetTime() - objRenderStartTime;
 
-    double guiRenderStartTime = glfwGetTime();
-    vulRenderer.beginRendering(commandBuffer, {}, true, settings::renderWidth, settings::renderHeight);
+    vulRenderer.beginRendering(commandBuffer, {}, preservePreviousContents, settings::renderWidth, settings::renderHeight);
     if (!cameraController.hideGUI) m_vulGUI.endFrame(commandBuffer);
-    m_GuiRenderTime = glfwGetTime() - guiRenderStartTime;
-
-    double renderFinishStartTime = glfwGetTime();
     vulRenderer.stopRendering(commandBuffer);
     vulRenderer.endFrame();
-    m_renderFinishingTime = glfwGetTime() - renderFinishStartTime;
 
     return m_vulWindow.shouldClose();
 }
@@ -172,7 +156,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
     }
     std::unique_ptr<VulDescriptorSetLayout> layout = layoutBuilder.build();
 
-    VulDescriptorSet set(*layout, *m_globalPool);
+    std::unique_ptr<VulDescriptorSet> set = std::make_unique<VulDescriptorSet>(*layout, *m_globalPool);
     std::vector<std::vector<VkDescriptorBufferInfo>> bufferInfosStorage;
     std::vector<std::vector<VkDescriptorImageInfo>> imageInfosStorage;
     for (size_t i = 0; i < descriptors.size(); i++){
@@ -183,7 +167,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
             for (uint32_t j = 0; j < desc.count; j++)
                 bufferInfos[j] = buffer[j].getDescriptorInfo();
             bufferInfosStorage.push_back(bufferInfos);
-            set.writeBuffer(i, bufferInfosStorage[bufferInfosStorage.size() - 1].data(), desc.count);
+            set->writeBuffer(i, bufferInfosStorage[bufferInfosStorage.size() - 1].data(), desc.count);
         }
         if (desc.type == DescriptorType::combinedTexSampler){
             VulImage *image = static_cast<VulImage *>(desc.content);
@@ -194,7 +178,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
                 imageInfos[j].sampler = image[j].getTextureSampler();
             }
             imageInfosStorage.push_back(imageInfos);
-            set.writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
+            set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
         }
         if (desc.type == DescriptorType::spCombinedTexSampler){
             std::shared_ptr<VulImage> *image = static_cast<std::shared_ptr<VulImage> *>(desc.content);
@@ -205,7 +189,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
                 imageInfos[j].sampler = image[j]->getTextureSampler();
             }
             imageInfosStorage.push_back(imageInfos);
-            set.writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
+            set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
         }
         if (desc.type == DescriptorType::storageImage){
             VulImage *image = static_cast<VulImage *>(desc.content);
@@ -215,12 +199,13 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
                 imageInfos[j].imageView = image[j].getImageView();
             }
             imageInfosStorage.push_back(imageInfos);
-            set.writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
+            set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
         }
     }
-    set.build();
+    set->build();
 
-    return {std::move(set), std::move(layout), set.hasSet()};
+    bool succeeded = set->hasSet();
+    return {std::move(set), std::move(layout), succeeded};
 }
         
 VulCompPipeline Vulkano::createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight)

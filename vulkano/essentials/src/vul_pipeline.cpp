@@ -179,7 +179,7 @@ void VulPipeline::draw( VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSe
     vkCmdBindIndexBuffer(cmdBuf, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
     for (const DrawData &drawData : drawDatas){
-        vkCmdPushConstants(cmdBuf, m_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, drawData.pushDataSize, drawData.pPushData);
+        vkCmdPushConstants(cmdBuf, m_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, drawData.pushDataSize, drawData.pPushData.get());
         vkCmdDrawIndexed(cmdBuf, drawData.indexCount, 1, drawData.firstIndex, drawData.vertexOffset, 0);
     }
 }

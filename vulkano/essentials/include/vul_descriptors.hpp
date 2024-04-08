@@ -99,7 +99,6 @@ class VulDescriptorSet{
 
         VulDescriptorSet &writeBuffer(uint32_t binding, VkDescriptorBufferInfo *bufferInfo, uint32_t descriptorCount = 1);
         VulDescriptorSet &writeImage(uint32_t binding, VkDescriptorImageInfo *imageInfo, uint32_t descriptorCount = 1);
-        VulDescriptorSet &writeAccelerationStructure(uint32_t binding, VkWriteDescriptorSetAccelerationStructureKHR *asInfo);
 
         bool build();
         void update();
@@ -110,7 +109,6 @@ class VulDescriptorSet{
         struct DescriptorInfo{
             std::vector<VkDescriptorBufferInfo> bufferInfos;
             std::vector<VkDescriptorImageInfo> imageInfos;
-            std::vector<VkWriteDescriptorSetAccelerationStructureKHR> asInfos;
         };
         std::vector<DescriptorInfo> descriptorInfos;
         

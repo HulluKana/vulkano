@@ -3,7 +3,7 @@
 #include"vul_device.hpp"
 #include<string>
 #include<vector>
-#include <vulkan/vulkan_core.h>
+#include<memory>
 
 namespace vulB{
 
@@ -31,7 +31,7 @@ class VulPipeline{
             uint32_t indexCount = 0;
             uint32_t firstIndex = 0;
             int32_t vertexOffset = 0;
-            void *pPushData = nullptr;
+            std::shared_ptr<void> pPushData;
             uint32_t pushDataSize = 0;
         };
         void draw(  VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSet> &descriptorSets, const std::vector<VkBuffer> &vertexBuffers,

@@ -1,4 +1,5 @@
 #include "vul_attachment_image.hpp"
+#include "vul_gltf_loader.hpp"
 #include "vul_host_device.hpp"
 #include "vul_pipeline.hpp"
 #include "vul_swap_chain.hpp"
@@ -12,7 +13,6 @@
 #include <glm/gtc/constants.hpp>
 #include <memory>
 #include<stdexcept>
-#include <iostream>
 
 using namespace vulB;
 namespace vul
@@ -122,7 +122,7 @@ defaults::Default3dInputData defaults::createDefault3dInputData(Vulkano &vulkano
     return output;
 }
 
-void defaults::createDefaultDescriptors(Vulkano &vulkano, Default3dInputData inputData)
+defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano &vulkano, Default3dInputData inputData)
 {
     for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
         std::unique_ptr<VulBuffer> globalBuffer = std::make_unique<VulBuffer>(vulkano.getVulDevice());
@@ -132,6 +132,11 @@ void defaults::createDefaultDescriptors(Vulkano &vulkano, Default3dInputData inp
         vulkano.buffers.push_back(std::move(globalBuffer));
     }
 
+    DefaultRenderDataInputData returnValue{};
+    returnValue.renderDataIdx = vulkano.renderDatas.size();
+    returnValue.descriptorSetLayoutIdx = vulkano.descriptorSetLayouts.size();
+    vulkano.renderDatas.push_back({});
+    vulkano.descriptorSetLayouts.push_back({});
     for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
         std::vector<Vulkano::Descriptor> descs;
         Vulkano::Descriptor ubo{}; 
@@ -171,35 +176,46 @@ void defaults::createDefaultDescriptors(Vulkano &vulkano, Default3dInputData inp
 
         Vulkano::descSetReturnVal retVal = vulkano.createDescriptorSet(descs);
         if (!retVal.succeeded) throw std::runtime_error("Failed to create default descriptor sets");
-        vulkano.mainDescriptorSets.push_back(std::move(retVal.set));
-        vulkano.mainSetLayout = std::move(retVal.layout);
+        vulkano.renderDatas[returnValue.renderDataIdx].descriptorSets[i].push_back(std::move(retVal.set));
+        vulkano.descriptorSetLayouts[returnValue.descriptorSetLayoutIdx] = std::move(retVal.layout);
     }
+    return returnValue;
 }
 
-void defaults::createDefault3dRenderSystem(Vulkano &vulkano)
+void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataInputData inputData)
 {
     VulPipeline::PipelineConfigInfo config{};
     config.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0}, {2, 2, VK_FORMAT_R32G32_SFLOAT}};
     config.bindingDescriptions = {  {0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX},
                                     {2, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
-    config.setLayouts = {vulkano.mainSetLayout->getDescriptorSetLayout()};
+    config.setLayouts = {vulkano.descriptorSetLayouts[inputData.descriptorSetLayoutIdx]->getDescriptorSetLayout()};
     config.colorAttachmentFormats = {vulkano.vulRenderer.getSwapChainColorFormat(), vulkano.vulRenderer.getSwapChainColorFormat()};
     config.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
     config.cullMode = VK_CULL_MODE_NONE;
-    vulkano.pipeline3d = std::make_unique<VulPipeline>(vulkano.getVulDevice(), "default3D.vert.spv", "default3D.frag.spv", config);
-}
-
-void defaults::createDefaultAttachmentImages(Vulkano &vulkano)
-{
-    vulkano.attachmentImages.resize(VulSwapChain::MAX_FRAMES_IN_FLIGHT);
-    for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-        std::shared_ptr<VulAttachmentImage> attachmentImage = std::make_shared<VulAttachmentImage>(vulkano.getVulDevice());
-        attachmentImage->createEmptyImage(VulAttachmentImage::ImageType::colorAttachment, vulkano.vulRenderer.getSwapChainColorFormat(), vulkano.vulRenderer.getSwapChainExtent());
-        vulkano.attachmentImages[i] = {attachmentImage};
+    vulkano.renderDatas[inputData.renderDataIdx].pipeline = std::make_shared<VulPipeline>(vulkano.getVulDevice(), "default3D.vert.spv", "default3D.frag.spv", config);
+    for (const vulB::GltfLoader::GltfNode &node : vulkano.scene.nodes) {
+        const vulB::GltfLoader::GltfPrimMesh &mesh = vulkano.scene.meshes[node.primMesh];
+        vulB::VulPipeline::DrawData drawData{};
+        drawData.firstIndex = mesh.firstIndex;
+        drawData.indexCount = mesh.indexCount;
+        drawData.vertexOffset = mesh.vertexOffset;
+        drawData.pPushData = std::make_shared<PushConstant>();
+        drawData.pushDataSize = sizeof(PushConstant);
+        vulkano.renderDatas[inputData.renderDataIdx].drawDatas.push_back(drawData);
     }
 }
 
-void defaults::updateDefault3dInputValues(Vulkano &vulkano)
+void defaults::createDefaultAttachmentImages(Vulkano &vulkano, DefaultRenderDataInputData inputData)
+{
+    for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
+        vulkano.renderDatas[inputData.renderDataIdx].attachmentImages[i].resize(1);
+        std::shared_ptr<VulAttachmentImage> attachmentImage = std::make_shared<VulAttachmentImage>(vulkano.getVulDevice());
+        attachmentImage->createEmptyImage(VulAttachmentImage::ImageType::colorAttachment, vulkano.vulRenderer.getSwapChainColorFormat(), vulkano.vulRenderer.getSwapChainExtent());
+        vulkano.renderDatas[inputData.renderDataIdx].attachmentImages[i] = {attachmentImage};
+    }
+}
+
+void defaults::updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataInputData inputData)
 {
     Scene &scene = vulkano.scene;
 
@@ -214,23 +230,13 @@ void defaults::updateDefault3dInputValues(Vulkano &vulkano)
         ubo.lightPositions[i] = glm::vec4(scene.lights[i].position, 69.0f);
         ubo.lightColors[i] = glm::vec4(scene.lights[i].color, scene.lights[i].intensity);
     }
-
     vulkano.buffers[vulkano.getFrameIdx()]->writeData(&ubo, sizeof(ubo), 0);
 
-    struct DefaultPushConstantInputData{
-        glm::mat4 modelMatrix;
-        glm::mat4 normalMatrix;
-        int matIdx;
-    };
-    
-    scene.pushDataSize = sizeof(DefaultPushConstantInputData);
     for (size_t i = 0; i < scene.nodes.size(); i++){
         const GltfLoader::GltfNode &node = scene.nodes[i];
         const GltfLoader::GltfPrimMesh &mesh = scene.meshes[node.primMesh];
-        std::vector<std::shared_ptr<void>> &pPushDatas = scene.pPushDatas;
-        if (i >= pPushDatas.size() || pPushDatas[i] == nullptr) pPushDatas.push_back(std::shared_ptr<void>(new DefaultPushConstantInputData));
 
-        DefaultPushConstantInputData *pushData = static_cast<DefaultPushConstantInputData *>(pPushDatas[i].get());
+        PushConstant *pushData = static_cast<PushConstant *>(vulkano.renderDatas[inputData.renderDataIdx].drawDatas[i].pPushData.get());
         pushData->modelMatrix = node.worldMatrix;
         pushData->normalMatrix = glm::mat4(1.0f);
         pushData->matIdx = mesh.materialIndex;
