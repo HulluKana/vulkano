@@ -17,6 +17,7 @@ using uint = uint32_t;
 
 #define MAX_LIGHTS 10
 #define MAX_TEXTURES 10
+#define OIT_LAYERS 8
 
 struct GlobalUbo {
     mat4 projectionMatrix;
@@ -36,13 +37,6 @@ struct PushConstant{
     int matIdx;
 };
 
-struct PrimitiveInfo{
-    uint indexOffset;
-    uint vertexOffset;
-    int materialIndex;
-    int padding;
-};
-
 struct PackedMaterial{
     vec4 colorFactor;
     vec4 emissiveFactor;
@@ -50,6 +44,13 @@ struct PackedMaterial{
     float metalliness;
     int colorTextureIndex;
     float ior;
+};
+
+struct ABuffer {
+    uint color;
+    float depth;
+    uint next;
+    uint padding;
 };
 
 #endif

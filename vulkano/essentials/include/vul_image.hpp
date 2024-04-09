@@ -15,14 +15,20 @@ class VulImage
         void loadFile(const std::string &fileName);
         void loadData(const void *data, uint32_t width, uint32_t height, uint32_t channels);
         void keepEmpty(uint32_t width, uint32_t height, uint32_t channels);
-        void createImage(bool createSampler, bool isDeviceLocal, bool isStorageImage, int dimensions);
+
+        enum class ImageType {
+            texture,
+            storageFloat,
+            storageUint
+        };
+        void createImage(bool createSampler, bool isDeviceLocal, ImageType type, int dimensions);
         void addSampler(VkSampler sampler);
         void modifyImage(void *data);
 
         void setDescriptorSet(VkDescriptorSet descriptorSet) {m_descriptorSet = descriptorSet;}
-
-        bool isStorageImage() const {return m_isStorage;}
+    
         bool isLocal() const {return m_isLocal;}
+        ImageType getType() const {return m_type;}
         uint32_t getWidth() const {return m_width;}
         uint32_t getHeight() const {return m_height;}
         uint32_t getChannels() const {return m_channels;}
@@ -50,7 +56,7 @@ class VulImage
         uint32_t m_width = 0;
         uint32_t m_height = 0;
         uint32_t m_channels = 0;
-        bool m_isStorage = false;
+        ImageType m_type = ImageType::texture;
         bool m_isLocal = false;
         bool m_hasSampler = false;
         VkDeviceMemory m_imageMemory;

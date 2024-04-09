@@ -21,19 +21,18 @@ int main() {
     vul::defaults::Default3dInputData default3dInputData = vul::defaults::createDefault3dInputData(vulkano);
     vul::defaults::DefaultRenderDataInputData defaultRenderDataInputData = vul::defaults::createDefaultDescriptors(vulkano, default3dInputData);
     vul::defaults::createDefault3dRenderSystem(vulkano, defaultRenderDataInputData);
-    vul::defaults::createDefaultAttachmentImages(vulkano, defaultRenderDataInputData);
     vulkano.initVulkano();
+    vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
     vul::settings::maxFps = 60.0f;
 
     bool stop = false;
     float ownStuffTime = 0.0f;
     while (!stop) {
-        if (vulkano.vulRenderer.wasSwapChainRecreated()) vul::defaults::createDefaultAttachmentImages(vulkano, defaultRenderDataInputData);
         VkCommandBuffer commandBuffer = vulkano.startFrame();
         if (commandBuffer == nullptr) continue;
         double ownStuffStartTime = glfwGetTime();
 
-        vul::defaults::updateDefault3dInputValues(vulkano, defaultRenderDataInputData);
+        vul::defaults::updateDefault3dInputValues(vulkano, defaultRenderDataInputData, default3dInputData);
         if (vulkano.shouldShowGUI()) GuiStuff(vulkano, ownStuffTime);
 
         ownStuffTime = glfwGetTime() - ownStuffStartTime;

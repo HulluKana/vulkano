@@ -16,7 +16,6 @@ class Object2D{
         void bind(VkCommandBuffer &cmdBuf);
         void draw(VkCommandBuffer &cmdBuf);
 
-        uint32_t renderSystemIndex = 1;
         void *pCustomPushData = nullptr;
         uint32_t customPushDataSize = 0;
     private:

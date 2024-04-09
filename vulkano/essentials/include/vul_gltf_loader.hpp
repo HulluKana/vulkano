@@ -48,6 +48,8 @@ class GltfLoader
             // Stuff added by extensions
             float emissionStrength = 0.0f;
             float ior = 1.5f;
+
+            std::string name;
         };
         struct GltfPrimMesh{
             uint32_t firstIndex = 0;
@@ -65,11 +67,15 @@ class GltfLoader
             glm::mat4 worldMatrix{1.0f};
             glm::vec3 position{0.0f};
             int primMesh = 0;
+
+            std::string name;
         };
         struct GltfLight{
             glm::vec3 position{0.0f};
             glm::vec3 color{0.0f};
             double intensity = 0.0;
+
+            std::string name;
         };
 
         std::vector<uint32_t> indices;

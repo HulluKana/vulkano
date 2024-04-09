@@ -43,24 +43,28 @@ void VulImage::keepEmpty(uint32_t width, uint32_t height, uint32_t channels)
     m_channels = channels;
 }
 
-void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorageImage, int dimensions)
+void VulImage::createImage(bool createSampler, bool isDeviceLocal, ImageType type, int dimensions)
 {
     if (dimensions < 1 || dimensions > 3) throw std::runtime_error("Vul image must have between 1 and 3 dimensions");
-    if (createSampler && isStorageImage) throw std::runtime_error("Cannot create a sampler for a storage image");
+    if (createSampler && type != ImageType::texture) throw std::runtime_error("Cannot create a sampler for a storage image");
     m_isLocal = isDeviceLocal;
-    m_isStorage = isStorageImage;
+    m_type = type;
 
     const void *data = nullptr;
     if (m_constData != nullptr) data = m_constData;
     else if (m_data != nullptr) data = m_data;
 
     VkDeviceSize imageSize = m_width * m_height * m_channels;
-    if (isStorageImage) imageSize *= sizeof(float);
+    if (type != ImageType::texture) imageSize *= sizeof(float);
 
-    if (isStorageImage){
+    if (type == ImageType::storageFloat){
         if (m_channels == 1) m_format = VK_FORMAT_R32_SFLOAT;
         else if (m_channels == 2) m_format = VK_FORMAT_R32G32_SFLOAT;
         else if (m_channels == 4) m_format = VK_FORMAT_R32G32B32A32_SFLOAT;
+    } else if (type == ImageType::storageUint) {
+        if (m_channels == 1) m_format = VK_FORMAT_R32_UINT;
+        else if (m_channels == 2) m_format = VK_FORMAT_R32G32_UINT;
+        else if (m_channels == 4) m_format = VK_FORMAT_R32G32B32A32_UINT;
     } else{
         if (m_channels == 1) m_format = VK_FORMAT_R8_SRGB;
         else if (m_channels == 2) m_format = VK_FORMAT_R8G8_SRGB;
@@ -68,8 +72,8 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorag
     }
 
     VkImageUsageFlags usage = 0;
-    if (isStorageImage) usage |= VK_IMAGE_USAGE_STORAGE_BIT;
-    else usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+    if (type == ImageType::texture) usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+    else usage |= VK_IMAGE_USAGE_STORAGE_BIT;
     if (isDeviceLocal) usage |= VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
     VkMemoryPropertyFlags memoryProperties;
@@ -77,10 +81,10 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorag
     else memoryProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
     VkImageTiling tiling = VK_IMAGE_TILING_LINEAR;
-    if (isDeviceLocal && !isStorageImage) tiling = VK_IMAGE_TILING_OPTIMAL; 
+    if (isDeviceLocal && type == ImageType::texture) tiling = VK_IMAGE_TILING_OPTIMAL; 
 
-    m_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-    if (isStorageImage) m_layout = VK_IMAGE_LAYOUT_GENERAL;
+    m_layout = VK_IMAGE_LAYOUT_GENERAL;
+    if (type == ImageType::texture) m_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     VkImageType imageType = VK_IMAGE_TYPE_2D;
     VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D;
@@ -109,7 +113,7 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorag
         vkMapMemory(m_vulDevice.device(), m_imageMemory, 0, imageSize, 0, &m_mappedMemory);
         memcpy(m_mappedMemory, data, (size_t)imageSize);
 
-        if (!isStorageImage) transitionImageLayout(m_format, VK_IMAGE_LAYOUT_GENERAL, m_layout);
+        if (type != ImageType::texture) transitionImageLayout(m_format, VK_IMAGE_LAYOUT_GENERAL, m_layout);
     }
     else transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, m_layout);
     
@@ -122,7 +126,7 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, bool isStorag
 void VulImage::addSampler(VkSampler sampler)
 {
     if (m_hasSampler) throw std::runtime_error("Image already has a sampler");
-    if (isStorageImage()) throw std::runtime_error("Cannot add a sampler to storage image");
+    if (m_type != ImageType::texture) throw std::runtime_error("Cannot add a sampler to storage image");
     m_textureSampler = sampler;
     m_hasSampler = true;
 }
@@ -130,7 +134,7 @@ void VulImage::addSampler(VkSampler sampler)
 void VulImage::modifyImage(void *data)
 {
     VkDeviceSize imageSize = m_width * m_height * m_channels;
-    if (m_isStorage) imageSize *= sizeof(float);
+    if (m_type != ImageType::texture) imageSize *= sizeof(float);
 
     if (m_isLocal){
         vulB::VulBuffer stagingBuffer(m_vulDevice);
@@ -142,9 +146,9 @@ void VulImage::modifyImage(void *data)
         transitionImageLayout(m_format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_layout);
     }
     else {
-        if (!m_isStorage) transitionImageLayout(m_format, m_layout, VK_IMAGE_LAYOUT_GENERAL);
+        if (m_type != ImageType::texture) transitionImageLayout(m_format, m_layout, VK_IMAGE_LAYOUT_GENERAL);
         memcpy(m_mappedMemory, data, (size_t)imageSize);
-        if (!m_isStorage) transitionImageLayout(m_format, VK_IMAGE_LAYOUT_GENERAL, m_layout);
+        if (m_type != ImageType::texture) transitionImageLayout(m_format, VK_IMAGE_LAYOUT_GENERAL, m_layout);
     }
 }
 

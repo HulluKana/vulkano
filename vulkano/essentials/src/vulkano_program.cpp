@@ -1,3 +1,4 @@
+#include "vul_2d_object.hpp"
 #include "vul_descriptors.hpp"
 #include "vul_gltf_loader.hpp"
 #include "vul_swap_chain.hpp"
@@ -31,7 +32,7 @@ Vulkano::Vulkano(uint32_t width, uint32_t height, std::string name) : m_vulWindo
     uint8_t *data = new uint8_t[16]{255, 0, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 0, 255, 255};
     std::shared_ptr<VulImage> emptyImage = std::make_shared<VulImage>(m_vulDevice);
     emptyImage->loadData(data, 2, 2, 4);
-    emptyImage->createImage(true, true, false, 2);
+    emptyImage->createImage(true, true, VulImage::ImageType::texture, 2);
     for (uint32_t i = 0; i < MAX_TEXTURES; i++)
         images[i] = emptyImage;
 }
@@ -106,6 +107,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
     bool preservePreviousContents = false;
     if (hasScene){
         for (const RenderData &renderData : renderDatas){
+            if (!renderData.is3d) continue;
             vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], preservePreviousContents, settings::renderWidth, settings::renderHeight);
             preservePreviousContents = true;
             std::vector<VkDescriptorSet> descriptorSets;
@@ -113,6 +115,22 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
             std::vector<VkBuffer> vertexBuffers = {scene.vertexBuffer->getBuffer(), scene.normalBuffer->getBuffer(), scene.uvBuffer->getBuffer()};
             renderData.pipeline->draw(commandBuffer, descriptorSets, vertexBuffers, scene.indexBuffer->getBuffer(), renderData.drawDatas);
             vulRenderer.stopRendering(commandBuffer);
+        }
+    }
+    if (object2Ds.size() > 0) {
+        for (const RenderData &renderData : renderDatas){
+            if (renderData.is3d) continue;
+            vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], preservePreviousContents, settings::renderWidth, settings::renderHeight);
+            std::vector<VkDescriptorSet> descriptorSets;
+            for (const std::shared_ptr<VulDescriptorSet> &descriptorSet : renderData.descriptorSets[vulRenderer.getFrameIndex()]) descriptorSets.push_back(descriptorSet->getSet());
+            vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.pipeline->getPipeline());
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.pipeline->getPipelineLayout(), 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+            for (Object2D &obj2d : object2Ds) {
+                obj2d.bind(commandBuffer);
+                obj2d.draw(commandBuffer);
+            }
+            vulRenderer.stopRendering(commandBuffer);
+            break;
         }
     }
 

@@ -91,6 +91,7 @@ class Vulkano{
         VulCompPipeline createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight);        
 
         struct RenderData {
+            bool is3d;
             std::shared_ptr<vulB::VulPipeline> pipeline;
             std::vector<vulB::VulPipeline::DrawData> drawDatas;
             std::array<std::vector<std::shared_ptr<vulB::VulDescriptorSet>>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descriptorSets;
