@@ -3,12 +3,11 @@
 #extension GL_GOOGLE_include_directive : enable
 
 #include"../vulkano/essentials/include/vul_host_device.hpp"
+#include"common.glsl"
 
 layout (location = 0) in vec3 fragPosWorld;
 layout (location = 1) in vec3 fragNormalWorld;
 layout (location = 2) in vec2 fragTexCoord;
-
-layout (location = 0) out vec4 FragColor;
 
 layout(set = 0, binding = 0) uniform Ubo {GlobalUbo ubo;};
 
@@ -17,61 +16,11 @@ layout(set = 0, binding = 2) readonly buffer MaterialBuffer{PackedMaterial m[];}
 layout(set = 0, binding = 3) uniform sampler2D multipleBounce2dImg;
 layout(set = 0, binding = 4) uniform sampler1D multipleBounce1dImg;
 
+layout (set = 1, binding = 0) buffer AlphaBuffer{ABuffer aBuffer[];};
+layout (set = 1, binding = 1, r32ui) uniform uimage2D aBufferHeads;
+layout (set = 1, binding = 2) buffer AlphaBufferCounter{uint aBufferCounter;};
+
 layout (push_constant) uniform Push{PushConstant push;};
-
-vec3 sRGBToAlbedo(vec3 sRGB)
-{
-    const vec3 prePow = (sRGB + vec3(0.055)) / 1.055;
-    return vec3(pow(prePow.x, 2.4), pow(prePow.y, 2.4), pow(prePow.z, 2.4));
-}
-
-vec3 albedoToSRGB(vec3 albedo)
-{
-    const vec3 prePow = albedo * 1.055;
-    return vec3(pow(prePow.x, 0.41667), pow(prePow.y, 0.41667), pow(prePow.z, 0.41167)) - vec3(0.055);
-}
-
-float lambda(vec3 someVector, vec3 surfaceNormal, float roughness)
-{
-    const float dotP = dot(surfaceNormal, someVector);
-    const float aPow2 = (dotP * dotP) / (roughness * roughness * (1.0 - dotP * dotP));
-    return (sqrt(1.0 + 1.0 / aPow2) - 1.0) / 2.0;
-}
-
-vec3 BRDF(vec3 surfaceNormal, vec3 viewDirection, vec3 lightDirection, vec3 specularColor, float roughness)
-{
-    if (dot(surfaceNormal, viewDirection) <= 0.0 || dot(surfaceNormal, lightDirection) <= 0.0) return vec3(0.0);
-    const float pi = 3.14159265359;
-    const vec3 halfVector = normalize(lightDirection + viewDirection);
-    const float dotHalfNorm = dot(halfVector, surfaceNormal);
-    if (dot(halfVector, viewDirection) <= 0.0 || dot(halfVector, lightDirection) <= 0.0 || dotHalfNorm <= 0.0) return vec3(0.0);
-    const vec3 freshnelColor = specularColor + (vec3(1.0) - specularColor) * pow((1.0 - dot(halfVector, lightDirection)), 5.0);
-    const float visibleFraction = 1.0 / (1.0 + lambda(viewDirection, surfaceNormal, roughness) + lambda(lightDirection, surfaceNormal, roughness));
-    const float roughnessPow2 = roughness * roughness;
-    const float whatDoICallThis = 1.0 + dotHalfNorm * dotHalfNorm * (roughnessPow2 - 1.0);
-    const float ggx = roughnessPow2 / (pi * whatDoICallThis * whatDoICallThis);
-    return (freshnelColor * visibleFraction * ggx) / (4.0 * dot(surfaceNormal, lightDirection * dot(surfaceNormal, viewDirection)));
-}
-
-vec3 multipleBounceBRDF(vec3 surfaceNormal, vec3 viewDirection, vec3 lightDirection, vec3 specularColor, float roughness)
-{
-    if (dot(surfaceNormal, viewDirection) <= 0.0 || dot(surfaceNormal, lightDirection) <= 0.0) return vec3(0.0);
-    const float pi = 3.14159265359;
-    const vec3 cosAvgFresnel = (specularColor * 20.0) / 21.0 + 1.0 / 21.0; 
-    const float dirAlbLight = texture(multipleBounce2dImg, vec2(acos(dot(surfaceNormal, lightDirection)) / (pi / 2.0), roughness)).x;
-    const float dirAlbView = texture(multipleBounce2dImg, vec2(acos(dot(surfaceNormal, viewDirection)) / (pi / 2.0), roughness)).x;
-    const float cosAvgDirAlb = texture(multipleBounce1dImg, roughness).x;
-    return (cosAvgFresnel * cosAvgDirAlb) / (pi * (1.0 - cosAvgDirAlb) * (1.0 - cosAvgFresnel * (1.0 - cosAvgDirAlb))) * (1.0 - dirAlbLight) * (1.0 - dirAlbView);
-}
-
-vec3 diffBRDF(vec3 surfaceNormal, vec3 viewDirection, vec3 lightDirection, vec3 specularColor, vec3 diffuseColor)
-{
-    const float pi = 3.14159265359;
-    const float nl = dot(surfaceNormal, lightDirection);
-    const float nv = dot(surfaceNormal, viewDirection);
-    if (nl <= 0.0 || nv <= 0.0) return vec3(0.0);
-    return 21.0 / (20.0 * pi) * (vec3(1.0) - specularColor) * diffuseColor * (1.0 - pow(1.0 - nl, 5.0)) * (1.0 - pow(1.0 - nv, 5.0)); 
-}
 
 void main()
 {
@@ -120,22 +69,21 @@ void main()
         float attenuation = 1.0 / dot(directionToLight, directionToLight);
         directionToLight = normalize(directionToLight);
 
-        const vec3 specularColor = vec3(0.03);
-        vec3 colorFromThisLight = vec3(0.0);
-        if (mat.metalliness < 0.5){
-            colorFromThisLight += BRDF(surfaceNormal, viewDirection, directionToLight, specularColor, mat.roughness);
-            colorFromThisLight += multipleBounceBRDF(surfaceNormal, viewDirection, directionToLight, specularColor, mat.roughness);
-            colorFromThisLight += diffBRDF(surfaceNormal, viewDirection, directionToLight, specularColor, rawColor);
-        } else {
-            colorFromThisLight += BRDF(surfaceNormal, viewDirection, directionToLight, rawColor, mat.roughness);
-            colorFromThisLight += multipleBounceBRDF(surfaceNormal, viewDirection, directionToLight, rawColor, mat.roughness);
-        }
+        //const vec3 specularColor = vec3(0.03);
+        const  vec3 specularColor = rawColor;
+        vec3 colorFromThisLight = BRDF(surfaceNormal, viewDirection, directionToLight, specularColor, mat.roughness);
         colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation;
         color += colorFromThisLight;
     }
 
     color += sRGBToAlbedo(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w);
-    if (mat.emissiveStrength > 0.01) color += sRGBToAlbedo(mat.emissiveColor * mat.emissiveStrength);
 
-    FragColor = vec4(albedoToSRGB(color), 1.0);
+    const uint newOffset = atomicAdd(aBufferCounter, 1) + 1;
+    const uint oldOffset = imageAtomicExchange(aBufferHeads, ivec2(gl_FragCoord.xy), newOffset);
+    ABuffer storeValue;
+    storeValue.color = packUnorm4x8(vec4(albedoToSRGB(color), mat.alpha));
+    storeValue.depth = gl_FragCoord.z;
+    storeValue.next = oldOffset;
+    storeValue.padding = 69;
+    aBuffer[newOffset] = storeValue;
 }

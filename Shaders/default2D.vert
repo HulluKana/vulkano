@@ -10,5 +10,5 @@ void main()
 {
     fragPos = position;
     fragTexCoord = uv;
-    gl_Position = vec4(position, 0.5f, 1.0f);
+    gl_Position = vec4(position, 0.0f, 1.0f);
 }

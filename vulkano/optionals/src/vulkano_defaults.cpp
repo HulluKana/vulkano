@@ -3,7 +3,9 @@
 #include "vul_host_device.hpp"
 #include "vul_image.hpp"
 #include "vul_pipeline.hpp"
+#include "vul_renderer.hpp"
 #include "vul_swap_chain.hpp"
+#include <vulkan/vulkan_core.h>
 #include<vulkano_defaults.hpp>
 
 #include <cstdint>
@@ -243,6 +245,7 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     mainConfig.colorAttachmentFormats = {vulkano.vulRenderer.getSwapChainColorFormat()};
     mainConfig.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
     mainConfig.cullMode = VK_CULL_MODE_NONE;
+    mainConfig.enableColorBlending = false;
     vulkano.renderDatas[inputData.mainRenderDataIdx].pipeline = std::make_shared<VulPipeline>(vulkano.getVulDevice(), "default3D.vert.spv", "default3D.frag.spv", mainConfig);
     vulkano.renderDatas[inputData.mainRenderDataIdx].is3d = true;
 
@@ -252,9 +255,10 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
                                     {2, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
     oitColoringConfig.setLayouts = {vulkano.descriptorSetLayouts[inputData.mainDescriptorSetLayoutIdx]->getDescriptorSetLayout(),
         vulkano.descriptorSetLayouts[inputData.oitDescriptorSetLayoutIdx]->getDescriptorSetLayout()};
-    oitColoringConfig.colorAttachmentFormats = {vulkano.vulRenderer.getSwapChainColorFormat()};
+    oitColoringConfig.colorAttachmentFormats = {};
     oitColoringConfig.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
     oitColoringConfig.cullMode = VK_CULL_MODE_NONE;
+    oitColoringConfig.enableColorBlending = false;
     vulkano.renderDatas[inputData.oitColoringRenderDataIdx].pipeline =
         std::make_shared<VulPipeline>(vulkano.getVulDevice(), "default3D.vert.spv", "oitColoring.frag.spv", oitColoringConfig);
     for (const vulB::GltfLoader::GltfNode &node : vulkano.scene.nodes) {
@@ -278,6 +282,10 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     oitCompositingConfig.colorAttachmentFormats = {vulkano.vulRenderer.getSwapChainColorFormat()};
     oitCompositingConfig.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
     oitCompositingConfig.cullMode = VK_CULL_MODE_NONE;
+    oitCompositingConfig.enableColorBlending = true;
+    oitCompositingConfig.blendOp = VK_BLEND_OP_MULTIPLY_EXT;
+    oitCompositingConfig.blendSrcFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+    oitCompositingConfig.blendDstFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].pipeline =
         std::make_shared<VulPipeline>(vulkano.getVulDevice(), "default2D.vert.spv", "oitCompositing.frag.spv", oitCompositingConfig);
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].is3d = false;
