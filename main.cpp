@@ -30,7 +30,12 @@ int main() {
     int k = 0;
     while (!stop) {
         k++;
-        if (k >= 2000) {
+        if (k == 2100) {
+            //vul::ProfAnalyzer::dumpMeasurementTree("tree.txt");
+            vul::ProfAnalyzer::dumpMeasurementSummary("summary.txt");
+            break;
+        }
+        if (k == 2000) {
             vul::ProfAnalyzer::resetMeasurements();
         }
         if (vulkano.vulRenderer.wasSwapChainRecreated()) vul::defaults::createDefaultAttachmentImages(vulkano, defaultRenderDataInputData);
@@ -43,10 +48,6 @@ int main() {
 
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);
-        if (k >= 2000) {
-            vul::ProfAnalyzer::dumpMeasurementTree("Measurements.txt");
-            break;
-        }
     }
     vulkano.letVulkanoFinish();
 

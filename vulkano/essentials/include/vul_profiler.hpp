@@ -15,6 +15,7 @@ namespace ProfAnalyzer {
 
 void resetMeasurements();
 void dumpMeasurementTree(const std::string &fileName);
+void dumpMeasurementSummary(const std::string &fileName);
 
 }
     
