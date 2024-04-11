@@ -1,4 +1,5 @@
 #include "vul_attachment_image.hpp"
+#include "vul_profiler.hpp"
 #include <memory>
 #include<vul_swap_chain.hpp>
 
@@ -50,6 +51,7 @@ VulSwapChain::~VulSwapChain()
 }
 
 VkResult VulSwapChain::acquireNextImage(uint32_t *imageIndex) {
+    VUL_PROFILE_FUNC()
     VkResult fenceResult = vkWaitForFences(
             device.device(),
             1,
@@ -72,7 +74,9 @@ VkResult VulSwapChain::acquireNextImage(uint32_t *imageIndex) {
 
 VkResult VulSwapChain::submitCommandBuffers(
         const VkCommandBuffer *buffers, uint32_t *imageIndex) {
+    VUL_PROFILE_FUNC()
     if (imagesInFlight[*imageIndex] != VK_NULL_HANDLE) {
+        VUL_PROFILE_SCOPE("Waiting for fences")
         vkWaitForFences(device.device(), 1, &imagesInFlight[*imageIndex], VK_TRUE, UINT64_MAX);
     }
     imagesInFlight[*imageIndex] = inFlightFences[currentFrame];
@@ -94,9 +98,12 @@ VkResult VulSwapChain::submitCommandBuffers(
     submitInfo.pSignalSemaphores = signalSemaphores;
 
     vkResetFences(device.device(), 1, &inFlightFences[currentFrame]);
-    if (vkQueueSubmit(device.graphicsQueue(), 1, &submitInfo, inFlightFences[currentFrame]) !=
-            VK_SUCCESS) {
-        throw std::runtime_error("failed to submit draw command buffer!");
+    {
+        VUL_PROFILE_SCOPE("Submiting the draw command buffer to the graphics queue")
+        if (vkQueueSubmit(device.graphicsQueue(), 1, &submitInfo, inFlightFences[currentFrame]) !=
+                VK_SUCCESS) {
+            throw std::runtime_error("failed to submit draw command buffer!");
+        }
     }
 
     VkPresentInfoKHR presentInfo = {};
@@ -111,14 +118,15 @@ VkResult VulSwapChain::submitCommandBuffers(
 
     presentInfo.pImageIndices = imageIndex;
 
-    auto result = vkQueuePresentKHR(device.presentQueue(), &presentInfo);
-
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
-
-    return result;
+    {
+        VUL_PROFILE_SCOPE("Presenting the swap chain image")
+        return vkQueuePresentKHR(device.presentQueue(), &presentInfo);
+    }
 }
 
 void VulSwapChain::createSwapChain() {
+    VUL_PROFILE_FUNC()
     SwapChainSupportDetails swapChainSupport = device.getSwapChainSupport();
 
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);

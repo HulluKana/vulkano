@@ -1,3 +1,4 @@
+#include "vul_profiler.hpp"
 #include<vul_pipeline.hpp>
 
 #include<fstream>
@@ -171,16 +172,23 @@ VulPipeline::~VulPipeline() {
 void VulPipeline::draw( VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSet> &descriptorSets, const std::vector<VkBuffer> &vertexBuffers,
                         VkBuffer indexBuffer, const std::vector<DrawData> &drawDatas)
 {
-    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
-    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+    VUL_PROFILE_FUNC()
+    {
+        VUL_PROFILE_SCOPE("Binding the pipeline, descriptor sets, vertex buffers and the index buffer")
+        vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+        vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
-    std::vector<VkDeviceSize> offsets = {0, 0, 0};
-    vkCmdBindVertexBuffers(cmdBuf, 0, static_cast<uint32_t>(vertexBuffers.size()), vertexBuffers.data(), offsets.data());
-    vkCmdBindIndexBuffer(cmdBuf, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+        std::vector<VkDeviceSize> offsets = {0, 0, 0};
+        vkCmdBindVertexBuffers(cmdBuf, 0, static_cast<uint32_t>(vertexBuffers.size()), vertexBuffers.data(), offsets.data());
+        vkCmdBindIndexBuffer(cmdBuf, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+    }
 
-    for (const DrawData &drawData : drawDatas){
-        vkCmdPushConstants(cmdBuf, m_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, drawData.pushDataSize, drawData.pPushData.get());
-        vkCmdDrawIndexed(cmdBuf, drawData.indexCount, 1, drawData.firstIndex, drawData.vertexOffset, 0);
+    {
+        VUL_PROFILE_SCOPE("Pushing constants and drawing indices")
+        for (const DrawData &drawData : drawDatas){
+            vkCmdPushConstants(cmdBuf, m_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, drawData.pushDataSize, drawData.pPushData.get());
+            vkCmdDrawIndexed(cmdBuf, drawData.indexCount, 1, drawData.firstIndex, drawData.vertexOffset, 0);
+        }
     }
 }
 

@@ -1,9 +1,11 @@
+#include "vul_profiler.hpp"
 #include<vul_transform.hpp>
 
 namespace vul{
 
 glm::mat4 transform3D::transformMat()
 {
+    VUL_PROFILE_FUNC()
     // Rotations correspond to Tait-bryan angles of X(1), Y(2), Z(3)
     // https://en.wikipedia.org/wiki/Euler_angles#Rotation_matrix
     /* Following function is basically

@@ -1,4 +1,5 @@
 #include "vul_attachment_image.hpp"
+#include "vul_profiler.hpp"
 #include <cstddef>
 #include <cstdlib>
 #include <memory>
@@ -29,6 +30,7 @@ VulRenderer::~VulRenderer()
 
 void VulRenderer::recreateSwapChain()
 {
+    VUL_PROFILE_FUNC()
     auto extent = vulWindow.getExtent();
     while (extent.width == 0 || extent.height == 0) {
         extent = vulWindow.getExtent();
@@ -74,6 +76,7 @@ void VulRenderer::createCommandBuffers()
 
 VkCommandBuffer VulRenderer::beginFrame()
 {
+    VUL_PROFILE_FUNC()
     assert(!isFrameStarted && "Can't call beginFrame while frame is already in progress");
 
     VkResult result = vulSwapChain->acquireNextImage(&currentImageIndex);
@@ -105,6 +108,7 @@ VkCommandBuffer VulRenderer::beginFrame()
 
 void VulRenderer::endFrame()
 {
+    VUL_PROFILE_FUNC()
     assert(isFrameStarted && "Can't call endFrame when frame hasn't even been started");
     VkCommandBuffer commandBuffer = getCurrentCommandBuffer();
     if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS){
@@ -128,6 +132,7 @@ void VulRenderer::endFrame()
 
 void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulAttachmentImage>> &attachmentImages, bool preservePreviousSwapchainImageContents, uint32_t renderWidth, uint32_t renderHeight)
 {
+    VUL_PROFILE_FUNC()
     assert(isFrameStarted && "Can't call beginRendering if the frame hasn't been started either");
     assert(commandBuffer == getCurrentCommandBuffer() && "Can't begin rendering on a command buffer from a different frame");
 
@@ -168,6 +173,7 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vecto
 
 void VulRenderer::stopRendering(VkCommandBuffer commandBuffer)
 {
+    VUL_PROFILE_FUNC()
     assert(isFrameStarted && "Can't call stopRendering if the frame hasn't been started either");
     assert(commandBuffer == getCurrentCommandBuffer() && "Can't end a render pass on a command buffer from a different frame");
 

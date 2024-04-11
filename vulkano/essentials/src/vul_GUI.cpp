@@ -1,3 +1,4 @@
+#include "vul_profiler.hpp"
 #include<vul_GUI.hpp>
 
 #include<imgui.h>
@@ -49,6 +50,7 @@ void VulGUI::initImGui(GLFWwindow *window, VkDescriptorPool &descriptorPool, Vul
 
 void VulGUI::startFrame()
 {
+    VUL_PROFILE_FUNC()
     ImGui_ImplVulkan_NewFrame();
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
@@ -56,6 +58,7 @@ void VulGUI::startFrame()
 
 void VulGUI::endFrame(VkCommandBuffer &commandBuffer)
 {
+    VUL_PROFILE_FUNC()
     ImGui::Render();
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 }

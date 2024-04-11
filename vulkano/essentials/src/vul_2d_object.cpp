@@ -1,3 +1,4 @@
+#include "vul_profiler.hpp"
 #include<vul_2d_object.hpp>
 #include <vulkan/vulkan_core.h>
 
@@ -50,6 +51,7 @@ void Object2D::addTriangle(vulB::VulDevice &vulDevice, glm::vec2 corner1, glm::v
 
 void Object2D::bind(VkCommandBuffer &cmdBuf)
 {
+    VUL_PROFILE_FUNC()
     std::vector<VkBuffer> vertexBuffers = {m_posBuf->getBuffer(), m_uvBuf->getBuffer()};
     std::vector<VkDeviceSize> offsets = {0, 0};
 
@@ -59,5 +61,6 @@ void Object2D::bind(VkCommandBuffer &cmdBuf)
 
 void Object2D::draw(VkCommandBuffer &cmdBuf)
 {
+    VUL_PROFILE_FUNC()
     vkCmdDrawIndexed(cmdBuf, m_indexCount, 1, 0, 0, 0);
 }

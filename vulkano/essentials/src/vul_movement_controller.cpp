@@ -1,3 +1,4 @@
+#include "vul_profiler.hpp"
 #include<vul_movement_controller.hpp>
 
 using namespace vul;
@@ -9,6 +10,7 @@ MovementController::MovementController()
 
 void MovementController::modifyValues(GLFWwindow *window, transform3D &transform)
 {
+    VUL_PROFILE_FUNC()
     if (glfwGetKey(window, keys.toggleGUI) == GLFW_PRESS) hideGUIpressed = true;
     if (glfwGetKey(window, keys.toggleGUI) == GLFW_RELEASE && hideGUIpressed){
         hideGUI = !hideGUI;
@@ -29,6 +31,7 @@ void MovementController::modifyValues(GLFWwindow *window, transform3D &transform
 
 void MovementController::rotate(GLFWwindow *window, float dt, transform3D &transform, int screenWidth, int screenHeight)
 {
+    VUL_PROFILE_FUNC()
     glm::vec3 keyRotate = glm::vec3(0.0f);
     glm::vec3 mouseRotate = glm::vec3(0.0f);
     if (glfwGetKey(window, keys.lookRight) == GLFW_PRESS) keyRotate.y += 1.0f; 
@@ -64,6 +67,7 @@ void MovementController::rotate(GLFWwindow *window, float dt, transform3D &trans
 
 void MovementController::move(GLFWwindow *window, float dt, transform3D &transform)
 {
+    VUL_PROFILE_FUNC()
     float yaw = -transform.rot.y;
     const glm::vec3 forwardDir = glm::vec3(sin(yaw), 0.0f, cos(yaw));
     const glm::vec3 rightDir = glm::vec3(-forwardDir.z, 0.0f, forwardDir.x);

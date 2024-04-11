@@ -1,4 +1,4 @@
-#include <vulkan/vulkan_core.h>
+#include "vul_profiler.hpp"
 #include<vulkano_program.hpp>
 #include<vulkano_defaults.hpp>
 
@@ -23,11 +23,16 @@ int main() {
     vul::defaults::createDefault3dRenderSystem(vulkano, defaultRenderDataInputData);
     vul::defaults::createDefaultAttachmentImages(vulkano, defaultRenderDataInputData);
     vulkano.initVulkano();
-    vul::settings::maxFps = 60.0f;
+    vul::settings::maxFps = 10000.0f;
 
     bool stop = false;
     float ownStuffTime = 0.0f;
+    int k = 0;
     while (!stop) {
+        k++;
+        if (k >= 2000) {
+            vul::ProfAnalyzer::resetMeasurements();
+        }
         if (vulkano.vulRenderer.wasSwapChainRecreated()) vul::defaults::createDefaultAttachmentImages(vulkano, defaultRenderDataInputData);
         VkCommandBuffer commandBuffer = vulkano.startFrame();
         if (commandBuffer == nullptr) continue;
@@ -38,6 +43,10 @@ int main() {
 
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);
+        if (k >= 2000) {
+            vul::ProfAnalyzer::dumpMeasurementTree("Measurements.txt");
+            break;
+        }
     }
     vulkano.letVulkanoFinish();
 

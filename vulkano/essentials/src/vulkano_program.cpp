@@ -1,5 +1,6 @@
 #include "vul_descriptors.hpp"
 #include "vul_gltf_loader.hpp"
+#include "vul_profiler.hpp"
 #include "vul_swap_chain.hpp"
 #include <cstdlib>
 #include<vulkano_program.hpp>
@@ -66,6 +67,7 @@ void Vulkano::initVulkano()
 
 VkCommandBuffer Vulkano::startFrame()
 {
+    VUL_PROFILE_FUNC()
     glfwPollEvents();
         
     double newTime = glfwGetTime();
@@ -103,6 +105,7 @@ VkCommandBuffer Vulkano::startFrame()
 
 bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 {
+    VUL_PROFILE_FUNC()
     bool preservePreviousContents = false;
     if (hasScene){
         for (const RenderData &renderData : renderDatas){

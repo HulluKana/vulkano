@@ -1,3 +1,4 @@
+#include "vul_profiler.hpp"
 #include<vul_camera.hpp>
 
 #include<cassert>
@@ -18,6 +19,7 @@ void VulCamera::setOrthographicProjection(float left, float right, float top, fl
     
 void VulCamera::setPerspectiveProjection(float fovY, float aspect, float near, float far) 
 {
+    VUL_PROFILE_FUNC()
     assert(glm::abs(aspect - std::numeric_limits<float>::epsilon()) > 0.0f && "I think if this fails the given aspect is too small");
     const float tanHalffovY = -tan(fovY / 2.f);
     projectionMatrix = glm::mat4{0.0f};
@@ -56,6 +58,7 @@ void VulCamera::setViewTarget(glm::vec3 position, glm::vec3 target, glm::vec3 up
 }
 
 void VulCamera::setViewXYZ(glm::vec3 position, glm::vec3 rotation) {
+    VUL_PROFILE_FUNC()
     const float c3 = glm::cos(rotation.z);
     const float s3 = glm::sin(rotation.z);
     const float c2 = glm::cos(rotation.y);

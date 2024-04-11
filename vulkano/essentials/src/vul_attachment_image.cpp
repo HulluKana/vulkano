@@ -1,4 +1,5 @@
 #include "vul_device.hpp"
+#include "vul_profiler.hpp"
 #include<vul_attachment_image.hpp>
 #include <vulkan/vulkan_core.h>
 
@@ -99,6 +100,7 @@ VkResult VulAttachmentImage::createFromVkImage(VkImage image, VkFormat format, V
 
 void VulAttachmentImage::establishPreAttachmentPipelineBarrier(VkCommandBuffer cmdBuf) const
 {
+    VUL_PROFILE_FUNC()
     VkImageSubresourceRange subResourceRange{};
     subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     subResourceRange.baseMipLevel = 0;
@@ -121,6 +123,7 @@ void VulAttachmentImage::establishPreAttachmentPipelineBarrier(VkCommandBuffer c
 
 void VulAttachmentImage::establishPostAttachmentPipelineBarrier(VkCommandBuffer cmdBuf) const
 {
+    VUL_PROFILE_FUNC()
     VkImageSubresourceRange subResourceRange{};
     subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     subResourceRange.baseMipLevel = 0;
@@ -143,6 +146,7 @@ void VulAttachmentImage::establishPostAttachmentPipelineBarrier(VkCommandBuffer 
 
 VkRenderingAttachmentInfo VulAttachmentImage::getAttachmentInfo(VkClearValue clearValue) const
 {
+    VUL_PROFILE_FUNC()
     VkAttachmentLoadOp loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     if (preservePreviousContents) loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
     if (m_type == ImageType::colorAttachment) {

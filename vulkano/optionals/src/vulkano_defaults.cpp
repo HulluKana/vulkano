@@ -2,6 +2,7 @@
 #include "vul_gltf_loader.hpp"
 #include "vul_host_device.hpp"
 #include "vul_pipeline.hpp"
+#include "vul_profiler.hpp"
 #include "vul_swap_chain.hpp"
 #include <vulkan/vulkan_core.h>
 #include<vulkano_defaults.hpp>
@@ -217,6 +218,7 @@ void defaults::createDefaultAttachmentImages(Vulkano &vulkano, DefaultRenderData
 
 void defaults::updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataInputData inputData)
 {
+    VUL_PROFILE_FUNC()
     Scene &scene = vulkano.scene;
 
     GlobalUbo ubo{};

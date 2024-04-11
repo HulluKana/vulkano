@@ -1,3 +1,4 @@
+#include "vul_profiler.hpp"
 #include<vul_buffer.hpp>
 
 #include <cstring>
@@ -82,6 +83,7 @@ VkResult VulBuffer::createBuffer(bool isLocal, VulBuffer::Usage usage)
 
 VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize offset)
 {
+    VUL_PROFILE_FUNC()
     if (m_buffer == nullptr) throw std::runtime_error("Tried to write to buffer before it was created");
     if (m_memoryPropertyFlags == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
         bool stagingBufferNeedRemoving = false;
