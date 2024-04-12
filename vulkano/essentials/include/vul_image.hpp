@@ -26,6 +26,7 @@ class VulImage
         uint32_t getWidth() const {return m_width;}
         uint32_t getHeight() const {return m_height;}
         uint32_t getChannels() const {return m_channels;}
+        VkImage getImage() const {return m_image;}
         VkImageView getImageView() const {return m_imageView;}
         VkSampler getTextureSampler() const {return m_textureSampler;}
         VkFormat getFormat() const {return m_format;}

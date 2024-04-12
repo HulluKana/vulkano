@@ -1,4 +1,4 @@
-#include "vul_profiler.hpp"
+#include <vul_debug_tools.hpp>
 #include<vul_pipeline.hpp>
 
 #include<fstream>
@@ -160,6 +160,11 @@ VulPipeline::VulPipeline(VulDevice& device, const std::string& vertFile, const s
     if (vkCreateGraphicsPipelines(m_vulDevice.device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline) != VK_SUCCESS){
         throw std::runtime_error("Failed to create graphics pipeline in vul_pipeline.cpp file");
     }
+
+    VUL_NAME_VK(m_vertShaderModule)
+    VUL_NAME_VK(m_fragShaderModule)
+    VUL_NAME_VK(m_pipeline)
+    VUL_NAME_VK(m_layout)
 }
 
 VulPipeline::~VulPipeline() {

@@ -1,3 +1,4 @@
+#include "vul_debug_tools.hpp"
 #include<vul_scene.hpp>
 #include<vul_host_device.hpp>
 #include <memory>
@@ -67,6 +68,12 @@ void Scene::loadScene(std::string fileName)
     meshes = gltfLoader.primMeshes;
     materials = gltfLoader.materials;
     images = gltfLoader.images;
+
+    VUL_NAME_VK(indexBuffer->getBuffer())
+    VUL_NAME_VK(vertexBuffer->getBuffer())
+    VUL_NAME_VK(normalBuffer->getBuffer())
+    VUL_NAME_VK(uvBuffer->getBuffer())
+    VUL_NAME_VK(materialBuffer->getBuffer())
 }
 
 }

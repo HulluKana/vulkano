@@ -1,5 +1,5 @@
 #include "vul_attachment_image.hpp"
-#include "vul_profiler.hpp"
+#include <vul_debug_tools.hpp>
 #include <memory>
 #include<vul_swap_chain.hpp>
 
@@ -190,6 +190,9 @@ void VulSwapChain::createSwapChain() {
         if (swapChainImages[i]->createFromVkImage(rawSwapChainImages[i], swapChainImageFormat, swapChainExtent) != VK_SUCCESS)
             throw std::runtime_error("Failed to create swap chain image");
     }
+
+    VUL_NAME_VK(swapChain)
+    for (VkImage swapChainImage : rawSwapChainImages) VUL_NAME_VK(swapChainImage)
 }
 
 void VulSwapChain::createSyncObjects() {
@@ -214,6 +217,10 @@ void VulSwapChain::createSyncObjects() {
             throw std::runtime_error("failed to create synchronization objects for a frame!");
         }
     }
+
+    for (VkSemaphore imageAvailableSemaphore : imageAvailableSemaphores) VUL_NAME_VK(imageAvailableSemaphore)
+    for (VkSemaphore renderFinishedSemaphore : renderFinishedSemaphores) VUL_NAME_VK(renderFinishedSemaphore)
+    for (VkFence inFlightFence : inFlightFences) VUL_NAME_VK(inFlightFence)
 }
 
 VkSurfaceFormatKHR VulSwapChain::chooseSwapSurfaceFormat(

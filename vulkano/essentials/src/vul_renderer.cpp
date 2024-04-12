@@ -1,5 +1,5 @@
 #include "vul_attachment_image.hpp"
-#include "vul_profiler.hpp"
+#include <vul_debug_tools.hpp>
 #include <cstddef>
 #include <cstdlib>
 #include <memory>
@@ -72,6 +72,8 @@ void VulRenderer::createCommandBuffers()
     if (vkAllocateCommandBuffers(vulDevice.device(), &allocInfo, commandBuffers.data()) != VK_SUCCESS){
         throw std::runtime_error("Failed to allocate command buffers in vul_renderer.cpp file");
     }
+
+    for (VkCommandBuffer rendererCmdBuf : commandBuffers) VUL_NAME_VK(rendererCmdBuf)
 }
 
 VkCommandBuffer VulRenderer::beginFrame()

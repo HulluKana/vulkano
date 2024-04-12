@@ -1,4 +1,4 @@
-#include "vul_profiler.hpp"
+#include <vul_debug_tools.hpp>
 #include<vul_buffer.hpp>
 
 #include <cstring>
@@ -75,10 +75,14 @@ VkResult VulBuffer::createBuffer(bool isLocal, VulBuffer::Usage usage)
     result = vkBindBufferMemory(m_vulDevice.device(), m_buffer, m_memory, 0);
     if (result != VK_SUCCESS) return result;
 
+    VUL_NAME_VK(m_buffer)
+    VUL_NAME_VK(m_memory)
+
     if (m_inputData != nullptr) {
         return writeData(m_inputData, m_elementCount * m_elementSize, 0);
     }
     return VK_SUCCESS;
+
 }
 
 VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize offset)

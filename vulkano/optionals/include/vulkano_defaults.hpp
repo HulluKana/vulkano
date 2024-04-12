@@ -19,7 +19,6 @@ namespace defaults
     };
     DefaultRenderDataInputData createDefaultDescriptors(Vulkano &vulkano, Default3dInputData inputData);
     void createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataInputData inputData);
-    void createDefaultAttachmentImages(Vulkano &vulkano, DefaultRenderDataInputData inputData);
     void updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataInputData inputData);
 }
 }

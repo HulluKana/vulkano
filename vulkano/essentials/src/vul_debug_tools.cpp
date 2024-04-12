@@ -1,3 +1,4 @@
+#include "vul_device.hpp"
 #include <algorithm>
 #include <cstring>
 #include <fstream>
@@ -8,7 +9,9 @@
 #include <utility>
 #include <vector>
 #include <chrono>
-#include <vul_profiler.hpp>
+#include <iostream>
+#include <vul_debug_tools.hpp>
+#include <vulkan/vulkan_core.h>
 
 struct Measurement {
     const char *name;
@@ -16,6 +19,12 @@ struct Measurement {
     std::chrono::steady_clock::time_point end;
 };
 std::vector<Measurement> measurements;
+
+PFN_vkSetDebugUtilsObjectNameEXT pfn_vkSetDebugUtilsObjectNameEXT = nullptr;
+VkResult vkSetDebugUtilsObjectNameEXT(VkDevice device, const VkDebugUtilsObjectNameInfoEXT* pNameInfo) 
+{
+    return pfn_vkSetDebugUtilsObjectNameEXT(device, pNameInfo);
+}
 
 namespace vul {
 
@@ -121,6 +130,27 @@ ScopedTimer::ScopedTimer(const char *name)
 ScopedTimer::~ScopedTimer()
 {
     measurements.emplace_back(Measurement{m_name, m_startTime, std::chrono::steady_clock::now()});
+}
+
+}
+
+namespace vulB {
+
+namespace DebugNamer {
+
+VulDevice *vulDevice;
+void initialize(VulDevice &device)
+{
+    vulDevice = &device;
+    pfn_vkSetDebugUtilsObjectNameEXT = reinterpret_cast<PFN_vkSetDebugUtilsObjectNameEXT>(vkGetInstanceProcAddr(device.getInstace(), "vkSetDebugUtilsObjectNameEXT"));
+}
+
+void setObjectName(const uint64_t object, const std::string &name, VkObjectType type)
+{
+    VkDebugUtilsObjectNameInfoEXT nameInfo{VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT, nullptr, type, object, name.c_str()};
+    vkSetDebugUtilsObjectNameEXT(vulDevice->device(), &nameInfo);
+}
+
 }
 
 }

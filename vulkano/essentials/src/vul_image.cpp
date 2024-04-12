@@ -1,3 +1,4 @@
+#include "vul_debug_tools.hpp"
 #include<vul_image.hpp>
 #include<vul_buffer.hpp>
 #include <cstring>
@@ -164,6 +165,8 @@ void VulImage::createImageView(VkImageViewType imageViewType)
     if (vkCreateImageView(m_vulDevice.device(), &viewInfo, nullptr, &m_imageView) != VK_SUCCESS) {
         throw std::runtime_error("failed to create texture image view in vulkano_image.cpp");
     }
+
+    VUL_NAME_VK(m_imageView)
 }
 
 void VulImage::createTextureSampler()
@@ -190,6 +193,8 @@ void VulImage::createTextureSampler()
         throw std::runtime_error("failed to create texture sampler in vul_texture_sampler.cpp");
     }
     m_hasSampler = true;
+
+    VUL_NAME_VK(m_textureSampler)
 }
 
 void VulImage::createVkImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageType imageType)
@@ -227,6 +232,9 @@ void VulImage::createVkImage(VkFormat format, VkImageTiling tiling, VkImageUsage
     }
 
     vkBindImageMemory(m_vulDevice.device(), m_image, m_imageMemory, 0);
+
+    VUL_NAME_VK(m_image)
+    VUL_NAME_VK(m_imageMemory)
 }
 
 void VulImage::transitionImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)

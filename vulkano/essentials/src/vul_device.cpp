@@ -1,3 +1,4 @@
+#include <vul_debug_tools.hpp>
 #include<vul_device.hpp>
 #include<vul_settings.hpp>
 
@@ -55,12 +56,23 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance,
 
 // class member functions
 VulDevice::VulDevice(vulB::VulWindow &window) : window{window} {
-  createInstance();
-  setupDebugMessenger();
-  createSurface();
-  pickPhysicalDevice();
-  createLogicalDevice();
-  createCommandPools();
+    createInstance();
+    setupDebugMessenger();
+    createSurface();
+    pickPhysicalDevice();
+    createLogicalDevice();
+    createCommandPools();
+
+    DebugNamer::initialize(*this);
+    VUL_NAME_VK(instance)
+    VUL_NAME_VK(physicalDevice)
+    VUL_NAME_VK(m_computeCommandPool)
+    VUL_NAME_VK(commandPool)
+    VUL_NAME_VK(device_)
+    VUL_NAME_VK(surface_)
+    VUL_NAME_VK(m_computeQueue)
+    VUL_NAME_VK(presentQueue_)
+    VUL_NAME_VK(graphicsQueue_)
 }
 
 VulDevice::~VulDevice() {

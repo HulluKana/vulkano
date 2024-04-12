@@ -48,6 +48,7 @@ class VulBuffer {
         void deleteStagingBuffer() {delete m_stagingBuffer.release();}
 
         VkBuffer getBuffer() const { return m_buffer; }
+        VkDeviceMemory getMemory() const {return m_memory; }
         bool hasStagingBuffer() const {return m_stagingBuffer.get() != nullptr;}
         void* getMappedMemory() const { return m_mapped; }
         VkBufferUsageFlags getUsageFlags() const { return m_usageFlags; }

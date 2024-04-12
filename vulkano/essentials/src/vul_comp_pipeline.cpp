@@ -1,3 +1,4 @@
+#include "vul_debug_tools.hpp"
 #include<vul_comp_pipeline.hpp>
 #include<vul_pipeline.hpp>
 #include<vul_swap_chain.hpp>
@@ -61,6 +62,12 @@ VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vecto
         if (vkCreateFence(m_vulDevice.device(), &fenceInfo, nullptr, &m_fences[i]) != VK_SUCCESS)
             throw std::runtime_error("Failed to create fence while creating compute pipeline");
     }
+
+    VUL_NAME_VK(m_shader)
+    VUL_NAME_VK(m_layout)
+    VUL_NAME_VK(m_pipeline)
+    for (VkCommandBuffer cmdBuf : m_cmdBufs) VUL_NAME_VK(cmdBuf)
+    for (VkFence fence : m_fences) VUL_NAME_VK(fence)
 }
 
 VulCompPipeline::~VulCompPipeline()

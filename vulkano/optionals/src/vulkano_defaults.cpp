@@ -2,7 +2,7 @@
 #include "vul_gltf_loader.hpp"
 #include "vul_host_device.hpp"
 #include "vul_pipeline.hpp"
-#include "vul_profiler.hpp"
+#include <vul_debug_tools.hpp>
 #include "vul_swap_chain.hpp"
 #include <vulkan/vulkan_core.h>
 #include<vulkano_defaults.hpp>
@@ -120,6 +120,14 @@ defaults::Default3dInputData defaults::createDefault3dInputData(Vulkano &vulkano
     output.multipleBounce1dImage = std::make_shared<VulImage>(vulkano.getVulDevice());
     output.multipleBounce1dImage->loadData(&otherResults[0], ROUGHNESS_COUNT, 1, 1);
     output.multipleBounce1dImage->createImage(true, true, false, 1);
+
+    VUL_NAME_VK(output.multipleBounce2dImage->getImage())
+    VUL_NAME_VK(output.multipleBounce2dImage->getImageView())
+    VUL_NAME_VK(output.multipleBounce2dImage->getTextureSampler())
+    VUL_NAME_VK(output.multipleBounce1dImage->getImage())
+    VUL_NAME_VK(output.multipleBounce1dImage->getImageView())
+    VUL_NAME_VK(output.multipleBounce1dImage->getTextureSampler())
+
     return output;
 }
 
@@ -130,6 +138,10 @@ defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano 
         globalBuffer->keepEmpty(sizeof(GlobalUbo), 1);
         globalBuffer->createBuffer(false, VulBuffer::usage_ubo);
         globalBuffer->mapAll();
+
+        VUL_NAME_VK(globalBuffer->getBuffer())
+        VUL_NAME_VK(globalBuffer->getMemory())
+
         vulkano.buffers.push_back(std::move(globalBuffer));
     }
 
@@ -177,6 +189,10 @@ defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano 
 
         Vulkano::descSetReturnVal retVal = vulkano.createDescriptorSet(descs);
         if (!retVal.succeeded) throw std::runtime_error("Failed to create default descriptor sets");
+
+        VUL_NAME_VK(retVal.set->getSet())
+        VUL_NAME_VK(retVal.layout->getDescriptorSetLayout())
+
         vulkano.renderDatas[returnValue.renderDataIdx].descriptorSets[i].push_back(std::move(retVal.set));
         vulkano.descriptorSetLayouts[returnValue.descriptorSetLayoutIdx] = std::move(retVal.layout);
     }
@@ -190,7 +206,7 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     config.bindingDescriptions = {  {0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX},
                                     {2, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
     config.setLayouts = {vulkano.descriptorSetLayouts[inputData.descriptorSetLayoutIdx]->getDescriptorSetLayout()};
-    config.colorAttachmentFormats = {vulkano.vulRenderer.getSwapChainColorFormat(), vulkano.vulRenderer.getSwapChainColorFormat()};
+    config.colorAttachmentFormats = {vulkano.vulRenderer.getSwapChainColorFormat()};
     config.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
     config.cullMode = VK_CULL_MODE_NONE;
     vulkano.renderDatas[inputData.renderDataIdx].pipeline = std::make_shared<VulPipeline>(vulkano.getVulDevice(), "default3D.vert.spv", "default3D.frag.spv", config);
@@ -204,16 +220,8 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
         drawData.pushDataSize = sizeof(PushConstant);
         vulkano.renderDatas[inputData.renderDataIdx].drawDatas.push_back(drawData);
     }
-}
 
-void defaults::createDefaultAttachmentImages(Vulkano &vulkano, DefaultRenderDataInputData inputData)
-{
-    for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-        vulkano.renderDatas[inputData.renderDataIdx].attachmentImages[i].resize(1);
-        std::shared_ptr<VulAttachmentImage> attachmentImage = std::make_shared<VulAttachmentImage>(vulkano.getVulDevice());
-        attachmentImage->createEmptyImage(VulAttachmentImage::ImageType::colorAttachment, vulkano.vulRenderer.getSwapChainColorFormat(), vulkano.vulRenderer.getSwapChainExtent());
-        vulkano.renderDatas[inputData.renderDataIdx].attachmentImages[i] = {attachmentImage};
-    }
+    VUL_NAME_VK(vulkano.renderDatas[inputData.renderDataIdx].pipeline->getPipeline())
 }
 
 void defaults::updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataInputData inputData)

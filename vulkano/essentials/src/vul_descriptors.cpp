@@ -1,3 +1,4 @@
+#include "vul_debug_tools.hpp"
 #include<vul_descriptors.hpp>
  
 // std
@@ -51,6 +52,8 @@ VulDescriptorSetLayout::VulDescriptorSetLayout(
                     &descriptorSetLayout) != VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor set layout!");
         }
+
+        VUL_NAME_VK(descriptorSetLayout)
     }
 
 VulDescriptorSetLayout::~VulDescriptorSetLayout() {
@@ -98,6 +101,8 @@ VulDescriptorPool::VulDescriptorPool(
                 VK_SUCCESS) {
             throw std::runtime_error("failed to create descriptor pool!");
         }
+
+        VUL_NAME_VK(descriptorPool)
     }
 
 VulDescriptorPool::~VulDescriptorPool() {
@@ -117,6 +122,8 @@ bool VulDescriptorPool::allocateDescriptorSet(
     if (vkAllocateDescriptorSets(vulDevice.device(), &allocInfo, &descriptor) != VK_SUCCESS) {
         return false;
     }
+
+    VUL_NAME_VK(descriptor)
     return true;
 }
 

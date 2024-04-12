@@ -1,5 +1,5 @@
 #include "vul_device.hpp"
-#include "vul_profiler.hpp"
+#include <vul_debug_tools.hpp>
 #include<vul_attachment_image.hpp>
 #include <vulkan/vulkan_core.h>
 
@@ -73,7 +73,14 @@ VkResult VulAttachmentImage::createEmptyImage(ImageType type, VkFormat format, V
     viewInfo.subresourceRange.levelCount = 1;
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
-    return vkCreateImageView(m_vulDevice.device(), &viewInfo, nullptr, &m_imageView);
+    result = vkCreateImageView(m_vulDevice.device(), &viewInfo, nullptr, &m_imageView);
+    if (result != VK_SUCCESS) return result;
+
+    VUL_NAME_VK(m_image)
+    VUL_NAME_VK(m_memory)
+    VUL_NAME_VK(m_imageView)
+
+    return VK_SUCCESS;
 }
 
 VkResult VulAttachmentImage::createFromVkImage(VkImage image, VkFormat format, VkExtent2D extent)
@@ -95,7 +102,11 @@ VkResult VulAttachmentImage::createFromVkImage(VkImage image, VkFormat format, V
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
-    return vkCreateImageView(m_vulDevice.device(), &viewInfo, nullptr, &m_imageView);
+    VkResult result = vkCreateImageView(m_vulDevice.device(), &viewInfo, nullptr, &m_imageView);
+
+    VUL_NAME_VK(m_imageView)
+
+    return result;
 }
 
 void VulAttachmentImage::establishPreAttachmentPipelineBarrier(VkCommandBuffer cmdBuf) const
