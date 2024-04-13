@@ -12,8 +12,9 @@ VulAttachmentImage::VulAttachmentImage(VulDevice &vulDevice) : m_vulDevice{vulDe
 VulAttachmentImage::~VulAttachmentImage()
 {
     if (m_ownsImage && m_image != nullptr) vkDestroyImage(m_vulDevice.device(), m_image, nullptr);
-    if (m_imageView != nullptr) vkDestroyImageView(m_vulDevice.device(), m_imageView, nullptr);
     if (m_memory != nullptr) vkFreeMemory(m_vulDevice.device(), m_memory, nullptr);
+    if (m_imageView != nullptr) vkDestroyImageView(m_vulDevice.device(), m_imageView, nullptr);
+    if (m_sampler != nullptr) vkDestroySampler(m_vulDevice.device(), m_sampler, nullptr);
 }
 
 VkResult VulAttachmentImage::createEmptyImage(ImageType type, VkFormat format, VkExtent2D extent)
@@ -29,7 +30,7 @@ VkResult VulAttachmentImage::createEmptyImage(ImageType type, VkFormat format, V
         imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
         aspectFlags = VK_IMAGE_ASPECT_COLOR_BIT;
     } else {
-        imageUsage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+        imageUsage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
         aspectFlags = VK_IMAGE_ASPECT_DEPTH_BIT;
     }
 
@@ -72,7 +73,28 @@ VkResult VulAttachmentImage::createEmptyImage(ImageType type, VkFormat format, V
     viewInfo.subresourceRange.levelCount = 1;
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
-    return vkCreateImageView(m_vulDevice.device(), &viewInfo, nullptr, &m_imageView);
+    result = vkCreateImageView(m_vulDevice.device(), &viewInfo, nullptr, &m_imageView);
+    if (result != VK_SUCCESS) return result;
+
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.magFilter = VK_FILTER_LINEAR;
+    samplerInfo.minFilter = VK_FILTER_LINEAR;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+    samplerInfo.anisotropyEnable = VK_TRUE;
+    samplerInfo.maxAnisotropy = m_vulDevice.properties.limits.maxSamplerAnisotropy;
+    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = 0.0f;
+
+    return vkCreateSampler(m_vulDevice.device(), &samplerInfo, nullptr, &m_sampler);
 }
 
 VkResult VulAttachmentImage::createFromVkImage(VkImage image, VkFormat format, VkExtent2D extent)
@@ -97,48 +119,42 @@ VkResult VulAttachmentImage::createFromVkImage(VkImage image, VkFormat format, V
     return vkCreateImageView(m_vulDevice.device(), &viewInfo, nullptr, &m_imageView);
 }
 
-void VulAttachmentImage::establishPreAttachmentPipelineBarrier(VkCommandBuffer cmdBuf) const
+void VulAttachmentImage::transitionLayout(VkCommandBuffer cmdBuf, VkImageLayout srcLayout, VkImageLayout dstLayout, bool beforeRender) const
 {
+    VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+    VkAccessFlags access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+    if (preservePreviousContents) access = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
+    if (m_type == ImageType::depthAttachment) {
+        aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
+        if (preservePreviousContents) access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+        else access = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+    }
+
     VkImageSubresourceRange subResourceRange{};
-    subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    subResourceRange.aspectMask = aspect;
     subResourceRange.baseMipLevel = 0;
     subResourceRange.levelCount = 1;
     subResourceRange.baseArrayLayer = 0;
     subResourceRange.layerCount = 1;
 
-    VkAccessFlags access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    if (preservePreviousContents) access = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
     VkImageMemoryBarrier imageMemoryBarrier{};
     imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    imageMemoryBarrier.dstAccessMask = access;
-    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+    if (beforeRender) imageMemoryBarrier.dstAccessMask = access;
+    else imageMemoryBarrier.srcAccessMask = access;
+    imageMemoryBarrier.oldLayout = srcLayout;
+    imageMemoryBarrier.newLayout = dstLayout;
     imageMemoryBarrier.image = m_image;
     imageMemoryBarrier.subresourceRange = subResourceRange;
 
-    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
-}
-
-void VulAttachmentImage::establishPostAttachmentPipelineBarrier(VkCommandBuffer cmdBuf) const
-{
-    VkImageSubresourceRange subResourceRange{};
-    subResourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    subResourceRange.baseMipLevel = 0;
-    subResourceRange.levelCount = 1;
-    subResourceRange.baseArrayLayer = 0;
-    subResourceRange.layerCount = 1;
-
-    VkAccessFlags access = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-    if (preservePreviousContents) access = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-    VkImageMemoryBarrier imageMemoryBarrier{};
-    imageMemoryBarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    imageMemoryBarrier.srcAccessMask = access;
-    imageMemoryBarrier.oldLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-    imageMemoryBarrier.newLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-    imageMemoryBarrier.image = m_image;
-    imageMemoryBarrier.subresourceRange = subResourceRange;
-
-    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
+    VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+    VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    if (m_type == ImageType::depthAttachment) srcStage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    if (beforeRender) {
+        srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        dstStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+        if (m_type == ImageType::depthAttachment) dstStage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+    }
+    vkCmdPipelineBarrier(cmdBuf, srcStage, dstStage, 0, 0, nullptr, 0, nullptr, 1, &imageMemoryBarrier);
 }
 
 VkRenderingAttachmentInfo VulAttachmentImage::getAttachmentInfo(VkClearValue clearValue) const

@@ -47,6 +47,7 @@ void VulRenderer::recreateSwapChain()
         }
     }
 
+    VkCommandBuffer cmdBuf = vulDevice.beginSingleTimeCommands();
     m_depthFormat = vulDevice.findSupportedFormat({  VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT}, 
                                                             VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
     m_depthImages.resize(vulSwapChain->imageCount());
@@ -54,7 +55,9 @@ void VulRenderer::recreateSwapChain()
         m_depthImages[i] = std::make_unique<VulAttachmentImage>(vulDevice);
         if (m_depthImages[i]->createEmptyImage( VulAttachmentImage::ImageType::depthAttachment, m_depthFormat, vulSwapChain->getSwapChainExtent()) != VK_SUCCESS)
             throw std::runtime_error("Failed to create depth image");
+        m_depthImages[i]->transitionLayout(cmdBuf, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, true);
     }
+    vulDevice.endSingleTimeCommands(cmdBuf);
 }
 
 void VulRenderer::createCommandBuffers() 
@@ -140,6 +143,7 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vecto
     colorAttachmentInfos[0] = vulSwapChain->getImage(currentImageIndex)->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}});
     for (size_t i = 0; i < attachmentImages.size(); i++) colorAttachmentInfos[i + 1] = attachmentImages[i]->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}});
     VkRenderingAttachmentInfo depthAttachmentInfo = m_depthImages[currentImageIndex]->getAttachmentInfo({{{1.0f}}});
+    depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea.offset = {0, 0};
@@ -147,9 +151,9 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vecto
     renderingInfo.layerCount = 1;
     renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachmentInfos.size());
     renderingInfo.pColorAttachments = colorAttachmentInfos.data();
-    renderingInfo.pDepthAttachment = &depthAttachmentInfo;
+    if (!preservePreviousSwapchainImageContents) renderingInfo.pDepthAttachment = &depthAttachmentInfo;
 
-    vulSwapChain->getImage(currentImageIndex)->establishPreAttachmentPipelineBarrier(commandBuffer);
+    vulSwapChain->getImage(currentImageIndex)->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, true);
     vkCmdBeginRendering(commandBuffer, &renderingInfo);
 
     VkViewport viewport{};
@@ -172,7 +176,7 @@ void VulRenderer::stopRendering(VkCommandBuffer commandBuffer)
     assert(commandBuffer == getCurrentCommandBuffer() && "Can't end a render pass on a command buffer from a different frame");
 
     vkCmdEndRendering(commandBuffer);
-    vulSwapChain->getImage(currentImageIndex)->establishPostAttachmentPipelineBarrier(commandBuffer);
+    vulSwapChain->getImage(currentImageIndex)->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, false);
 }
 
 }

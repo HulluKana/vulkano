@@ -1,3 +1,4 @@
+#include <memory>
 #include<vul_descriptors.hpp>
  
 // std
@@ -112,8 +113,6 @@ bool VulDescriptorPool::allocateDescriptorSet(
     allocInfo.pSetLayouts = &descriptorSetLayout;
     allocInfo.descriptorSetCount = 1;
 
-    // Might want to create a "DescriptorPoolManager" class that handles this case, and builds
-    // a new pool whenever an old pool fills up. But this is beyond our current scope
     if (vkAllocateDescriptorSets(vulDevice.device(), &allocInfo, &descriptor) != VK_SUCCESS) {
         return false;
     }
@@ -134,7 +133,7 @@ void VulDescriptorPool::resetPool() {
 
 // *************** Descriptor Writer *********************
 
-VulDescriptorSet::VulDescriptorSet(VulDescriptorSetLayout &setLayout, VulDescriptorPool &pool)
+VulDescriptorSet::VulDescriptorSet(std::shared_ptr<VulDescriptorSetLayout> setLayout, VulDescriptorPool &pool)
     : m_setLayout{setLayout}, m_pool{pool} {}
 
 void VulDescriptorSet::free()
@@ -146,9 +145,9 @@ void VulDescriptorSet::free()
 
 VulDescriptorSet &VulDescriptorSet::writeBuffer(
         uint32_t binding, VkDescriptorBufferInfo *bufferInfo, uint32_t descriptorCount) {
-    assert(m_setLayout.bindings.count(binding) == 1 && "Layout does not contain specified binding");
+    assert(m_setLayout->bindings.count(binding) == 1 && "Layout does not contain specified binding");
 
-    auto &bindingDescription = m_setLayout.bindings[binding];
+    auto &bindingDescription = m_setLayout->bindings[binding];
     assert(bindingDescription.descriptorCount == descriptorCount && "Binding some amount of descriptor infos, but binding expects different amount");
 
     VkWriteDescriptorSet write{};
@@ -168,9 +167,9 @@ VulDescriptorSet &VulDescriptorSet::writeBuffer(
 }
 
 VulDescriptorSet &VulDescriptorSet::writeImage(uint32_t binding, VkDescriptorImageInfo *imageInfo, uint32_t descriptorCount) {
-    assert(m_setLayout.bindings.count(binding) == 1 && "Layout does not contain specified binding");
+    assert(m_setLayout->bindings.count(binding) == 1 && "Layout does not contain specified binding");
 
-    auto &bindingDescription = m_setLayout.bindings[binding];
+    auto &bindingDescription = m_setLayout->bindings[binding];
     assert(bindingDescription.descriptorCount == descriptorCount && "Binding some amount of descriptor infos, but binding expects different amount");
 
     VkWriteDescriptorSet write{};
@@ -190,7 +189,7 @@ VulDescriptorSet &VulDescriptorSet::writeImage(uint32_t binding, VkDescriptorIma
 }
 
 bool VulDescriptorSet::build() {
-    bool success = m_pool.allocateDescriptorSet(m_setLayout.getDescriptorSetLayout(), m_set);
+    bool success = m_pool.allocateDescriptorSet(m_setLayout->getDescriptorSetLayout(), m_set);
     if (!success) {
         return false;
     }

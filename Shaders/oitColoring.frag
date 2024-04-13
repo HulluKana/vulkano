@@ -19,11 +19,14 @@ layout(set = 0, binding = 4) uniform sampler1D multipleBounce1dImg;
 layout (set = 1, binding = 0) buffer AlphaBuffer{ABuffer aBuffer[];};
 layout (set = 1, binding = 1, r32ui) uniform uimage2D aBufferHeads;
 layout (set = 1, binding = 2) buffer AlphaBufferCounter{uint aBufferCounter;};
+layout (set = 1, binding = 3) uniform sampler2D depthImages[4];
 
 layout (push_constant) uniform Push{PushConstant push;};
 
 void main()
 {
+    if (texture(depthImages[1], vec2(gl_FragCoord.x / 2560.0, gl_FragCoord.y / 1440.0)).x < gl_FragCoord.z) discard;
+
     struct Material{
         vec3 color;
         float alpha;

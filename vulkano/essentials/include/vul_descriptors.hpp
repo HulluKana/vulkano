@@ -89,7 +89,7 @@ class VulDescriptorPool {
 
 class VulDescriptorSet{
     public:
-        VulDescriptorSet(VulDescriptorSetLayout &setLayout, VulDescriptorPool &pool);
+        VulDescriptorSet(std::shared_ptr<VulDescriptorSetLayout> setLayout, VulDescriptorPool &pool);
 
         VulDescriptorSet(const VulDescriptorSet &) = delete;
         VulDescriptorSet &operator=(const VulDescriptorSet &) = delete;
@@ -104,6 +104,7 @@ class VulDescriptorSet{
         void update();
 
         VkDescriptorSet getSet() const {return m_set;}
+        std::shared_ptr<VulDescriptorSetLayout> getLayout() const {return m_setLayout;}
         bool hasSet() const {return m_hasSet;}
 
         struct DescriptorInfo{
@@ -115,7 +116,7 @@ class VulDescriptorSet{
     private:
         void overwrite();
 
-        VulDescriptorSetLayout &m_setLayout;
+        std::shared_ptr<VulDescriptorSetLayout> m_setLayout;
         VulDescriptorPool &m_pool;
         std::vector<VkWriteDescriptorSet> m_writes;
 

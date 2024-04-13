@@ -151,13 +151,9 @@ defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano 
     returnValue.mainRenderDataIdx = vulkano.renderDatas.size();
     returnValue.oitColoringRenderDataIdx = returnValue.mainRenderDataIdx + 1;
     returnValue.oitCompositingRenderDataIdx = returnValue.oitColoringRenderDataIdx + 1;
-    returnValue.mainDescriptorSetLayoutIdx = vulkano.descriptorSetLayouts.size();
-    returnValue.oitDescriptorSetLayoutIdx = returnValue.mainDescriptorSetLayoutIdx + 1;
     vulkano.renderDatas.push_back({});
     vulkano.renderDatas.push_back({});
     vulkano.renderDatas.push_back({});
-    vulkano.descriptorSetLayouts.push_back({});
-    vulkano.descriptorSetLayouts.push_back({});
     for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
         std::vector<Vulkano::Descriptor> descs;
         Vulkano::Descriptor ubo{}; 
@@ -199,7 +195,6 @@ defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano 
         if (!retVal.succeeded) throw std::runtime_error("Failed to create default main descriptor sets");
         vulkano.renderDatas[returnValue.mainRenderDataIdx].descriptorSets[i].push_back(std::move(retVal.set));
         vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i] = vulkano.renderDatas[returnValue.mainRenderDataIdx].descriptorSets[i];
-        vulkano.descriptorSetLayouts[returnValue.mainDescriptorSetLayoutIdx] = std::move(retVal.layout);
     }
     
     for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
@@ -225,11 +220,17 @@ defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano 
         aBufferCounter.stages = {Vulkano::ShaderStage::frag};
         descs.push_back(aBufferCounter);
 
+        Vulkano::Descriptor depthImages{};
+        depthImages.type = Vulkano::DescriptorType::upCombinedAttachmentSampler;
+        depthImages.content = vulkano.vulRenderer.getDepthImages().data();
+        depthImages.count = vulkano.vulRenderer.getDepthImages().size();
+        depthImages.stages = {Vulkano::ShaderStage::frag};
+        descs.push_back(depthImages);
+
         Vulkano::descSetReturnVal retVal = vulkano.createDescriptorSet(descs);
         if (!retVal.succeeded) throw std::runtime_error("Failed to create default OIT descriptor sets");
         vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i].push_back(std::move(retVal.set));
         vulkano.renderDatas[returnValue.oitCompositingRenderDataIdx].descriptorSets[i].push_back(vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i][1]);
-        vulkano.descriptorSetLayouts[returnValue.oitDescriptorSetLayoutIdx] = std::move(retVal.layout);
     }
 
     return returnValue;
@@ -241,7 +242,7 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     mainConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0}, {2, 2, VK_FORMAT_R32G32_SFLOAT}};
     mainConfig.bindingDescriptions = {  {0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX},
                                     {2, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
-    mainConfig.setLayouts = {vulkano.descriptorSetLayouts[inputData.mainDescriptorSetLayoutIdx]->getDescriptorSetLayout()};
+    mainConfig.setLayouts = {vulkano.renderDatas[inputData.mainRenderDataIdx].descriptorSets[0][0]->getLayout()->getDescriptorSetLayout()};
     mainConfig.colorAttachmentFormats = {vulkano.vulRenderer.getSwapChainColorFormat()};
     mainConfig.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
     mainConfig.cullMode = VK_CULL_MODE_NONE;
@@ -253,8 +254,8 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     oitColoringConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0}, {2, 2, VK_FORMAT_R32G32_SFLOAT}};
     oitColoringConfig.bindingDescriptions = {  {0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX},
                                     {2, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
-    oitColoringConfig.setLayouts = {vulkano.descriptorSetLayouts[inputData.mainDescriptorSetLayoutIdx]->getDescriptorSetLayout(),
-        vulkano.descriptorSetLayouts[inputData.oitDescriptorSetLayoutIdx]->getDescriptorSetLayout()};
+    oitColoringConfig.setLayouts = {vulkano.renderDatas[inputData.oitColoringRenderDataIdx].descriptorSets[0][0]->getLayout()->getDescriptorSetLayout(),
+        vulkano.renderDatas[inputData.oitColoringRenderDataIdx].descriptorSets[0][1]->getLayout()->getDescriptorSetLayout()};
     oitColoringConfig.colorAttachmentFormats = {};
     oitColoringConfig.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
     oitColoringConfig.cullMode = VK_CULL_MODE_NONE;
@@ -278,7 +279,7 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     VulPipeline::PipelineConfigInfo oitCompositingConfig{};
     oitCompositingConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32_SFLOAT, 0}};
     oitCompositingConfig.bindingDescriptions = {{0, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
-    oitCompositingConfig.setLayouts = {vulkano.descriptorSetLayouts[inputData.oitDescriptorSetLayoutIdx]->getDescriptorSetLayout()};
+    oitCompositingConfig.setLayouts = {vulkano.renderDatas[inputData.oitColoringRenderDataIdx].descriptorSets[0][1]->getLayout()->getDescriptorSetLayout()};
     oitCompositingConfig.colorAttachmentFormats = {vulkano.vulRenderer.getSwapChainColorFormat()};
     oitCompositingConfig.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
     oitCompositingConfig.cullMode = VK_CULL_MODE_NONE;

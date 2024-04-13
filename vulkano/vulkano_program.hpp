@@ -68,6 +68,7 @@ class Vulkano{
             ssbo,
             combinedTexSampler,
             spCombinedTexSampler,
+            upCombinedAttachmentSampler,
             storageImage
         };
         enum class ShaderStage{
@@ -78,12 +79,11 @@ class Vulkano{
         struct Descriptor{
             DescriptorType type;
             std::vector<ShaderStage> stages;
-            void *content;
+            const void *content;
             uint32_t count = 1;
         };
         struct descSetReturnVal{
             std::unique_ptr<vulB::VulDescriptorSet> set;
-            std::unique_ptr<vulB::VulDescriptorSetLayout> layout;
             bool succeeded;
         };
 
@@ -98,7 +98,6 @@ class Vulkano{
             std::array<std::vector<std::shared_ptr<vulB::VulAttachmentImage>>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> attachmentImages;
         };
         std::vector<RenderData> renderDatas;
-        std::vector<std::unique_ptr<vulB::VulDescriptorSetLayout>> descriptorSetLayouts;
 
         Scene scene{m_vulDevice};
         bool hasScene = false;

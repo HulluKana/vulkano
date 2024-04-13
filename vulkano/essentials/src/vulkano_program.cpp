@@ -1,8 +1,10 @@
 #include "vul_2d_object.hpp"
+#include "vul_attachment_image.hpp"
 #include "vul_descriptors.hpp"
 #include "vul_gltf_loader.hpp"
 #include "vul_swap_chain.hpp"
 #include <cstdlib>
+#include <vulkan/vulkan_core.h>
 #include<vulkano_program.hpp>
 
 #include<imgui.h>
@@ -94,7 +96,7 @@ VkCommandBuffer Vulkano::startFrame()
     if (VkCommandBuffer commandBuffer = vulRenderer.beginFrame()){
         m_prevWindowSize = vulRenderer.getSwapChainExtent();
 
-        if (!cameraController.hideGUI) m_vulGUI.startFrame();
+        //if (!cameraController.hideGUI) m_vulGUI.startFrame();
 
         return commandBuffer;
     }
@@ -108,6 +110,8 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
     if (hasScene){
         for (const RenderData &renderData : renderDatas){
             if (!renderData.is3d) continue;
+            bool k = preservePreviousContents;
+            if (k) for (const auto &l : vulRenderer.getDepthImages()) l->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, true);
             vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], preservePreviousContents, settings::renderWidth, settings::renderHeight);
             preservePreviousContents = true;
             std::vector<VkDescriptorSet> descriptorSets;
@@ -115,6 +119,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
             std::vector<VkBuffer> vertexBuffers = {scene.vertexBuffer->getBuffer(), scene.normalBuffer->getBuffer(), scene.uvBuffer->getBuffer()};
             renderData.pipeline->draw(commandBuffer, descriptorSets, vertexBuffers, scene.indexBuffer->getBuffer(), renderData.drawDatas);
             vulRenderer.stopRendering(commandBuffer);
+            if (k) for (const auto &l : vulRenderer.getDepthImages()) l->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, false);
         }
     }
     if (object2Ds.size() > 0) {
@@ -134,9 +139,11 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
         }
     }
 
+    /*
     vulRenderer.beginRendering(commandBuffer, {}, preservePreviousContents, settings::renderWidth, settings::renderHeight);
     if (!cameraController.hideGUI) m_vulGUI.endFrame(commandBuffer);
     vulRenderer.stopRendering(commandBuffer);
+    */
     vulRenderer.endFrame();
 
     return m_vulWindow.shouldClose();
@@ -167,20 +174,20 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
         if (descriptors[i].type == DescriptorType::ubo) type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         else if (descriptors[i].type == DescriptorType::ssbo) type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         else if (descriptors[i].type == DescriptorType::combinedTexSampler ||
-            descriptors[i].type == DescriptorType::spCombinedTexSampler)
+            descriptors[i].type == DescriptorType::spCombinedTexSampler || descriptors[i].type == DescriptorType::upCombinedAttachmentSampler)
             type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         else if (descriptors[i].type == DescriptorType::storageImage) type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         layoutBuilder.addBinding(i, type, stageFlags, descriptors[i].count);
     }
-    std::unique_ptr<VulDescriptorSetLayout> layout = layoutBuilder.build();
+    std::shared_ptr<VulDescriptorSetLayout> layout = layoutBuilder.build();
 
-    std::unique_ptr<VulDescriptorSet> set = std::make_unique<VulDescriptorSet>(*layout, *m_globalPool);
+    std::unique_ptr<VulDescriptorSet> set = std::make_unique<VulDescriptorSet>(layout, *m_globalPool);
     std::vector<std::vector<VkDescriptorBufferInfo>> bufferInfosStorage;
     std::vector<std::vector<VkDescriptorImageInfo>> imageInfosStorage;
     for (size_t i = 0; i < descriptors.size(); i++){
         const Descriptor &desc = descriptors[i];
         if (desc.type == DescriptorType::ubo || desc.type == DescriptorType::ssbo){
-            VulBuffer *buffer = static_cast<VulBuffer *>(desc.content);
+            const VulBuffer *buffer = static_cast<const VulBuffer *>(desc.content);
             std::vector<VkDescriptorBufferInfo> bufferInfos(desc.count);
             for (uint32_t j = 0; j < desc.count; j++)
                 bufferInfos[j] = buffer[j].getDescriptorInfo();
@@ -188,7 +195,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
             set->writeBuffer(i, bufferInfosStorage[bufferInfosStorage.size() - 1].data(), desc.count);
         }
         if (desc.type == DescriptorType::combinedTexSampler){
-            VulImage *image = static_cast<VulImage *>(desc.content);
+            const VulImage *image = static_cast<const VulImage *>(desc.content);
             std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
             for (uint32_t j = 0; j < desc.count; j++){
                 imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -199,7 +206,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
             set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
         }
         if (desc.type == DescriptorType::spCombinedTexSampler){
-            std::shared_ptr<VulImage> *image = static_cast<std::shared_ptr<VulImage> *>(desc.content);
+            const std::shared_ptr<VulImage> *image = static_cast<const std::shared_ptr<VulImage> *>(desc.content);
             std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
             for (uint32_t j = 0; j < desc.count; j++){
                 imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -209,8 +216,19 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
             imageInfosStorage.push_back(imageInfos);
             set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
         }
+        if (desc.type == DescriptorType::upCombinedAttachmentSampler){
+            const std::unique_ptr<VulAttachmentImage> *image = static_cast<const std::unique_ptr<VulAttachmentImage> *>(desc.content);
+            std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++){
+                imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfos[j].imageView = image[j]->getImageView();
+                imageInfos[j].sampler = image[j]->getSampler();
+            }
+            imageInfosStorage.push_back(imageInfos);
+            set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
+        }
         if (desc.type == DescriptorType::storageImage){
-            VulImage *image = static_cast<VulImage *>(desc.content);
+            const VulImage *image = static_cast<const VulImage *>(desc.content);
             std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
             for (uint32_t j = 0; j < desc.count; j++){
                 imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
@@ -223,7 +241,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
     set->build();
 
     bool succeeded = set->hasSet();
-    return {std::move(set), std::move(layout), succeeded};
+    return {std::move(set), succeeded};
 }
         
 VulCompPipeline Vulkano::createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight)

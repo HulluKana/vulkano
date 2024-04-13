@@ -33,10 +33,21 @@ int main() {
         double ownStuffStartTime = glfwGetTime();
 
         vul::defaults::updateDefault3dInputValues(vulkano, defaultRenderDataInputData, default3dInputData);
-        if (vulkano.shouldShowGUI()) GuiStuff(vulkano, ownStuffTime);
+        //if (vulkano.shouldShowGUI()) GuiStuff(vulkano, ownStuffTime);
 
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);
+        if (vulkano.vulRenderer.wasSwapChainRecreated()) {
+            for (int i = 0; i < 2; i++){
+                auto &k = vulkano.renderDatas[defaultRenderDataInputData.oitColoringRenderDataIdx].descriptorSets[i][1];
+                for (int j = 0; j < vulkano.vulRenderer.getDepthImages().size(); j++) {
+                    k->descriptorInfos[3].imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                    k->descriptorInfos[3].imageInfos[j].imageView = vulkano.vulRenderer.getDepthImages()[j]->getImageView();
+                    k->descriptorInfos[3].imageInfos[j].sampler = vulkano.vulRenderer.getDepthImages()[j]->getSampler();
+                }
+                k->update();
+            }
+        }
     }
     vulkano.letVulkanoFinish();
 
