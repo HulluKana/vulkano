@@ -6,16 +6,18 @@
 #include <string.h>
 #include <vulkan/vulkan_core.h>
 
+#ifdef VUL_ENABLE_PROFILER
 #define COMBINE_THINGS_ASSISTANT(X,Y) X##Y
 #define COMBINE_THINGS(X,Y) COMBINE_THINGS_ASSISTANT(X,Y)
-
-#define FILE_NAME (strrchr("/" __FILE__, '/') + 1)
-
 #define VUL_PROFILE_SCOPE(name) vul::ScopedTimer COMBINE_THINGS(scopedTimer_, __LINE__)(name);
 #define VUL_PROFILE_FUNC() VUL_PROFILE_SCOPE(__PRETTY_FUNCTION__)
+#endif
 
+#ifdef VUL_ENABLE_DEBUG_NAMER
+#define FILE_NAME (strrchr("/" __FILE__, '/') + 1)
 #define VUL_NAME_VK_MANUAL(obj, name) vulB::DebugNamer::setObjectName(obj, name);
 #define VUL_NAME_VK(obj) VUL_NAME_VK_MANUAL(obj, #obj " " + std::string(FILE_NAME) + ':' + std::to_string(__LINE__));
+#endif
 
 namespace vul {
 
