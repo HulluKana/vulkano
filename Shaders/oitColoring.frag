@@ -1,6 +1,7 @@
 #version 460
 
 #extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_nonuniform_qualifier : enable
 
 #include"../vulkano/essentials/include/vul_host_device.hpp"
 #include"common.glsl"
@@ -11,7 +12,7 @@ layout (location = 2) in vec2 fragTexCoord;
 
 layout(set = 0, binding = 0) uniform Ubo {GlobalUbo ubo;};
 
-layout (set = 0, binding = 1) uniform sampler2D texSampler[MAX_TEXTURES];
+layout (set = 0, binding = 1) uniform sampler2D texSampler[];
 layout(set = 0, binding = 2) readonly buffer MaterialBuffer{PackedMaterial m[];} matBuf;
 layout(set = 0, binding = 3) uniform sampler2D multipleBounce2dImg;
 layout(set = 0, binding = 4) uniform sampler1D multipleBounce1dImg;
@@ -19,13 +20,13 @@ layout(set = 0, binding = 4) uniform sampler1D multipleBounce1dImg;
 layout (set = 1, binding = 0) buffer AlphaBuffer{ABuffer aBuffer[];};
 layout (set = 1, binding = 1, r32ui) uniform uimage2D aBufferHeads;
 layout (set = 1, binding = 2) buffer AlphaBufferCounter{uint aBufferCounter;};
-layout (set = 1, binding = 3) uniform sampler2D depthImages[4];
+layout (set = 1, binding = 3) uniform sampler2D depthImages[];
 
-layout (push_constant) uniform Push{PushConstant push;};
+layout (push_constant) uniform Push{OitPushConstant push;};
 
 void main()
 {
-    if (texture(depthImages[1], vec2(gl_FragCoord.x / 2560.0, gl_FragCoord.y / 1440.0)).x < gl_FragCoord.z) discard;
+    if (texture(depthImages[push.depthImageIdx], vec2(gl_FragCoord.x / push.width, gl_FragCoord.y / push.height)).x < gl_FragCoord.z) discard;
 
     struct Material{
         vec3 color;

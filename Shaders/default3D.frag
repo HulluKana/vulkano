@@ -1,6 +1,7 @@
 #version 460
 
 #extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_nonuniform_qualifier : enable
 
 #include"../vulkano/essentials/include/vul_host_device.hpp"
 #include"common.glsl"
@@ -13,12 +14,12 @@ layout (location = 0) out vec4 FragColor;
 
 layout(set = 0, binding = 0) uniform Ubo {GlobalUbo ubo;};
 
-layout (set = 0, binding = 1) uniform sampler2D texSampler[MAX_TEXTURES];
+layout (set = 0, binding = 1) uniform sampler2D texSampler[];
 layout(set = 0, binding = 2) readonly buffer MaterialBuffer{PackedMaterial m[];} matBuf;
 layout(set = 0, binding = 3) uniform sampler2D multipleBounce2dImg;
 layout(set = 0, binding = 4) uniform sampler1D multipleBounce1dImg;
 
-layout (push_constant) uniform Push{PushConstant push;};
+layout (push_constant) uniform Push{DefaultPushConstant push;};
 
 layout (early_fragment_tests) in;
 

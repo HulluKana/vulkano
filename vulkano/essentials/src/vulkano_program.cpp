@@ -30,13 +30,6 @@ Vulkano::Vulkano(uint32_t width, uint32_t height, std::string name) : m_vulWindo
         .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 50)
         .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 50)
         .build();
-
-    uint8_t *data = new uint8_t[16]{255, 0, 255, 255, 0, 0, 0, 255, 0, 0, 0, 255, 255, 0, 255, 255};
-    std::shared_ptr<VulImage> emptyImage = std::make_shared<VulImage>(m_vulDevice);
-    emptyImage->loadData(data, 2, 2, 4);
-    emptyImage->createImage(true, true, VulImage::ImageType::texture, 2);
-    for (uint32_t i = 0; i < MAX_TEXTURES; i++)
-        images[i] = emptyImage;
 }
 
 Vulkano::~Vulkano()
@@ -47,7 +40,7 @@ Vulkano::~Vulkano()
 
 void Vulkano::initVulkano()
 {
-    for (uint32_t i = 0; i < imageCount; i++){
+    for (size_t i = 0; i < images.size(); i++){
         if (!images[i]->usableByImGui) continue;
 
         Descriptor image{};
@@ -96,7 +89,7 @@ VkCommandBuffer Vulkano::startFrame()
     if (VkCommandBuffer commandBuffer = vulRenderer.beginFrame()){
         m_prevWindowSize = vulRenderer.getSwapChainExtent();
 
-        //if (!cameraController.hideGUI) m_vulGUI.startFrame();
+        if (!cameraController.hideGUI) m_vulGUI.startFrame();
 
         return commandBuffer;
     }
@@ -112,7 +105,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
             if (!renderData.is3d) continue;
             bool k = preservePreviousContents;
             if (k) for (const auto &l : vulRenderer.getDepthImages()) l->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, true);
-            vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], preservePreviousContents, settings::renderWidth, settings::renderHeight);
+            vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::renderWidth, settings::renderHeight);
             preservePreviousContents = true;
             std::vector<VkDescriptorSet> descriptorSets;
             for (const std::shared_ptr<VulDescriptorSet> &descriptorSet : renderData.descriptorSets[vulRenderer.getFrameIndex()]) descriptorSets.push_back(descriptorSet->getSet());
@@ -125,7 +118,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
     if (object2Ds.size() > 0) {
         for (const RenderData &renderData : renderDatas){
             if (renderData.is3d) continue;
-            vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], preservePreviousContents, settings::renderWidth, settings::renderHeight);
+            vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::renderWidth, settings::renderHeight);
             std::vector<VkDescriptorSet> descriptorSets;
             for (const std::shared_ptr<VulDescriptorSet> &descriptorSet : renderData.descriptorSets[vulRenderer.getFrameIndex()]) descriptorSets.push_back(descriptorSet->getSet());
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.pipeline->getPipeline());
@@ -139,11 +132,9 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
         }
     }
 
-    /*
-    vulRenderer.beginRendering(commandBuffer, {}, preservePreviousContents, settings::renderWidth, settings::renderHeight);
+    vulRenderer.beginRendering(commandBuffer, {}, VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent, VulRenderer::DepthImageMode::noDepthImage, settings::renderWidth, settings::renderHeight);
     if (!cameraController.hideGUI) m_vulGUI.endFrame(commandBuffer);
     vulRenderer.stopRendering(commandBuffer);
-    */
     vulRenderer.endFrame();
 
     return m_vulWindow.shouldClose();

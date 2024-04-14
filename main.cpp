@@ -1,4 +1,3 @@
-#include <vulkan/vulkan_core.h>
 #include<vulkano_program.hpp>
 #include<vulkano_defaults.hpp>
 
@@ -17,7 +16,7 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 int main() {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
     vulkano.loadScene("../Models/Room.glb");
-    for (size_t i = 0; i < vulkano.scene.images.size(); i++) vulkano.images[i + vulkano.imageCount] = vulkano.scene.images[i];
+    for (const std::shared_ptr<vul::VulImage> &image : vulkano.scene.images) vulkano.images.push_back(image);
     vul::defaults::Default3dInputData default3dInputData = vul::defaults::createDefault3dInputData(vulkano);
     vul::defaults::DefaultRenderDataInputData defaultRenderDataInputData = vul::defaults::createDefaultDescriptors(vulkano, default3dInputData);
     vul::defaults::createDefault3dRenderSystem(vulkano, defaultRenderDataInputData);
@@ -33,21 +32,12 @@ int main() {
         double ownStuffStartTime = glfwGetTime();
 
         vul::defaults::updateDefault3dInputValues(vulkano, defaultRenderDataInputData, default3dInputData);
-        //if (vulkano.shouldShowGUI()) GuiStuff(vulkano, ownStuffTime);
+        if (vulkano.shouldShowGUI()) GuiStuff(vulkano, ownStuffTime);
 
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);
-        if (vulkano.vulRenderer.wasSwapChainRecreated()) {
-            for (int i = 0; i < 2; i++){
-                auto &k = vulkano.renderDatas[defaultRenderDataInputData.oitColoringRenderDataIdx].descriptorSets[i][1];
-                for (int j = 0; j < vulkano.vulRenderer.getDepthImages().size(); j++) {
-                    k->descriptorInfos[3].imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                    k->descriptorInfos[3].imageInfos[j].imageView = vulkano.vulRenderer.getDepthImages()[j]->getImageView();
-                    k->descriptorInfos[3].imageInfos[j].sampler = vulkano.vulRenderer.getDepthImages()[j]->getSampler();
-                }
-                k->update();
-            }
-        }
+
+        vul::defaults::updateOitDepthImages(vulkano, defaultRenderDataInputData);
     }
     vulkano.letVulkanoFinish();
 

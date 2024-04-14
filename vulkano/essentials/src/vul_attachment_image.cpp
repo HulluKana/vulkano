@@ -160,14 +160,16 @@ void VulAttachmentImage::transitionLayout(VkCommandBuffer cmdBuf, VkImageLayout 
 VkRenderingAttachmentInfo VulAttachmentImage::getAttachmentInfo(VkClearValue clearValue) const
 {
     VkAttachmentLoadOp loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+    VkAttachmentStoreOp storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     if (preservePreviousContents) loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+    if (storeCurrentContents) storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     if (m_type == ImageType::colorAttachment) {
         VkRenderingAttachmentInfo colorAttachmentInfo{};
         colorAttachmentInfo.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
         colorAttachmentInfo.imageView = m_imageView;
         colorAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
         colorAttachmentInfo.loadOp = loadOp;
-        colorAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        colorAttachmentInfo.storeOp = storeOp;
         colorAttachmentInfo.clearValue = clearValue;
         return colorAttachmentInfo;
     }
@@ -177,7 +179,7 @@ VkRenderingAttachmentInfo VulAttachmentImage::getAttachmentInfo(VkClearValue cle
         depthAttachmentInfo.imageView = m_imageView;
         depthAttachmentInfo.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
         depthAttachmentInfo.loadOp = loadOp;
-        depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttachmentInfo.storeOp = storeOp;
         depthAttachmentInfo.clearValue = clearValue;
         return depthAttachmentInfo;
     }

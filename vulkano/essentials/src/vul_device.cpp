@@ -1,3 +1,4 @@
+#include <stdexcept>
 #include<vul_device.hpp>
 #include<vul_settings.hpp>
 
@@ -159,11 +160,15 @@ void VulDevice::createLogicalDevice() {
     queueCreateInfo.pQueuePriorities = &queuePriority;
     queueCreateInfos.push_back(queueCreateInfo);
   }
+  VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures{};
+  descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+  descriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
 
   VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddresFeature{};
   bufferDeviceAddresFeature.sType =
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
   bufferDeviceAddresFeature.bufferDeviceAddress = VK_TRUE;
+  bufferDeviceAddresFeature.pNext = &descriptorIndexingFeatures;
 
   VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature{};
   dynamic_rendering_feature.sType =

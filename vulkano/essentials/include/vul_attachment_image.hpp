@@ -29,6 +29,7 @@ class VulAttachmentImage {
         VkSampler getSampler() const {return m_sampler;}
 
         bool preservePreviousContents = false;
+        bool storeCurrentContents = true;
     private:
         VulDevice &m_vulDevice;
 

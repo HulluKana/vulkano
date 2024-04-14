@@ -2,6 +2,8 @@
 
 #include <cstring>
 #include <stdexcept>
+#include <iostream>
+#include <vulkan/vulkan_core.h>
 
 namespace vulB {
 
@@ -93,7 +95,7 @@ VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize 
 
         VkResult result = m_stagingBuffer->writeData(data, size, offset);
         if (result != VK_SUCCESS) return result;
-        copyDataFromBufferSingleTime(*m_stagingBuffer.get(), size, offset, offset);
+        copyDataFromBufferSingleTime(*m_stagingBuffer, size, offset, offset);
 
         if (stagingBufferNeedRemoving) deleteStagingBuffer();
     }
@@ -104,7 +106,7 @@ VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize 
             VkResult result = map(size, offset);
             if (result != VK_SUCCESS) return result;
         }
-        memcpy(reinterpret_cast<char *>(m_mapped) + offset, data, size);
+        memcpy(reinterpret_cast<char *>(m_mapped), data, size);
         if (needUnmapping) unmap();
     }
     return VK_SUCCESS;
@@ -153,7 +155,9 @@ VkResult VulBuffer::addStagingBuffer()
     if (!m_creationPreparationDone) throw std::runtime_error("Buffer creation preparations need to be done before creating staging buffer");
     m_stagingBuffer = std::make_unique<VulBuffer>(m_vulDevice);
     m_stagingBuffer->keepEmpty(m_elementSize, m_elementCount);
-    return m_stagingBuffer->createBuffer(false, usage_transferSrc);
+    VkResult result = m_stagingBuffer->createBuffer(false, usage_transferSrc);
+    if (result != VK_SUCCESS) return result;
+    return m_stagingBuffer->mapAll();
 }
 
 }

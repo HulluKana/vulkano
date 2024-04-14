@@ -129,7 +129,7 @@ void VulRenderer::endFrame()
     currentFrameIndex = (currentFrameIndex + 1) % VulSwapChain::MAX_FRAMES_IN_FLIGHT;
 }
 
-void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulAttachmentImage>> &attachmentImages, bool preservePreviousSwapchainImageContents, uint32_t renderWidth, uint32_t renderHeight)
+void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulAttachmentImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, uint32_t renderWidth, uint32_t renderHeight)
 {
     assert(isFrameStarted && "Can't call beginRendering if the frame hasn't been started either");
     assert(commandBuffer == getCurrentCommandBuffer() && "Can't begin rendering on a command buffer from a different frame");
@@ -138,12 +138,16 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vecto
     renderArea.width = renderWidth > 0 ? renderWidth : vulSwapChain->getSwapChainExtent().width;
     renderArea.height = renderHeight > 0 ? renderHeight : vulSwapChain->getSwapChainExtent().height;
 
-    std::vector<VkRenderingAttachmentInfo> colorAttachmentInfos(attachmentImages.size() + 1);
-    vulSwapChain->getImage(currentImageIndex)->preservePreviousContents = preservePreviousSwapchainImageContents;
-    colorAttachmentInfos[0] = vulSwapChain->getImage(currentImageIndex)->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}});
-    for (size_t i = 0; i < attachmentImages.size(); i++) colorAttachmentInfos[i + 1] = attachmentImages[i]->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}});
+    if (swapChainImageMode == SwapChainImageMode::preservePreviousStoreCurrent) vulSwapChain->getImage(currentImageIndex)->preservePreviousContents = true;
+    else vulSwapChain->getImage(currentImageIndex)->preservePreviousContents = false;
+    std::vector<VkRenderingAttachmentInfo> colorAttachmentInfos;
+    if (swapChainImageMode != SwapChainImageMode::noSwapChainImage) colorAttachmentInfos.push_back(vulSwapChain->getImage(currentImageIndex)->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}}));
+    for (size_t i = 0; i < attachmentImages.size(); i++) colorAttachmentInfos.push_back(attachmentImages[i]->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}}));
+
+    if (depthImageMode == DepthImageMode::clearPreviousStoreCurrent) m_depthImages[currentImageIndex]->storeCurrentContents = true;
+    else m_depthImages[currentImageIndex]->storeCurrentContents = false;
     VkRenderingAttachmentInfo depthAttachmentInfo = m_depthImages[currentImageIndex]->getAttachmentInfo({{{1.0f}}});
-    depthAttachmentInfo.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea.offset = {0, 0};
@@ -151,7 +155,7 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vecto
     renderingInfo.layerCount = 1;
     renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachmentInfos.size());
     renderingInfo.pColorAttachments = colorAttachmentInfos.data();
-    if (!preservePreviousSwapchainImageContents) renderingInfo.pDepthAttachment = &depthAttachmentInfo;
+    if (depthImageMode != DepthImageMode::noDepthImage) renderingInfo.pDepthAttachment = &depthAttachmentInfo;
 
     vulSwapChain->getImage(currentImageIndex)->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, true);
     vkCmdBeginRendering(commandBuffer, &renderingInfo);

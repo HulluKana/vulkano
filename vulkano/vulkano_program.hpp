@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vul_attachment_image.hpp"
+#include "vul_renderer.hpp"
 #include<vul_buffer.hpp>
 #include<vul_device.hpp>
 #include<vul_descriptors.hpp>
@@ -96,6 +97,8 @@ class Vulkano{
             std::vector<vulB::VulPipeline::DrawData> drawDatas;
             std::array<std::vector<std::shared_ptr<vulB::VulDescriptorSet>>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descriptorSets;
             std::array<std::vector<std::shared_ptr<vulB::VulAttachmentImage>>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> attachmentImages;
+            vulB::VulRenderer::SwapChainImageMode swapChainImageMode;
+            vulB::VulRenderer::DepthImageMode depthImageMode;
         };
         std::vector<RenderData> renderDatas;
 
@@ -105,8 +108,7 @@ class Vulkano{
         std::vector<std::unique_ptr<vulB::VulBuffer>> buffers;
 
         std::vector<Object2D> object2Ds;
-        std::array<std::shared_ptr<VulImage>, MAX_TEXTURES> images;
-        uint32_t imageCount = 0u;
+        std::vector<std::shared_ptr<VulImage>> images;
 
         vulB::VulRenderer vulRenderer{m_vulWindow, m_vulDevice};
         vulB::VulCamera camera{};

@@ -16,7 +16,6 @@ using uint = uint32_t;
 #endif
 
 #define MAX_LIGHTS 10
-#define MAX_TEXTURES 10
 #define OIT_LAYERS 8
 
 struct GlobalUbo {
@@ -31,10 +30,19 @@ struct GlobalUbo {
     int numLights;
 };
 
-struct PushConstant{
+struct DefaultPushConstant{
     mat4 modelMatrix;
     mat4 normalMatrix;
     int matIdx;
+};
+
+struct OitPushConstant{
+    mat4 modelMatrix;
+    mat4 normalMatrix;
+    int matIdx;
+    uint depthImageIdx;
+    float width;
+    float height;
 };
 
 struct PackedMaterial{
