@@ -13,7 +13,7 @@ layout (set = 0, binding = 0) readonly buffer AlphaBuffer{ABuffer aBuffer[];};
 layout (set = 0, binding = 1, r32ui) uniform uimage2D aBufferHeads;
 
 struct UnpackedABuffer {
-    vec3 color;
+    vec3 reflection;
     float alpha;
     float depth;
 };
@@ -30,7 +30,7 @@ void main()
         vec4 storedColorFactor = unpackUnorm4x8(stored.color);
         vec4 storedReflection = unpackUnorm4x8(stored.reflectionColor);
         UnpackedABuffer unpacked;
-        unpacked.color = storedColorFactor.xyz;
+        unpacked.reflection = storedReflection.xyz;
         unpacked.alpha = storedColorFactor.w;
         unpacked.depth = stored.depth;
         frags[fragCount] = unpacked;
@@ -51,11 +51,11 @@ void main()
         }
     }
 
-    vec3 color = frags[0].color;
-    float alphaInverted = 1.0 - frags[0].alpha;
+    vec3 color = frags[0].reflection;
     for (uint i = 1; i < fragCount; i++) {
-        color += frags[i].color + (1.0 - frags[i].alpha) * color;
-        alphaInverted *= 1.0 - frags[i].alpha;
+        color += frags[i].reflection + (1.0 - frags[i].alpha) * color;
     }
-    FragColor = vec4(color, 1.0 - alphaInverted);
+    FragColor = vec4(color, 1.0);
+
+    imageStore(aBufferHeads, ivec2(gl_FragCoord.xy), uvec4(0));
 }

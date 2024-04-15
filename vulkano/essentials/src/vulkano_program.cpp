@@ -128,7 +128,6 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
                 obj2d.draw(commandBuffer);
             }
             vulRenderer.stopRendering(commandBuffer);
-            break;
         }
     }
 

@@ -19,10 +19,11 @@ namespace defaults
         size_t mainRenderDataIdx;
         size_t oitColoringRenderDataIdx;
         size_t oitCompositingRenderDataIdx;
+        size_t oitReflectionRenderDataIdx;
     };
     DefaultRenderDataInputData createDefaultDescriptors(Vulkano &vulkano, Default3dInputData inputData);
     void createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataInputData inputData);
-    void updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataInputData inputDataRender, Default3dInputData inputData3d);
-    void updateOitDepthImages(Vulkano &vulkano, DefaultRenderDataInputData inputData);
+    size_t updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataInputData inputDataRender, Default3dInputData inputData3d);
+    void updateOitResources(Vulkano &vulkano, DefaultRenderDataInputData inputDataRender, Default3dInputData inputData3d, size_t requiredABufferSize);
 }
 }

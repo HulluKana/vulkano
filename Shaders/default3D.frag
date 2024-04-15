@@ -76,7 +76,7 @@ void main()
 
     float epsilon = 0.0001;
     vec3 rawColor;
-    if (mat.colorTextureIndex >= 0 && mat.colorTextureIndex < MAX_TEXTURES) rawColor = texture(texSampler[mat.colorTextureIndex], fragTexCoord).xyz;
+    if (mat.colorTextureIndex >= 0) rawColor = texture(texSampler[mat.colorTextureIndex], fragTexCoord).xyz;
     else rawColor = sRGBToAlbedo(mat.color);
 
     vec3 surfaceNormal = normalize(fragNormalWorld);

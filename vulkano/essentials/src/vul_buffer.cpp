@@ -28,14 +28,6 @@ void VulBuffer::loadData(const void *data, uint32_t elementSize, uint32_t elemen
     m_creationPreparationDone = true;
 }
 
-void VulBuffer::keepEmpty(uint32_t elementSize, uint32_t elementCount)
-{
-    if (m_creationPreparationDone) throw std::runtime_error("Cannot do buffer creation preparations multiple times");
-    m_elementSize = elementSize;
-    m_elementCount = elementCount;
-    m_creationPreparationDone = true;
-}
-
 VkResult VulBuffer::createBuffer(bool isLocal, VulBuffer::Usage usage)
 {
     if (!m_creationPreparationDone) throw std::runtime_error("Buffer creation preparations need to be done before creating buffer");
@@ -150,12 +142,23 @@ void VulBuffer::unmap()
     }
 }
 
+VkResult VulBuffer::resizeBufferWithData(const void *data, uint32_t elementSize, uint32_t elementCount)
+{
+    unmap();
+    vkDestroyBuffer(m_vulDevice.device(), m_buffer, nullptr);
+    vkFreeMemory(m_vulDevice.device(), m_memory, nullptr);
+    m_elementSize = elementSize;
+    m_elementCount = elementCount;
+    m_inputData = data;
+    return createBuffer(m_memoryPropertyFlags == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<Usage>(m_usageFlags));
+}
+
 VkResult VulBuffer::addStagingBuffer()
 {
     if (!m_creationPreparationDone) throw std::runtime_error("Buffer creation preparations need to be done before creating staging buffer");
     m_stagingBuffer = std::make_unique<VulBuffer>(m_vulDevice);
     m_stagingBuffer->keepEmpty(m_elementSize, m_elementCount);
-    VkResult result = m_stagingBuffer->createBuffer(false, usage_transferSrc);
+    VkResult result = m_stagingBuffer->createBuffer(false, static_cast<Usage>(usage_transferSrc | usage_transferDst));
     if (result != VK_SUCCESS) return result;
     return m_stagingBuffer->mapAll();
 }

@@ -56,9 +56,9 @@ struct PackedMaterial{
 
 struct ABuffer {
     uint color;
+    uint reflectionColor;
     float depth;
     uint next;
-    uint padding;
 };
 
 #endif

@@ -31,13 +31,12 @@ int main() {
         if (commandBuffer == nullptr) continue;
         double ownStuffStartTime = glfwGetTime();
 
-        vul::defaults::updateDefault3dInputValues(vulkano, defaultRenderDataInputData, default3dInputData);
+        size_t requiredABufferSize = vul::defaults::updateDefault3dInputValues(vulkano, defaultRenderDataInputData, default3dInputData);
         if (vulkano.shouldShowGUI()) GuiStuff(vulkano, ownStuffTime);
 
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);
-
-        vul::defaults::updateOitDepthImages(vulkano, defaultRenderDataInputData);
+        vul::defaults::updateOitResources(vulkano, defaultRenderDataInputData, default3dInputData, requiredABufferSize);
     }
     vulkano.letVulkanoFinish();
 
