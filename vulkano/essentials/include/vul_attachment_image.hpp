@@ -21,20 +21,22 @@ class VulAttachmentImage {
         VkResult createEmptyImage(ImageType type, VkFormat format, VkExtent2D extent);
         VkResult createFromVkImage(VkImage image, VkFormat format, VkExtent2D extent);
         
-        void establishPreAttachmentPipelineBarrier(VkCommandBuffer cmdBuf) const;
-        void establishPostAttachmentPipelineBarrier(VkCommandBuffer cmdBuf) const;
+        void transitionLayout(VkCommandBuffer cmdBuf, VkImageLayout srcLayout, VkImageLayout dstLayout, bool beforeRender) const;
         VkRenderingAttachmentInfo getAttachmentInfo(VkClearValue clearValue) const;
 
         VkImage getImage() const {return m_image;}
         VkImageView getImageView() const {return m_imageView;}
+        VkSampler getSampler() const {return m_sampler;}
 
         bool preservePreviousContents = false;
+        bool storeCurrentContents = true;
     private:
         VulDevice &m_vulDevice;
 
         VkImage m_image = nullptr;
-        VkImageView m_imageView = nullptr;
         VkDeviceMemory m_memory = nullptr; 
+        VkImageView m_imageView = nullptr;
+        VkSampler m_sampler = nullptr;
 
         bool m_ownsImage = true;
         ImageType m_type{};

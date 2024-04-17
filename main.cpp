@@ -16,12 +16,13 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 int main() {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
     vulkano.loadScene("../Models/Room.glb");
-    for (size_t i = 0; i < vulkano.scene.images.size(); i++) vulkano.images[i + vulkano.imageCount] = vulkano.scene.images[i];
+    for (const std::shared_ptr<vul::VulImage> &image : vulkano.scene.images) vulkano.images.push_back(image);
     vul::defaults::Default3dInputData default3dInputData = vul::defaults::createDefault3dInputData(vulkano);
     vul::defaults::DefaultRenderDataInputData defaultRenderDataInputData = vul::defaults::createDefaultDescriptors(vulkano, default3dInputData);
     vul::defaults::createDefault3dRenderSystem(vulkano, defaultRenderDataInputData);
     vulkano.initVulkano();
-    vul::settings::maxFps = 10000.0f;
+    vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
+    vul::settings::maxFps = 60.0f;
 
     bool stop = false;
     float ownStuffTime = 0.0f;
@@ -30,11 +31,12 @@ int main() {
         if (commandBuffer == nullptr) continue;
         double ownStuffStartTime = glfwGetTime();
 
-        vul::defaults::updateDefault3dInputValues(vulkano, defaultRenderDataInputData);
+        size_t requiredABufferSize = vul::defaults::updateDefault3dInputValues(vulkano, defaultRenderDataInputData, default3dInputData);
         if (vulkano.shouldShowGUI()) GuiStuff(vulkano, ownStuffTime);
 
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);
+        vul::defaults::updateOitResources(vulkano, defaultRenderDataInputData, default3dInputData, requiredABufferSize);
     }
     vulkano.letVulkanoFinish();
 

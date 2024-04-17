@@ -20,7 +20,7 @@ class VulBuffer {
         template<typename T>
         void loadVector(const std::vector<T> &vector) {loadData(vector.data(), sizeof(T), static_cast<uint32_t>(vector.size()));}
         void loadData(const void *data, uint32_t elementSize, uint32_t elementCount);
-        void keepEmpty(uint32_t elementSize, uint32_t elementCount);
+        void keepEmpty(uint32_t elementSize, uint32_t elementCount) {loadData(nullptr, elementSize, elementCount);}
 
         enum Usage : VkBufferUsageFlags {
             usage_none = 0,
@@ -44,12 +44,18 @@ class VulBuffer {
         VkResult map(VkDeviceSize size, VkDeviceSize offset);
         void unmap();
 
+        template<typename T>
+        VkResult resizeBufferWithVector(const std::vector<T> &vector) {return resizeBufferWithData(vector.data(), sizeof(T), static_cast<uint32_t>(vector.size()));}
+        VkResult resizeBufferWithData(const void *data, uint32_t elementSize, uint32_t elementCount);
+        VkResult resizeBufferAsEmpty(uint32_t elementSize, uint32_t elementCount) {return resizeBufferWithData(nullptr, elementSize, elementCount);}
+
         VkResult addStagingBuffer();
         void deleteStagingBuffer() {delete m_stagingBuffer.release();}
 
         VkBuffer getBuffer() const { return m_buffer; }
         VkDeviceMemory getMemory() const {return m_memory; }
         bool hasStagingBuffer() const {return m_stagingBuffer.get() != nullptr;}
+        const std::unique_ptr<VulBuffer> &getStagingBuffer() const {return m_stagingBuffer;}
         void* getMappedMemory() const { return m_mapped; }
         VkBufferUsageFlags getUsageFlags() const { return m_usageFlags; }
         VkMemoryPropertyFlags getMemoryPropertyFlags() const { return m_memoryPropertyFlags; }

@@ -26,6 +26,7 @@ class VulRenderer{
         VkFormat getSwapChainColorFormat() const {return vulSwapChain->getSwapChainImageFormat();}
         bool wasSwapChainRecreated() const {return m_swapchainRecreated;}
         VkFormat getDepthFormat() const {return m_depthFormat;}
+        const std::vector<std::unique_ptr<VulAttachmentImage>> &getDepthImages() const {return m_depthImages;}
         bool isFrameInProgress() const {return isFrameStarted;}
 
         VkCommandBuffer getCurrentCommandBuffer() const {
@@ -37,10 +38,22 @@ class VulRenderer{
             assert(isFrameStarted && "Cannot get frame index when frame is not in progress");
             return currentFrameIndex;
         }
+        uint32_t getImageIndex() const {return currentImageIndex;}
 
         VkCommandBuffer beginFrame();
         void endFrame();
-        void beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulAttachmentImage>> &attachmentImages, bool preservePreviousSwapchainImageContents, uint32_t renderWidth, uint32_t renderHeight);
+
+        enum class SwapChainImageMode {
+            clearPreviousStoreCurrent,
+            preservePreviousStoreCurrent,
+            noSwapChainImage
+        };
+        enum class DepthImageMode {
+            clearPreviousStoreCurrent,
+            clearPreviousDiscardCurrent,
+            noDepthImage
+        };
+        void beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulAttachmentImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, uint32_t renderWidth, uint32_t renderHeight);
         void stopRendering(VkCommandBuffer commandBuffer);
         
     private:

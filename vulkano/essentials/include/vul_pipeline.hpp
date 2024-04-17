@@ -16,6 +16,10 @@ class VulPipeline{
             std::vector<VkFormat> colorAttachmentFormats;
             VkFormat depthAttachmentFormat = VK_FORMAT_UNDEFINED;
             VkCullModeFlagBits cullMode = VK_CULL_MODE_NONE;
+            bool enableColorBlending = false;
+            VkBlendOp blendOp = VK_BLEND_OP_ADD;
+            VkBlendFactor blendSrcFactor = VK_BLEND_FACTOR_ONE;
+            VkBlendFactor blendDstFactor = VK_BLEND_FACTOR_ZERO;
         };
 
         VulPipeline(VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo);

@@ -23,7 +23,8 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
     materials.reserve(model.materials.size());
 
     for (const tinygltf::Material &tmat : model.materials){
-        Material omat;
+        Material omat{};
+        omat.name = tmat.name;
         
         omat.emissiveFactor = (tmat.emissiveFactor.size() == 3) ? glm::vec3(tmat.emissiveFactor[0], tmat.emissiveFactor[1], tmat.emissiveFactor[2]) : glm::vec3(0.0f);
         
@@ -46,7 +47,7 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
     }
 
     if (materials.empty()){
-        Material mat;
+        Material mat{};
         materials.emplace_back(mat);
     }
 }
@@ -56,7 +57,7 @@ void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
     for (const tinygltf::Image &image : model.images){
         std::shared_ptr<VulImage> vulImage = std::make_shared<VulImage>(device);
         vulImage->loadData(image.image.data(), image.width, image.height, image.image.size() / image.width / image.height);
-        vulImage->createImage(true, true, false, 2);
+        vulImage->createImage(true, true, VulImage::ImageType::texture, 2);
         images.push_back(vulImage);
     }
 }
@@ -240,6 +241,7 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
         const std::vector<uint32_t> &meshes = m_meshToPrimMesh[node.mesh];
         for (uint32_t mesh : meshes){
             GltfNode dunno;
+            dunno.name = node.name;
             dunno.primMesh = mesh;
             dunno.worldMatrix = worldMatrix;
             dunno.position = transform.pos;
@@ -250,6 +252,7 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
     else if (node.extensions.find("KHR_lights_punctual") != node.extensions.end()){
         const tinygltf::Light &light = model.lights[node.light];
         GltfLight gltfLight{};
+        gltfLight.name = light.name;
         gltfLight.position = {transform.pos.x, transform.pos.y, transform.pos.z};
         gltfLight.color = {light.color[0], light.color[1], light.color[2]};
         gltfLight.intensity = light.intensity;

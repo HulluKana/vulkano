@@ -81,10 +81,10 @@ VulPipeline::VulPipeline(VulDevice& device, const std::string& vertFile, const s
     colorBlendAttachment.colorWriteMask =
         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
         VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = VK_FALSE;
-    colorBlendAttachment.srcColorBlendFactor = VK_BLEND_FACTOR_ONE;   // Optional
-    colorBlendAttachment.dstColorBlendFactor = VK_BLEND_FACTOR_ZERO;  // Optional
-    colorBlendAttachment.colorBlendOp = VK_BLEND_OP_ADD;              // Optional
+    colorBlendAttachment.blendEnable = configInfo.enableColorBlending;
+    colorBlendAttachment.srcColorBlendFactor = configInfo.blendSrcFactor;
+    colorBlendAttachment.dstColorBlendFactor = configInfo.blendDstFactor;
+    colorBlendAttachment.colorBlendOp = configInfo.blendOp;
     colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;   // Optional
     colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;  // Optional
     colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;              // Optional

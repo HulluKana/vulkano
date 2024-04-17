@@ -32,6 +32,9 @@ add_dependencies(debugVulkano shaders)
 target_compile_options(vulkano PRIVATE "-Wall")
 target_compile_options(debugVulkano PRIVATE "-Wall" "-g")
 
+#add_compile_definitions(VUL_ENABLE_PROFILER)
+#add_compile_definitions(VUL_ENABLE_DEBUG_NAMER)
+
 target_link_libraries(vulkano vulkan)
 target_link_libraries(debugVulkano vulkan)
 

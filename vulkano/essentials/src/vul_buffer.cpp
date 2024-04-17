@@ -3,6 +3,8 @@
 
 #include <cstring>
 #include <stdexcept>
+#include <iostream>
+#include <vulkan/vulkan_core.h>
 
 namespace vulB {
 
@@ -27,16 +29,10 @@ void VulBuffer::loadData(const void *data, uint32_t elementSize, uint32_t elemen
     m_creationPreparationDone = true;
 }
 
-void VulBuffer::keepEmpty(uint32_t elementSize, uint32_t elementCount)
-{
-    if (m_creationPreparationDone) throw std::runtime_error("Cannot do buffer creation preparations multiple times");
-    m_elementSize = elementSize;
-    m_elementCount = elementCount;
-    m_creationPreparationDone = true;
-}
-
 VkResult VulBuffer::createBuffer(bool isLocal, VulBuffer::Usage usage)
 {
+    VUL_PROFILE_FUNC()
+
     if (!m_creationPreparationDone) throw std::runtime_error("Buffer creation preparations need to be done before creating buffer");
     if (~(usage_transferSrc | usage_transferDst | usage_ubo | usage_ssbo | usage_indexBuffer | usage_vertexBuffer) & usage)
         throw std::runtime_error("Unsupported buffer usage flag");
@@ -88,6 +84,7 @@ VkResult VulBuffer::createBuffer(bool isLocal, VulBuffer::Usage usage)
 VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize offset)
 {
     VUL_PROFILE_FUNC()
+
     if (m_buffer == nullptr) throw std::runtime_error("Tried to write to buffer before it was created");
     if (m_memoryPropertyFlags == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
         bool stagingBufferNeedRemoving = false;
@@ -99,7 +96,7 @@ VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize 
 
         VkResult result = m_stagingBuffer->writeData(data, size, offset);
         if (result != VK_SUCCESS) return result;
-        copyDataFromBufferSingleTime(*m_stagingBuffer.get(), size, offset, offset);
+        copyDataFromBufferSingleTime(*m_stagingBuffer, size, offset, offset);
 
         if (stagingBufferNeedRemoving) deleteStagingBuffer();
     }
@@ -110,7 +107,7 @@ VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize 
             VkResult result = map(size, offset);
             if (result != VK_SUCCESS) return result;
         }
-        memcpy(reinterpret_cast<char *>(m_mapped) + offset, data, size);
+        memcpy(reinterpret_cast<char *>(m_mapped), data, size);
         if (needUnmapping) unmap();
     }
     return VK_SUCCESS;
@@ -118,6 +115,8 @@ VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize 
 
 void VulBuffer::copyDataFromBufferSingleTime(VulBuffer &srcBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset)
 {
+    VUL_PROFILE_FUNC()
+
     VkCommandBuffer cmdBuf = m_vulDevice.beginSingleTimeCommands();
     copyDataFromBuffer(srcBuffer, size, srcOffset, dstOffset, cmdBuf);
     m_vulDevice.endSingleTimeCommands(cmdBuf);
@@ -125,6 +124,8 @@ void VulBuffer::copyDataFromBufferSingleTime(VulBuffer &srcBuffer, VkDeviceSize 
 
 void VulBuffer::copyDataFromBuffer(VulBuffer &srcBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset, VkCommandBuffer cmdBuf)
 {
+    VUL_PROFILE_FUNC()
+
     if (m_buffer == nullptr) throw std::runtime_error("Tried to copy to buffer before it was created");
     if (srcBuffer.getBuffer() == nullptr) throw std::runtime_error("Tried to copy from buffer before it was created");
     if (!(m_usageFlags & usage_transferDst)) throw std::runtime_error("Copy destination buffer needs transfer dst usage flag");
@@ -141,6 +142,8 @@ void VulBuffer::copyDataFromBuffer(VulBuffer &srcBuffer, VkDeviceSize size, VkDe
 
 VkResult VulBuffer::map(VkDeviceSize size, VkDeviceSize offset)
 {
+    VUL_PROFILE_FUNC()
+
     if (m_buffer == nullptr) throw std::runtime_error("Tried to map buffer before it was created");
     if (m_memoryPropertyFlags == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) throw std::runtime_error("Cannot map device local buffer");
     return vkMapMemory(m_vulDevice.device(), m_memory, offset, size, 0, &m_mapped);
@@ -154,12 +157,29 @@ void VulBuffer::unmap()
     }
 }
 
+VkResult VulBuffer::resizeBufferWithData(const void *data, uint32_t elementSize, uint32_t elementCount)
+{
+    VUL_PROFILE_FUNC()
+
+    unmap();
+    vkDestroyBuffer(m_vulDevice.device(), m_buffer, nullptr);
+    vkFreeMemory(m_vulDevice.device(), m_memory, nullptr);
+    m_elementSize = elementSize;
+    m_elementCount = elementCount;
+    m_inputData = data;
+    return createBuffer(m_memoryPropertyFlags == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<Usage>(m_usageFlags));
+}
+
 VkResult VulBuffer::addStagingBuffer()
 {
+    VUL_PROFILE_FUNC()
+
     if (!m_creationPreparationDone) throw std::runtime_error("Buffer creation preparations need to be done before creating staging buffer");
     m_stagingBuffer = std::make_unique<VulBuffer>(m_vulDevice);
     m_stagingBuffer->keepEmpty(m_elementSize, m_elementCount);
-    return m_stagingBuffer->createBuffer(false, usage_transferSrc);
+    VkResult result = m_stagingBuffer->createBuffer(false, static_cast<Usage>(usage_transferSrc | usage_transferDst));
+    if (result != VK_SUCCESS) return result;
+    return m_stagingBuffer->mapAll();
 }
 
 }
