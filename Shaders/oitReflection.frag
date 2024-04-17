@@ -14,7 +14,7 @@ layout (set = 0, binding = 1, r32ui) uniform uimage2D aBufferHeads;
 
 struct UnpackedABuffer {
     vec3 reflection;
-    float alpha;
+    vec3 multipliedColor;
     float depth;
 };
 
@@ -31,7 +31,7 @@ void main()
         vec4 storedReflection = unpackUnorm4x8(stored.reflectionColor);
         UnpackedABuffer unpacked;
         unpacked.reflection = storedReflection.xyz;
-        unpacked.alpha = storedColorFactor.w;
+        unpacked.multipliedColor = storedColorFactor.xyz * (1.0 - storedColorFactor.w);
         unpacked.depth = stored.depth;
         frags[fragCount] = unpacked;
         offset = stored.next;
@@ -53,7 +53,7 @@ void main()
 
     vec3 color = frags[0].reflection;
     for (uint i = 1; i < fragCount; i++) {
-        color += frags[i].reflection + (1.0 - frags[i].alpha) * color;
+        color = frags[i].reflection + frags[i].multipliedColor * color;
     }
     FragColor = vec4(color, 1.0);
 

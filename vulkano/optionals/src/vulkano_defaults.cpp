@@ -302,7 +302,7 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     oitCompositingConfig.enableColorBlending = true;
     oitCompositingConfig.blendOp = VK_BLEND_OP_MULTIPLY_EXT;
     oitCompositingConfig.blendSrcFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    oitCompositingConfig.blendDstFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    oitCompositingConfig.blendDstFactor = VK_BLEND_FACTOR_ONE;
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].pipeline =
         std::make_shared<VulPipeline>(vulkano.getVulDevice(), "default2D.vert.spv", "oitCompositing.frag.spv", oitCompositingConfig);
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].is3d = false;

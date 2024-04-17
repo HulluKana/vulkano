@@ -56,6 +56,7 @@ void main()
     vec3 viewDirection = normalize(ubo.cameraPosition.xyz - fragPosWorld);
     if (dot(surfaceNormal, viewDirection) < 0.0) surfaceNormal = -surfaceNormal;
     vec3 color = vec3(0.0);
+    const vec3 specularColor = vec3(0.03);
     for (int i = 0; i < ubo.numLights; i++){
         vec3 lightPos = ubo.lightPositions[i].xyz;
         vec4 lightColor = ubo.lightColors[i];
@@ -64,13 +65,12 @@ void main()
         float attenuation = 1.0 / dot(directionToLight, directionToLight);
         directionToLight = normalize(directionToLight);
 
-        const vec3 specularColor = vec3(0.03);
         vec3 colorFromThisLight = BRDF(surfaceNormal, viewDirection, directionToLight, specularColor, mat.roughness);
         colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation;
         color += colorFromThisLight;
     }
 
-    color += sRGBToAlbedo(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w);
+    color += sRGBToAlbedo(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w) * specularColor;
 
     const uint newOffset = atomicAdd(aBufferCounter, 1) + 1;
     const uint oldOffset = imageAtomicExchange(aBufferHeads, ivec2(gl_FragCoord.xy), newOffset);
