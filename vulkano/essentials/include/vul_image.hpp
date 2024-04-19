@@ -39,6 +39,7 @@ class VulImage
         VkDescriptorSet getImGuiTextureID() const {return m_descriptorSet;}
 
         bool usableByImGui{false};
+        std::string name;
 
         // Do I even need to explain this at this point?
         VulImage(const VulImage &) = delete;

@@ -14,6 +14,10 @@
 #include<vul_gltf_loader.hpp>
 #include<vul_transform.hpp>
 
+#define TINYGLTF_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <tiny_gltf.h>
+
 using namespace vul;
 namespace vulB
 {
@@ -33,6 +37,8 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
         omat.colorTextureIndex = pbr.baseColorTexture.index;
         omat.roughness = pbr.roughnessFactor;
         omat.metalliness = pbr.metallicFactor;
+        omat.roughnessMetallinessTextureIndex = pbr.metallicRoughnessTexture.index;
+        omat.normalTextureIndex = tmat.normalTexture.index;
 
         if (tmat.extensions.find("KHR_materials_ior") != tmat.extensions.end()){
             const auto &ext = tmat.extensions.find("KHR_materials_ior")->second;
@@ -54,10 +60,49 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
 
 void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
 {
-    for (const tinygltf::Image &image : model.images){
+    for (const tinygltf::Texture &texture : model.textures){
+        const tinygltf::Image &image = model.images[texture.source];
+
+        int channels = image.image.size() / image.width / image.height;
+        std::vector<std::vector<uint8_t>> data2d;
+        for (int y = 0; y < image.height; y++) {
+            std::vector<uint8_t> row;
+            for (int x = 0; x < image.width; x++) {
+                for (int i = 0; i < channels; i++) {
+                    row.push_back(image.image[(y * image.width + x) * channels + i]);
+                }
+            }
+            data2d.push_back(row);
+        }
+        bool rEmove = false;
+        for (size_t i = 0; i < data2d.size(); i++) {
+            if (rEmove) {
+                data2d.erase(data2d.begin() + i, data2d.begin() + i + 1);
+                i--;
+            }
+            rEmove = !rEmove;
+        }
+        for (auto &row : data2d) {
+            bool rEmove = false;
+            for (size_t i = 0; i < row.size(); i += channels) {
+                if (rEmove) {
+                    row.erase(row.begin() + i, row.begin() + i + channels);
+                    i -= channels;
+                }
+                rEmove = !rEmove;
+            }
+        }
+        std::vector<uint8_t> data;
+        for (size_t y = 0; y < data2d.size(); y++) {
+            for (size_t x = 0; x < data2d[y].size(); x++) {
+                data.push_back(data2d[y][x]);
+            }
+        }
+
         std::shared_ptr<VulImage> vulImage = std::make_shared<VulImage>(device);
-        vulImage->loadData(image.image.data(), image.width, image.height, image.image.size() / image.width / image.height);
+        vulImage->loadData(data.data(), data2d.size(), data2d[0].size() / channels, channels);
         vulImage->createImage(true, true, VulImage::ImageType::texture, 2);
+        vulImage->name = image.name;
         images.push_back(vulImage);
     }
 }
@@ -269,7 +314,7 @@ float GltfLoader::getFloat(const tinygltf::Value &value, const std::string &name
     if (value.Has(name)){
         return static_cast<float>(value.Get(name).Get<double>());
     }
-    throw std::runtime_error("Couldn't get float from tinygltf in scene.cpp. This probably should be handled, but I haven't figured out that yet");
+    throw std::runtime_error("Couldn't get float from tinygltf. This probably should be handled, but I haven't figured out that yet");
 }
 
 template<class T>

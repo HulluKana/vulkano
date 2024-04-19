@@ -3,6 +3,7 @@
 #include "vul_descriptors.hpp"
 #include <vul_debug_tools.hpp>
 #include "vul_gltf_loader.hpp"
+#include "vul_renderer.hpp"
 #include "vul_swap_chain.hpp"
 #include <cstdlib>
 #include <vulkan/vulkan_core.h>
@@ -102,26 +103,46 @@ VkCommandBuffer Vulkano::startFrame()
 bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 {
     VUL_PROFILE_FUNC()
-    bool preservePreviousContents = false;
+    VulRenderer::SwapChainImageMode prevSwapChainMode{};
+    VulRenderer::DepthImageMode prevDepthImageMode{};
+    size_t prevAttachmentImageCount = 0;
+    bool firstPass = true;
+    bool prevSampleFromDepth = false;
     if (hasScene){
         for (const RenderData &renderData : renderDatas){
             if (!renderData.is3d) continue;
-            bool k = preservePreviousContents;
-            if (k) for (const auto &l : vulRenderer.getDepthImages()) l->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, true);
-            vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::renderWidth, settings::renderHeight);
-            preservePreviousContents = true;
+
+            if (firstPass || renderData.swapChainImageMode != prevSwapChainMode || renderData.depthImageMode != prevDepthImageMode || renderData.attachmentImages[vulRenderer.getFrameIndex()].size() > 0) {
+                if (!firstPass) vulRenderer.stopRendering(commandBuffer);
+                if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, false);
+                if (renderData.sampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, true);
+                vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::renderWidth, settings::renderHeight);
+                prevSwapChainMode = renderData.swapChainImageMode;
+                prevDepthImageMode = renderData.depthImageMode;
+                prevAttachmentImageCount = renderData.attachmentImages[vulRenderer.getFrameIndex()].size();
+                firstPass = false;
+                prevSampleFromDepth = renderData.sampleFromDepth;
+            }
             std::vector<VkDescriptorSet> descriptorSets;
             for (const std::shared_ptr<VulDescriptorSet> &descriptorSet : renderData.descriptorSets[vulRenderer.getFrameIndex()]) descriptorSets.push_back(descriptorSet->getSet());
             std::vector<VkBuffer> vertexBuffers = {scene.vertexBuffer->getBuffer(), scene.normalBuffer->getBuffer(), scene.uvBuffer->getBuffer()};
             renderData.pipeline->draw(commandBuffer, descriptorSets, vertexBuffers, scene.indexBuffer->getBuffer(), renderData.drawDatas);
-            vulRenderer.stopRendering(commandBuffer);
-            if (k) for (const auto &l : vulRenderer.getDepthImages()) l->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, false);
         }
     }
     if (object2Ds.size() > 0) {
         for (const RenderData &renderData : renderDatas){
             if (renderData.is3d) continue;
-            vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::renderWidth, settings::renderHeight);
+
+            if (firstPass || renderData.swapChainImageMode != prevSwapChainMode || renderData.depthImageMode != prevDepthImageMode || renderData.attachmentImages[vulRenderer.getFrameIndex()].size() > 0) {
+                if (!firstPass) vulRenderer.stopRendering(commandBuffer);
+                if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, false);
+                vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::renderWidth, settings::renderHeight);
+                prevSwapChainMode = renderData.swapChainImageMode;
+                prevDepthImageMode = renderData.depthImageMode;
+                prevAttachmentImageCount = renderData.attachmentImages[vulRenderer.getFrameIndex()].size();
+                firstPass = false;
+            }
+
             std::vector<VkDescriptorSet> descriptorSets;
             for (const std::shared_ptr<VulDescriptorSet> &descriptorSet : renderData.descriptorSets[vulRenderer.getFrameIndex()]) descriptorSets.push_back(descriptorSet->getSet());
             vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, renderData.pipeline->getPipeline());
@@ -130,11 +151,13 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
                 obj2d.bind(commandBuffer);
                 obj2d.draw(commandBuffer);
             }
-            vulRenderer.stopRendering(commandBuffer);
         }
     }
 
-    vulRenderer.beginRendering(commandBuffer, {}, VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent, VulRenderer::DepthImageMode::noDepthImage, settings::renderWidth, settings::renderHeight);
+    if (firstPass || VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent != prevSwapChainMode || VulRenderer::DepthImageMode::noDepthImage != prevDepthImageMode || prevAttachmentImageCount > 0) {
+        if (!firstPass) vulRenderer.stopRendering(commandBuffer);
+        vulRenderer.beginRendering(commandBuffer, {}, VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent, VulRenderer::DepthImageMode::noDepthImage, settings::renderWidth, settings::renderHeight);
+    }
     if (!cameraController.hideGUI) m_vulGUI.endFrame(commandBuffer);
     vulRenderer.stopRendering(commandBuffer);
     vulRenderer.endFrame();

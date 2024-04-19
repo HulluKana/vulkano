@@ -14,7 +14,7 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-#include"../../../3rdParty/tiny_gltf.h"
+#include<tiny_gltf.h>
 
 namespace vulB
 {
@@ -43,6 +43,8 @@ class GltfLoader
             int colorTextureIndex = -1;
             float roughness = 1.0f;
             float metalliness = 0.0f;
+            int roughnessMetallinessTextureIndex = -1;
+            int normalTextureIndex = -1;
             glm::vec3 emissiveFactor = glm::vec3(0.0f);
 
             // Stuff added by extensions

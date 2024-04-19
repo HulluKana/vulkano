@@ -5,8 +5,6 @@
 #include <stdexcept>
 #include <iostream>
 
-#define TINYGLTF_IMPLEMENTATION
-#define STB_IMAGE_WRITE_IMPLEMENTATION
 #include<tiny_gltf.h>
 
 using namespace vulB;
@@ -25,7 +23,7 @@ void Scene::loadScene(std::string fileName)
     std::string warn, err;
     
     if (!context.LoadBinaryFromFile(&model, &err, &warn, fileName)) 
-        throw std::runtime_error(std::string("Failed to load scene from file. File name is ") + fileName);
+        throw std::runtime_error("Failed to load scene from file: " + err);
 
     GltfLoader gltfLoader;
     gltfLoader.importMaterials(model);

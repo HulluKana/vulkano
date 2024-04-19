@@ -99,6 +99,7 @@ class Vulkano{
             std::array<std::vector<std::shared_ptr<vulB::VulAttachmentImage>>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> attachmentImages;
             vulB::VulRenderer::SwapChainImageMode swapChainImageMode;
             vulB::VulRenderer::DepthImageMode depthImageMode;
+            bool sampleFromDepth;
         };
         std::vector<RenderData> renderDatas;
 

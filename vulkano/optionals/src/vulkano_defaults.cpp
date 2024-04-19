@@ -272,6 +272,7 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     vulkano.renderDatas[inputData.mainRenderDataIdx].is3d = true;
     vulkano.renderDatas[inputData.mainRenderDataIdx].swapChainImageMode = VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent;
     vulkano.renderDatas[inputData.mainRenderDataIdx].depthImageMode = VulRenderer::DepthImageMode::clearPreviousStoreCurrent;
+    vulkano.renderDatas[inputData.mainRenderDataIdx].sampleFromDepth = false;
 
     VulPipeline::PipelineConfigInfo oitColoringConfig{};
     oitColoringConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0}, {2, 2, VK_FORMAT_R32G32_SFLOAT}};
@@ -307,6 +308,7 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     vulkano.renderDatas[inputData.oitColoringRenderDataIdx].is3d = true;
     vulkano.renderDatas[inputData.oitColoringRenderDataIdx].swapChainImageMode = VulRenderer::SwapChainImageMode::noSwapChainImage;
     vulkano.renderDatas[inputData.oitColoringRenderDataIdx].depthImageMode = VulRenderer::DepthImageMode::noDepthImage;
+    vulkano.renderDatas[inputData.oitColoringRenderDataIdx].sampleFromDepth = true;
 
     VulPipeline::PipelineConfigInfo oitCompositingConfig{};
     oitCompositingConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32_SFLOAT, 0}};
@@ -324,6 +326,7 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].is3d = false;
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].swapChainImageMode = VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent;
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].depthImageMode = VulRenderer::DepthImageMode::noDepthImage;
+    vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].sampleFromDepth = false;
 
     VulPipeline::PipelineConfigInfo oitReflectionConfig{};
     oitReflectionConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32_SFLOAT, 0}};
@@ -341,6 +344,7 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].is3d = false;
     vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].swapChainImageMode = VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent;
     vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].depthImageMode = VulRenderer::DepthImageMode::noDepthImage;
+    vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].sampleFromDepth = false;
 
     VUL_NAME_VK(vulkano.renderDatas[inputData.mainRenderDataIdx].pipeline->getPipeline())
     VUL_NAME_VK(vulkano.renderDatas[inputData.oitColoringRenderDataIdx].pipeline->getPipeline())

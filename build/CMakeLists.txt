@@ -29,7 +29,7 @@ add_executable(vulkano "../main.cpp" "${SRC}")
 add_executable(debugVulkano "../main.cpp" "${SRC}")
 add_dependencies(vulkano shaders)
 add_dependencies(debugVulkano shaders)
-target_compile_options(vulkano PRIVATE "-Wall")
+target_compile_options(vulkano PRIVATE "-Wall" "-O3")
 target_compile_options(debugVulkano PRIVATE "-Wall" "-g")
 
 #add_compile_definitions(VUL_ENABLE_PROFILER)
