@@ -13,6 +13,7 @@ class VulImage
         ~VulImage();
 
         void loadFile(const std::string &fileName);
+        void loadKtxFile(const std::string &fileName);
         void loadData(const void *data, uint32_t width, uint32_t height, uint32_t channels);
         void keepEmpty(uint32_t width, uint32_t height, uint32_t channels);
 
@@ -54,7 +55,7 @@ class VulImage
         void transitionImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
         void copyBufferToImage(VkBuffer buffer);
 
-        VkFormat m_format;
+        VkFormat m_format = VK_FORMAT_UNDEFINED;
         uint32_t m_width = 0;
         uint32_t m_height = 0;
         uint32_t m_channels = 0;

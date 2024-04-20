@@ -15,7 +15,7 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 
 int main() {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
-    vulkano.loadScene("../Models/sponza.glb");
+    vulkano.loadScene("../Models/sponza.gltf");
     for (const std::shared_ptr<vul::VulImage> &image : vulkano.scene.images) vulkano.images.push_back(image);
     vul::defaults::Default3dInputData default3dInputData = vul::defaults::createDefault3dInputData(vulkano);
     vul::defaults::DefaultRenderDataInputData defaultRenderDataInputData = vul::defaults::createDefaultDescriptors(vulkano, default3dInputData);

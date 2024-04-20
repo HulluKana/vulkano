@@ -14,8 +14,9 @@
 #include<vul_gltf_loader.hpp>
 #include<vul_transform.hpp>
 
-#define TINYGLTF_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+#define TINYGLTF_IMPLEMENTATION
+#define TINYGLTF_NO_EXTERNAL_IMAGE
 #include <tiny_gltf.h>
 
 using namespace vul;
@@ -63,44 +64,8 @@ void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
     for (const tinygltf::Texture &texture : model.textures){
         const tinygltf::Image &image = model.images[texture.source];
 
-        int channels = image.image.size() / image.width / image.height;
-        std::vector<std::vector<uint8_t>> data2d;
-        for (int y = 0; y < image.height; y++) {
-            std::vector<uint8_t> row;
-            for (int x = 0; x < image.width; x++) {
-                for (int i = 0; i < channels; i++) {
-                    row.push_back(image.image[(y * image.width + x) * channels + i]);
-                }
-            }
-            data2d.push_back(row);
-        }
-        bool rEmove = false;
-        for (size_t i = 0; i < data2d.size(); i++) {
-            if (rEmove) {
-                data2d.erase(data2d.begin() + i, data2d.begin() + i + 1);
-                i--;
-            }
-            rEmove = !rEmove;
-        }
-        for (auto &row : data2d) {
-            bool rEmove = false;
-            for (size_t i = 0; i < row.size(); i += channels) {
-                if (rEmove) {
-                    row.erase(row.begin() + i, row.begin() + i + channels);
-                    i -= channels;
-                }
-                rEmove = !rEmove;
-            }
-        }
-        std::vector<uint8_t> data;
-        for (size_t y = 0; y < data2d.size(); y++) {
-            for (size_t x = 0; x < data2d[y].size(); x++) {
-                data.push_back(data2d[y][x]);
-            }
-        }
-
         std::shared_ptr<VulImage> vulImage = std::make_shared<VulImage>(device);
-        vulImage->loadData(data.data(), data2d.size(), data2d[0].size() / channels, channels);
+        vulImage->loadKtxFile("../Models/" + image.uri);
         vulImage->createImage(true, true, VulImage::ImageType::texture, 2);
         vulImage->name = image.name;
         images.push_back(vulImage);

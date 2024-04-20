@@ -4,6 +4,7 @@
 #include <cstring>
 #include <vulkan/vulkan_core.h>
 
+#include <ktx.h>
 #define STB_IMAGE_IMPLEMENTATION
 #include<stb_image.h>
 
@@ -30,6 +31,25 @@ void VulImage::loadFile(const std::string &fileName)
     if (!m_data) throw std::runtime_error("failed to load image!");
 }
 
+void VulImage::loadKtxFile(const std::string &fileName)
+{
+    m_format = VK_FORMAT_BC7_SRGB_BLOCK;
+
+    ktxTexture2 *ktxTexture;
+    KTX_error_code result = ktxTexture2_CreateFromNamedFile(fileName.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture); 
+    if (result != KTX_SUCCESS) throw std::runtime_error("Failed to create ktxTexture: " + std::to_string(result));
+
+    result = ktxTexture2_TranscodeBasis(ktxTexture, KTX_TTF_BC7_RGBA, 0);
+    if (result != KTX_SUCCESS)
+        throw std::runtime_error("Failed to transcode ktxTexture to format " + std::to_string(KTX_TTF_BC7_RGBA) + ": " + std::to_string(result));
+
+    m_data = malloc(ktxTexture->dataSize);
+    memcpy(m_data, ktxTexture->pData, ktxTexture->dataSize);
+
+    keepEmpty(ktxTexture->baseWidth, ktxTexture->baseHeight, 4);
+    free(ktxTexture);
+}
+
 void VulImage::loadData(const void *data, uint32_t width, uint32_t height, uint32_t channels)
 {
     m_constData = data;
@@ -38,7 +58,7 @@ void VulImage::loadData(const void *data, uint32_t width, uint32_t height, uint3
 
 void VulImage::keepEmpty(uint32_t width, uint32_t height, uint32_t channels)
 {
-    if (channels != 1 && channels != 2 && channels != 4) throw std::runtime_error("The amount of channels in an image must be 1, 2 or 4");
+    if (channels != 1 && channels != 2 && channels != 4) throw std::runtime_error("The amount of channels in an image must be 1, 2 or 4, but it is " + std::to_string(channels));
     m_width = width;
     m_height = height;
     m_channels = channels;
@@ -56,21 +76,24 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, ImageType typ
     else if (m_data != nullptr) data = m_data;
 
     VkDeviceSize imageSize = m_width * m_height * m_channels;
-    if (type != ImageType::texture) imageSize *= sizeof(float);
+    if (m_format == VK_FORMAT_UNDEFINED) {
+        if (type != ImageType::texture) imageSize *= sizeof(float);
 
-    if (type == ImageType::storageFloat){
-        if (m_channels == 1) m_format = VK_FORMAT_R32_SFLOAT;
-        else if (m_channels == 2) m_format = VK_FORMAT_R32G32_SFLOAT;
-        else if (m_channels == 4) m_format = VK_FORMAT_R32G32B32A32_SFLOAT;
-    } else if (type == ImageType::storageUint) {
-        if (m_channels == 1) m_format = VK_FORMAT_R32_UINT;
-        else if (m_channels == 2) m_format = VK_FORMAT_R32G32_UINT;
-        else if (m_channels == 4) m_format = VK_FORMAT_R32G32B32A32_UINT;
-    } else{
-        if (m_channels == 1) m_format = VK_FORMAT_R8_SRGB;
-        else if (m_channels == 2) m_format = VK_FORMAT_R8G8_SRGB;
-        else if (m_channels == 4) m_format = VK_FORMAT_R8G8B8A8_SRGB;
+        if (type == ImageType::storageFloat){
+            if (m_channels == 1) m_format = VK_FORMAT_R32_SFLOAT;
+            else if (m_channels == 2) m_format = VK_FORMAT_R32G32_SFLOAT;
+            else if (m_channels == 4) m_format = VK_FORMAT_R32G32B32A32_SFLOAT;
+        } else if (type == ImageType::storageUint) {
+            if (m_channels == 1) m_format = VK_FORMAT_R32_UINT;
+            else if (m_channels == 2) m_format = VK_FORMAT_R32G32_UINT;
+            else if (m_channels == 4) m_format = VK_FORMAT_R32G32B32A32_UINT;
+        } else{
+            if (m_channels == 1) m_format = VK_FORMAT_R8_SRGB;
+            else if (m_channels == 2) m_format = VK_FORMAT_R8G8_SRGB;
+            else if (m_channels == 4) m_format = VK_FORMAT_R8G8B8A8_SRGB;
+        }
     }
+    else imageSize /= 4;
 
     VkImageUsageFlags usage = 0;
     if (type == ImageType::texture) usage |= VK_IMAGE_USAGE_SAMPLED_BIT;

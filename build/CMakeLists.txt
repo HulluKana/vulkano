@@ -33,13 +33,16 @@ target_compile_options(vulkano PRIVATE "-Wall" "-O3")
 target_compile_options(debugVulkano PRIVATE "-Wall" "-g")
 
 #add_compile_definitions(VUL_ENABLE_PROFILER)
-#add_compile_definitions(VUL_ENABLE_DEBUG_NAMER)
+add_compile_definitions(VUL_ENABLE_DEBUG_NAMER)
 
 target_link_libraries(vulkano vulkan)
 target_link_libraries(debugVulkano vulkan)
 
 target_link_libraries(vulkano glfw)
 target_link_libraries(debugVulkano glfw)
+
+target_link_libraries(vulkano ktx)
+target_link_libraries(debugVulkano ktx)
 
 set(IMGUI_PATH "../3rdParty/imgui")
 file(GLOB IMGUI_SOURCES ${IMGUI_PATH}/*.cpp) 

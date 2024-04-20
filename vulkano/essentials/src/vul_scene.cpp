@@ -22,7 +22,7 @@ void Scene::loadScene(std::string fileName)
     tinygltf::TinyGLTF context;
     std::string warn, err;
     
-    if (!context.LoadBinaryFromFile(&model, &err, &warn, fileName)) 
+    if (!context.LoadASCIIFromFile(&model, &err, &warn, fileName)) 
         throw std::runtime_error("Failed to load scene from file: " + err);
 
     GltfLoader gltfLoader;
