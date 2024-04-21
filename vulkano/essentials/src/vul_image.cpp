@@ -1,4 +1,5 @@
 #include "vul_debug_tools.hpp"
+#include <memory>
 #include<vul_image.hpp>
 #include<vul_buffer.hpp>
 #include <cstring>
@@ -64,7 +65,15 @@ void VulImage::keepEmpty(uint32_t width, uint32_t height, uint32_t channels)
     m_channels = channels;
 }
 
-void VulImage::createImage(bool createSampler, bool isDeviceLocal, ImageType type, int dimensions)
+void VulImage::createImageSingleTime(bool createSampler, bool isDeviceLocal, ImageType type, int dimensions)
+{
+    VkCommandBuffer cmdBuf = m_vulDevice.beginSingleTimeCommands();
+    createImage(createSampler, isDeviceLocal, type, dimensions, cmdBuf);
+    m_vulDevice.endSingleTimeCommands(cmdBuf);
+    deleteCpuResources();
+}
+
+void VulImage::createImage(bool createSampler, bool isDeviceLocal, ImageType type, int dimensions, VkCommandBuffer cmdBuf)
 {
     if (dimensions < 1 || dimensions > 3) throw std::runtime_error("Vul image must have between 1 and 3 dimensions");
     if (createSampler && type != ImageType::texture) throw std::runtime_error("Cannot create a sampler for a storage image");
@@ -123,28 +132,26 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, ImageType typ
 
     createVkImage(m_format, tiling, usage, memoryProperties, imageType);
     if (data != nullptr && isDeviceLocal){
-        vulB::VulBuffer stagingBuffer(m_vulDevice);
-        stagingBuffer.loadData(data, 1, imageSize);
-        stagingBuffer.createBuffer(false, vulB::VulBuffer::usage_transferSrc);
+        m_stagingBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+        m_stagingBuffer->loadData(data, 1, imageSize);
+        m_stagingBuffer->createBuffer(false, vulB::VulBuffer::usage_transferSrc);
 
-        transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        copyBufferToImage(stagingBuffer.getBuffer());
-        transitionImageLayout(m_format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_layout);
+        transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
+        copyBufferToImage(m_stagingBuffer->getBuffer(), cmdBuf);
+        transitionImageLayout(m_format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_layout, cmdBuf);
     }
     else if (data != nullptr && !isDeviceLocal){
-        transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL);
+        transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, cmdBuf);
 
         vkMapMemory(m_vulDevice.device(), m_imageMemory, 0, imageSize, 0, &m_mappedMemory);
         memcpy(m_mappedMemory, data, (size_t)imageSize);
 
-        if (type != ImageType::texture) transitionImageLayout(m_format, VK_IMAGE_LAYOUT_GENERAL, m_layout);
+        if (type != ImageType::texture) transitionImageLayout(m_format, VK_IMAGE_LAYOUT_GENERAL, m_layout, cmdBuf);
     }
-    else transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, m_layout);
+    else transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, m_layout, cmdBuf);
     
     createImageView(imageViewType);
     if (createSampler) createTextureSampler();
-
-    if (m_data != nullptr) stbi_image_free(m_data);
 }
 
 void VulImage::addSampler(VkSampler sampler)
@@ -160,19 +167,35 @@ void VulImage::modifyImage(void *data)
     VkDeviceSize imageSize = m_width * m_height * m_channels;
     if (m_type != ImageType::texture) imageSize *= sizeof(float);
 
+    VkCommandBuffer cmdBuf = m_vulDevice.beginSingleTimeCommands();
     if (m_isLocal){
         vulB::VulBuffer stagingBuffer(m_vulDevice);
         stagingBuffer.loadData(data, 1, imageSize);
         stagingBuffer.createBuffer(false, vulB::VulBuffer::usage_transferSrc);
 
-        transitionImageLayout(m_format, m_layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
-        copyBufferToImage(stagingBuffer.getBuffer());
-        transitionImageLayout(m_format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_layout);
+        transitionImageLayout(m_format, m_layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
+        copyBufferToImage(stagingBuffer.getBuffer(), cmdBuf);
+        transitionImageLayout(m_format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_layout, cmdBuf);
     }
     else {
-        if (m_type != ImageType::texture) transitionImageLayout(m_format, m_layout, VK_IMAGE_LAYOUT_GENERAL);
+        if (m_type != ImageType::texture) transitionImageLayout(m_format, m_layout, VK_IMAGE_LAYOUT_GENERAL, cmdBuf);
         memcpy(m_mappedMemory, data, (size_t)imageSize);
-        if (m_type != ImageType::texture) transitionImageLayout(m_format, VK_IMAGE_LAYOUT_GENERAL, m_layout);
+        if (m_type != ImageType::texture) transitionImageLayout(m_format, VK_IMAGE_LAYOUT_GENERAL, m_layout, cmdBuf);
+    }
+    m_vulDevice.endSingleTimeCommands(cmdBuf);
+}
+
+void VulImage::deleteCpuResources()
+{
+    if (m_data != nullptr) {
+        free(m_data);
+        m_data = nullptr;
+    }
+    m_constData = nullptr;
+
+    if (m_stagingBuffer != nullptr) {
+        delete m_stagingBuffer.release();
+        m_stagingBuffer = nullptr;
     }
 }
 
@@ -264,10 +287,8 @@ void VulImage::createVkImage(VkFormat format, VkImageTiling tiling, VkImageUsage
     VUL_NAME_VK(m_imageMemory)
 }
 
-void VulImage::transitionImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout)
+void VulImage::transitionImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf)
 {
-    VkCommandBuffer commandBuffer = m_vulDevice.beginSingleTimeCommands();
-
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
     barrier.oldLayout = oldLayout;
@@ -309,15 +330,11 @@ void VulImage::transitionImageLayout(VkFormat format, VkImageLayout oldLayout, V
         destinationStage = VK_PIPELINE_STAGE_HOST_BIT; 
     } else throw std::invalid_argument("unsupported new layout transition in vulkano_image.cpp file!");
 
-    vkCmdPipelineBarrier(commandBuffer, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
-
-    m_vulDevice.endSingleTimeCommands(commandBuffer);
+    vkCmdPipelineBarrier(cmdBuf, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
-void VulImage::copyBufferToImage(VkBuffer buffer) 
+void VulImage::copyBufferToImage(VkBuffer buffer, VkCommandBuffer cmdBuf) 
 {
-    VkCommandBuffer commandBuffer = m_vulDevice.beginSingleTimeCommands();
-
     VkBufferImageCopy region{};
     region.bufferOffset = 0;
     region.bufferRowLength = 0;
@@ -331,9 +348,7 @@ void VulImage::copyBufferToImage(VkBuffer buffer)
     region.imageOffset = {0, 0, 0};
     region.imageExtent = {m_width, m_height, 1};
 
-    vkCmdCopyBufferToImage(commandBuffer, buffer, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-
-    m_vulDevice.endSingleTimeCommands(commandBuffer);
+    vkCmdCopyBufferToImage(cmdBuf, buffer, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 }
 
 

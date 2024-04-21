@@ -10,6 +10,7 @@
 #include <stdexcept>
 #include <string>
 #include <iostream>
+#include <future>
 
 #include<vul_gltf_loader.hpp>
 #include<vul_transform.hpp>
@@ -61,15 +62,29 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
 
 void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
 {
-    for (const tinygltf::Texture &texture : model.textures){
-        const tinygltf::Image &image = model.images[texture.source];
-
+    std::function<std::shared_ptr<VulImage>(int)> importTexture = [&](int srcIdx)
+    {
+        const tinygltf::Image &image = model.images[srcIdx];
         std::shared_ptr<VulImage> vulImage = std::make_shared<VulImage>(device);
         vulImage->loadKtxFile("../Models/" + image.uri);
-        vulImage->createImage(true, true, VulImage::ImageType::texture, 2);
         vulImage->name = image.name;
-        images.push_back(vulImage);
+        return vulImage;
+    };
+
+    std::vector<std::future<std::shared_ptr<VulImage>>> results(model.textures.size());
+    for (size_t i = 0; i < model.textures.size(); i++) {
+        results[i] = std::async(std::launch::async, importTexture, model.textures[i].source);
     }
+
+    images.reserve(model.textures.size());
+    VkCommandBuffer cmdBuf = device.beginSingleTimeCommands();
+    for (size_t i = 0; i < results.size(); i++) {
+        images.push_back(results[i].get());
+        images[i]->createImage(true, true, VulImage::ImageType::texture, 2, cmdBuf);
+    }
+    device.endSingleTimeCommands(cmdBuf);
+
+    for (std::shared_ptr<VulImage> &image : images) image->deleteCpuResources();
 }
 
 void GltfLoader::importDrawableNodes(const tinygltf::Model &model, GltfAttributes requestedAttributes)

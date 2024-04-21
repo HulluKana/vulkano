@@ -1,5 +1,6 @@
 #pragma once
 
+#include "vul_buffer.hpp"
 #include"vul_device.hpp"
 #include<string>
 #include <vulkan/vulkan_core.h>
@@ -22,10 +23,12 @@ class VulImage
             storageFloat,
             storageUint
         };
-        void createImage(bool createSampler, bool isDeviceLocal, ImageType type, int dimensions);
+        void createImageSingleTime(bool createSampler, bool isDeviceLocal, ImageType type, int dimensions);
+        void createImage(bool createSampler, bool isDeviceLocal, ImageType type, int dimensions, VkCommandBuffer cmdBuf);
         void addSampler(VkSampler sampler);
         void modifyImage(void *data);
 
+        void deleteCpuResources();
         void setDescriptorSet(VkDescriptorSet descriptorSet) {m_descriptorSet = descriptorSet;}
     
         bool isLocal() const {return m_isLocal;}
@@ -52,8 +55,8 @@ class VulImage
         void createImageView(VkImageViewType imageViewType);
         void createTextureSampler();
         void createVkImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageType imageType);
-        void transitionImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
-        void copyBufferToImage(VkBuffer buffer);
+        void transitionImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf);
+        void copyBufferToImage(VkBuffer buffer, VkCommandBuffer cmdBuf);
 
         VkFormat m_format = VK_FORMAT_UNDEFINED;
         uint32_t m_width = 0;
@@ -69,6 +72,7 @@ class VulImage
 
         void *m_data = nullptr;
         const void *m_constData = nullptr;
+        std::unique_ptr<vulB::VulBuffer> m_stagingBuffer = nullptr;
         VkImageLayout m_layout;
         VkImage m_image;
         void *m_mappedMemory;
