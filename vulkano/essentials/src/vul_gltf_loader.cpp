@@ -66,7 +66,7 @@ void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
     {
         const tinygltf::Image &image = model.images[srcIdx];
         std::shared_ptr<VulImage> vulImage = std::make_shared<VulImage>(device);
-        vulImage->loadKtxFile("../Models/" + image.uri);
+        vulImage->loadKtxFile("../Models/" + image.uri, image.uri[image.uri.length() - 1] == 'l');
         vulImage->name = image.name;
         return vulImage;
     };
@@ -225,6 +225,10 @@ void GltfLoader::processMesh(const tinygltf::Model &model, const tinygltf::Primi
         if (gltfAttribAnd(requestedAttributes, GltfAttributes::Normal) == GltfAttributes::Normal){
             bool normalCreated = getAttribute<glm::vec3>(model, mesh, normals, "NORMAL");
             if (!normalCreated) throw std::runtime_error("The mesh doesnt have normals");
+        }
+        if (gltfAttribAnd(requestedAttributes, GltfAttributes::Tangent) == GltfAttributes::Tangent) {
+            if (!getAttribute<glm::vec4>(model, mesh, tangents, "TANGENT"))
+                throw std::runtime_error("The mesh doesnt have tangents");
         }
         if (gltfAttribAnd(requestedAttributes, GltfAttributes::TexCoord) == GltfAttributes::TexCoord){
             bool texCoordCreated = getAttribute<glm::vec2>(model, mesh, uvCoords, "TEXCOORD_0");

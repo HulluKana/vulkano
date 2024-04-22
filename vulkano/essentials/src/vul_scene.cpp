@@ -1,4 +1,5 @@
 #include "vul_debug_tools.hpp"
+#include "vul_gltf_loader.hpp"
 #include<vul_scene.hpp>
 #include<vul_host_device.hpp>
 #include <memory>
@@ -28,8 +29,8 @@ void Scene::loadScene(std::string fileName)
     GltfLoader gltfLoader;
     gltfLoader.importMaterials(model);
     gltfLoader.importTextures(model, m_vulDevice);
-    gltfLoader.importDrawableNodes(   model, GltfLoader::gltfAttribOr(GltfLoader::GltfAttributes::Normal, 
-                                        GltfLoader::GltfAttributes::TexCoord));
+    gltfLoader.importDrawableNodes(model, GltfLoader::gltfAttribOr(GltfLoader::gltfAttribOr(GltfLoader::GltfAttributes::Normal,
+                    GltfLoader::GltfAttributes::Tangent), GltfLoader::GltfAttributes::TexCoord));
 
     std::vector<PackedMaterial> packedMaterials;
     for (const GltfLoader::Material &mat : gltfLoader.materials){
@@ -39,25 +40,28 @@ void Scene::loadScene(std::string fileName)
         packedMat.roughness = mat.roughness;
         packedMat.metalliness = mat.metalliness;
         packedMat.colorTextureIndex = mat.colorTextureIndex;
-        packedMat.ior = mat.ior;
+        packedMat.normalTextureIndex = mat.normalTextureIndex;
         packedMaterials.push_back(packedMat);
     }
 
     indexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
     vertexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
     normalBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+    tangentBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
     uvBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
     materialBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
 
     indexBuffer->loadVector(gltfLoader.indices);
     vertexBuffer->loadVector(gltfLoader.positions);
     normalBuffer->loadVector(gltfLoader.normals);
+    tangentBuffer->loadVector(gltfLoader.tangents);
     uvBuffer->loadVector(gltfLoader.uvCoords);
     materialBuffer->loadVector(packedMaterials);
 
     indexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_indexBuffer | VulBuffer::usage_transferDst));
     vertexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
     normalBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
+    tangentBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
     uvBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
     materialBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_transferDst));
 

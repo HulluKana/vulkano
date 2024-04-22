@@ -32,9 +32,10 @@ void VulImage::loadFile(const std::string &fileName)
     if (!m_data) throw std::runtime_error("failed to load image!");
 }
 
-void VulImage::loadKtxFile(const std::string &fileName)
+void VulImage::loadKtxFile(const std::string &fileName, bool unorm)
 {
     m_format = VK_FORMAT_BC7_SRGB_BLOCK;
+    if (unorm) m_format = VK_FORMAT_BC7_UNORM_BLOCK;
 
     ktxTexture2 *ktxTexture;
     KTX_error_code result = ktxTexture2_CreateFromNamedFile(fileName.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture); 

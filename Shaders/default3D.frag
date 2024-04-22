@@ -8,7 +8,8 @@
 
 layout (location = 0) in vec3 fragPosWorld;
 layout (location = 1) in vec3 fragNormalWorld;
-layout (location = 2) in vec2 fragTexCoord;
+layout (location = 2) in vec4 fragTangentWorld;
+layout (location = 3) in vec2 fragTexCoord;
 
 layout (location = 0) out vec4 FragColor;
 
@@ -54,6 +55,7 @@ void main()
         float metalliness;
         float ior;
         int colorTextureIndex; 
+        int normalTextureIndex;
     } mat;
     if (push.matIdx > -1){
         PackedMaterial packedMat = matBuf.m[push.matIdx];
@@ -64,6 +66,7 @@ void main()
         mat.roughness = packedMat.roughness;
         mat.metalliness = packedMat.metalliness;
         mat.colorTextureIndex = packedMat.colorTextureIndex;
+        mat.normalTextureIndex = packedMat.normalTextureIndex;
     } else{
         mat.color = vec3(0.8);
         mat.alpha = 1.0;
@@ -72,6 +75,7 @@ void main()
         mat.roughness = 0.5;
         mat.metalliness = 0.0;
         mat.colorTextureIndex = -1;
+        mat.normalTextureIndex = -1;
     }
 
     float epsilon = 0.0001;
@@ -79,7 +83,13 @@ void main()
     if (mat.colorTextureIndex >= 0) rawColor = texture(texSampler[mat.colorTextureIndex], fragTexCoord).xyz;
     else rawColor = sRGBToAlbedo(mat.color);
 
-    vec3 surfaceNormal = normalize(fragNormalWorld);
+    vec3 surfaceNormal = fragNormalWorld;
+    if (mat.normalTextureIndex >= 0) {
+        const vec3 bitangent = cross(fragNormalWorld, fragTangentWorld.xyz) * fragTangentWorld.w;
+        const mat3 TBN = mat3(fragTangentWorld, bitangent, fragNormalWorld);
+        surfaceNormal = normalize((texture(texSampler[mat.normalTextureIndex], fragTexCoord).xyz * 2.0 - vec3(1.0)) * TBN);
+    }
+
     vec3 viewDirection = normalize(ubo.cameraPosition.xyz - fragPosWorld);
     vec3 color = vec3(0.0);
     for (int i = 0; i < ubo.numLights; i++){
@@ -104,7 +114,7 @@ void main()
         color += colorFromThisLight;
     }
 
-    color += sRGBToAlbedo(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w);
+    color += sRGBToAlbedo(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w) * rawColor;
     if (mat.emissiveStrength > 0.01) color += sRGBToAlbedo(mat.emissiveColor * mat.emissiveStrength);
 
     FragColor = vec4(albedoToSRGB(color), 1.0);

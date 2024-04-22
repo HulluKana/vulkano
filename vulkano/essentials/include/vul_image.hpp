@@ -14,7 +14,7 @@ class VulImage
         ~VulImage();
 
         void loadFile(const std::string &fileName);
-        void loadKtxFile(const std::string &fileName);
+        void loadKtxFile(const std::string &fileName, bool unorm);
         void loadData(const void *data, uint32_t width, uint32_t height, uint32_t channels);
         void keepEmpty(uint32_t width, uint32_t height, uint32_t channels);
 

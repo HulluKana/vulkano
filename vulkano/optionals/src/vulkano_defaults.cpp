@@ -260,9 +260,10 @@ defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano 
 void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataInputData inputData)
 {
     VulPipeline::PipelineConfigInfo mainConfig{};
-    mainConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0}, {2, 2, VK_FORMAT_R32G32_SFLOAT}};
-    mainConfig.bindingDescriptions = {  {0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX},
-                                    {2, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
+    mainConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0},
+        {2, 2, VK_FORMAT_R32G32B32A32_SFLOAT, 0}, {3, 3, VK_FORMAT_R32G32_SFLOAT, 0}};
+    mainConfig.bindingDescriptions = {{0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX},
+        {2, sizeof(glm::vec4), VK_VERTEX_INPUT_RATE_VERTEX}, {3, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
     mainConfig.setLayouts = {vulkano.renderDatas[inputData.mainRenderDataIdx].descriptorSets[0][0]->getLayout()->getDescriptorSetLayout()};
     mainConfig.colorAttachmentFormats = {vulkano.vulRenderer.getSwapChainColorFormat()};
     mainConfig.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
@@ -275,9 +276,10 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     vulkano.renderDatas[inputData.mainRenderDataIdx].sampleFromDepth = false;
 
     VulPipeline::PipelineConfigInfo oitColoringConfig{};
-    oitColoringConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0}, {2, 2, VK_FORMAT_R32G32_SFLOAT}};
+    oitColoringConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0},
+        {2, 2, VK_FORMAT_R32G32B32A32_SFLOAT, 0}, {3, 3, VK_FORMAT_R32G32_SFLOAT, 0}};
     oitColoringConfig.bindingDescriptions = {  {0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX},
-                                    {2, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
+        {2, sizeof(glm::vec4), VK_VERTEX_INPUT_RATE_VERTEX}, {3, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
     oitColoringConfig.setLayouts = {vulkano.renderDatas[inputData.oitColoringRenderDataIdx].descriptorSets[0][0]->getLayout()->getDescriptorSetLayout(),
         vulkano.renderDatas[inputData.oitColoringRenderDataIdx].descriptorSets[0][1]->getLayout()->getDescriptorSetLayout()};
     oitColoringConfig.colorAttachmentFormats = {};
@@ -362,7 +364,7 @@ size_t defaults::updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataI
     ubo.viewMatrix = vulkano.camera.getView();
     ubo.cameraPosition = glm::vec4(vulkano.cameraTransform.pos, 0.0f);
 
-    ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.02f);
+    ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.6f);
     ubo.numLights = scene.lights.size();
     for (int i = 0; i < std::min(static_cast<int>(scene.lights.size()), MAX_LIGHTS); i++){
         ubo.lightPositions[i] = glm::vec4(scene.lights[i].position, 69.0f);

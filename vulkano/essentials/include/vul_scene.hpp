@@ -24,6 +24,7 @@ class Scene
 
         std::unique_ptr<vulB::VulBuffer> vertexBuffer;
         std::unique_ptr<vulB::VulBuffer> normalBuffer;
+        std::unique_ptr<vulB::VulBuffer> tangentBuffer;
         std::unique_ptr<vulB::VulBuffer> uvBuffer;
         std::unique_ptr<vulB::VulBuffer> indexBuffer;
         std::unique_ptr<vulB::VulBuffer> materialBuffer;

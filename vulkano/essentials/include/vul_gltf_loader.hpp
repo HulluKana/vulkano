@@ -26,8 +26,9 @@ class GltfLoader
                 NoAttribs = 0,
                 Position = 1,
                 Normal = 2,
-                TexCoord = 4,
-                Color = 8,
+                Tangent = 4,
+                TexCoord = 8,
+                Color = 16,
                 All = 0xff
         };
         static inline GltfAttributes gltfAttribOr(GltfAttributes lhs, GltfAttributes rhs)
@@ -83,6 +84,7 @@ class GltfLoader
         std::vector<uint32_t> indices;
         std::vector<glm::vec3> positions;
         std::vector<glm::vec3> normals;
+        std::vector<glm::vec4> tangents;
         std::vector<glm::vec2> uvCoords;
         std::vector<glm::vec4> colors;
 

@@ -125,7 +125,8 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
             }
             std::vector<VkDescriptorSet> descriptorSets;
             for (const std::shared_ptr<VulDescriptorSet> &descriptorSet : renderData.descriptorSets[vulRenderer.getFrameIndex()]) descriptorSets.push_back(descriptorSet->getSet());
-            std::vector<VkBuffer> vertexBuffers = {scene.vertexBuffer->getBuffer(), scene.normalBuffer->getBuffer(), scene.uvBuffer->getBuffer()};
+            std::vector<VkBuffer> vertexBuffers = {scene.vertexBuffer->getBuffer(), scene.normalBuffer->getBuffer(), scene.tangentBuffer->getBuffer(),
+                scene.uvBuffer->getBuffer()};
             renderData.pipeline->draw(commandBuffer, descriptorSets, vertexBuffers, scene.indexBuffer->getBuffer(), renderData.drawDatas);
         }
     }
