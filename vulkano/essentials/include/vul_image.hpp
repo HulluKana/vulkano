@@ -55,13 +55,14 @@ class VulImage
         void createImageView(VkImageViewType imageViewType);
         void createTextureSampler();
         void createVkImage(VkFormat format, VkImageTiling tiling, VkImageUsageFlags usage, VkMemoryPropertyFlags properties, VkImageType imageType);
-        void transitionImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf);
-        void copyBufferToImage(VkBuffer buffer, VkCommandBuffer cmdBuf);
+        void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf);
+        void copyBufferToImage(VkBuffer buffer, uint32_t mipLevel, VkCommandBuffer cmdBuf);
 
         VkFormat m_format = VK_FORMAT_UNDEFINED;
         uint32_t m_width = 0;
         uint32_t m_height = 0;
         uint32_t m_channels = 0;
+        uint32_t m_mipLevels = 1;
         ImageType m_type = ImageType::texture;
         bool m_isLocal = false;
         bool m_hasSampler = false;
@@ -72,7 +73,7 @@ class VulImage
 
         void *m_data = nullptr;
         const void *m_constData = nullptr;
-        std::unique_ptr<vulB::VulBuffer> m_stagingBuffer = nullptr;
+        std::vector<std::unique_ptr<vulB::VulBuffer>> m_stagingBuffers;
         VkImageLayout m_layout;
         VkImage m_image;
         void *m_mappedMemory;

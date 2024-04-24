@@ -10,6 +10,7 @@
 #include<stb_image.h>
 
 #include<stdexcept>
+#include <iostream>
 
 namespace vul{
 
@@ -49,6 +50,7 @@ void VulImage::loadKtxFile(const std::string &fileName, bool unorm)
     memcpy(m_data, ktxTexture->pData, ktxTexture->dataSize);
 
     keepEmpty(ktxTexture->baseWidth, ktxTexture->baseHeight, 4);
+    m_mipLevels = ktxTexture->numLevels;
     free(ktxTexture);
 }
 
@@ -133,23 +135,30 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, ImageType typ
 
     createVkImage(m_format, tiling, usage, memoryProperties, imageType);
     if (data != nullptr && isDeviceLocal){
-        m_stagingBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
-        m_stagingBuffer->loadData(data, 1, imageSize);
-        m_stagingBuffer->createBuffer(false, vulB::VulBuffer::usage_transferSrc);
-
-        transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
-        copyBufferToImage(m_stagingBuffer->getBuffer(), cmdBuf);
-        transitionImageLayout(m_format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_layout, cmdBuf);
+        transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
+        uint32_t size = 16;
+        uint32_t usedSize = 32;
+        m_stagingBuffers.push_back(std::make_unique<vulB::VulBuffer>(m_vulDevice));
+        m_stagingBuffers.push_back(std::make_unique<vulB::VulBuffer>(m_vulDevice));
+        for (uint32_t i = 2; i < m_mipLevels; i++) {
+            m_stagingBuffers.push_back(std::make_unique<vulB::VulBuffer>(m_vulDevice));
+            m_stagingBuffers[i]->loadData(reinterpret_cast<void *>(reinterpret_cast<size_t>(data) + usedSize), 1, size);
+            m_stagingBuffers[i]->createBuffer(false, vulB::VulBuffer::usage_transferSrc);;
+            copyBufferToImage(m_stagingBuffers[i]->getBuffer(), m_mipLevels - i - 1, cmdBuf);
+            usedSize += size;
+            size *= 4;
+        }
+        transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_layout, cmdBuf);
     }
     else if (data != nullptr && !isDeviceLocal){
-        transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, cmdBuf);
+        transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, cmdBuf);
 
         vkMapMemory(m_vulDevice.device(), m_imageMemory, 0, imageSize, 0, &m_mappedMemory);
         memcpy(m_mappedMemory, data, (size_t)imageSize);
 
-        if (type != ImageType::texture) transitionImageLayout(m_format, VK_IMAGE_LAYOUT_GENERAL, m_layout, cmdBuf);
+        if (type != ImageType::texture) transitionImageLayout(VK_IMAGE_LAYOUT_GENERAL, m_layout, cmdBuf);
     }
-    else transitionImageLayout(m_format, VK_IMAGE_LAYOUT_UNDEFINED, m_layout, cmdBuf);
+    else transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, m_layout, cmdBuf);
     
     createImageView(imageViewType);
     if (createSampler) createTextureSampler();
@@ -174,14 +183,14 @@ void VulImage::modifyImage(void *data)
         stagingBuffer.loadData(data, 1, imageSize);
         stagingBuffer.createBuffer(false, vulB::VulBuffer::usage_transferSrc);
 
-        transitionImageLayout(m_format, m_layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
-        copyBufferToImage(stagingBuffer.getBuffer(), cmdBuf);
-        transitionImageLayout(m_format, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_layout, cmdBuf);
+        transitionImageLayout(m_layout, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
+        copyBufferToImage(stagingBuffer.getBuffer(), 0, cmdBuf);
+        transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_layout, cmdBuf);
     }
     else {
-        if (m_type != ImageType::texture) transitionImageLayout(m_format, m_layout, VK_IMAGE_LAYOUT_GENERAL, cmdBuf);
+        if (m_type != ImageType::texture) transitionImageLayout(m_layout, VK_IMAGE_LAYOUT_GENERAL, cmdBuf);
         memcpy(m_mappedMemory, data, (size_t)imageSize);
-        if (m_type != ImageType::texture) transitionImageLayout(m_format, VK_IMAGE_LAYOUT_GENERAL, m_layout, cmdBuf);
+        if (m_type != ImageType::texture) transitionImageLayout(VK_IMAGE_LAYOUT_GENERAL, m_layout, cmdBuf);
     }
     m_vulDevice.endSingleTimeCommands(cmdBuf);
 }
@@ -194,10 +203,7 @@ void VulImage::deleteCpuResources()
     }
     m_constData = nullptr;
 
-    if (m_stagingBuffer != nullptr) {
-        delete m_stagingBuffer.release();
-        m_stagingBuffer = nullptr;
-    }
+    m_stagingBuffers.clear();
 }
 
 void VulImage::createImageView(VkImageViewType imageViewType)
@@ -209,7 +215,7 @@ void VulImage::createImageView(VkImageViewType imageViewType)
     viewInfo.format = m_format;
     viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = 1;
+    viewInfo.subresourceRange.levelCount = m_mipLevels;
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
@@ -238,7 +244,7 @@ void VulImage::createTextureSampler()
     samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
     samplerInfo.mipLodBias = 0.0f;
     samplerInfo.minLod = 0.0f;
-    samplerInfo.maxLod = 0.0f;
+    samplerInfo.maxLod = static_cast<float>(m_mipLevels);
 
     if (vkCreateSampler(m_vulDevice.device(), &samplerInfo, nullptr, &m_textureSampler) != VK_SUCCESS) {
         throw std::runtime_error("failed to create texture sampler in vul_texture_sampler.cpp");
@@ -256,7 +262,7 @@ void VulImage::createVkImage(VkFormat format, VkImageTiling tiling, VkImageUsage
     imageInfo.extent.width = m_width;
     imageInfo.extent.height = m_height;
     imageInfo.extent.depth = 1;
-    imageInfo.mipLevels = 1;
+    imageInfo.mipLevels = m_mipLevels;
     imageInfo.arrayLayers = 1;
     imageInfo.format = format;
     imageInfo.tiling = tiling;
@@ -288,7 +294,7 @@ void VulImage::createVkImage(VkFormat format, VkImageTiling tiling, VkImageUsage
     VUL_NAME_VK(m_imageMemory)
 }
 
-void VulImage::transitionImageLayout(VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf)
+void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf)
 {
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -299,7 +305,7 @@ void VulImage::transitionImageLayout(VkFormat format, VkImageLayout oldLayout, V
     barrier.image = m_image;
     barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = 1;
+    barrier.subresourceRange.levelCount = m_mipLevels;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = 1;
 
@@ -334,20 +340,23 @@ void VulImage::transitionImageLayout(VkFormat format, VkImageLayout oldLayout, V
     vkCmdPipelineBarrier(cmdBuf, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
-void VulImage::copyBufferToImage(VkBuffer buffer, VkCommandBuffer cmdBuf) 
+void VulImage::copyBufferToImage(VkBuffer buffer, uint32_t mipLevel, VkCommandBuffer cmdBuf) 
 {
+    uint32_t width = m_width / static_cast<uint32_t>(pow(2, mipLevel));
+    uint32_t height = m_height / static_cast<uint32_t>(pow(2, mipLevel));
+
     VkBufferImageCopy region{};
     region.bufferOffset = 0;
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
 
     region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
+    region.imageSubresource.mipLevel = mipLevel;
     region.imageSubresource.baseArrayLayer = 0;
     region.imageSubresource.layerCount = 1;
 
     region.imageOffset = {0, 0, 0};
-    region.imageExtent = {m_width, m_height, 1};
+    region.imageExtent = {width, height, 1};
 
     vkCmdCopyBufferToImage(cmdBuf, buffer, m_image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 }
