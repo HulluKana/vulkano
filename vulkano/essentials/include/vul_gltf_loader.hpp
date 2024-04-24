@@ -101,7 +101,7 @@ class GltfLoader
     private:
         void processMesh(   const tinygltf::Model &model, const tinygltf::Primitive &mesh, 
                             GltfAttributes requestedAttributes, const std::string &name);
-        void processNode(const tinygltf::Model &model, int nodeIdx, const glm::mat4 &parentMatrix, const glm::vec3 &parentPos);
+        void processNode(const tinygltf::Model &model, int nodeIdx, const glm::vec3 &parentPos, const glm::quat &parentRot);
 
 
         float getFloat(const tinygltf::Value &value, const std::string &name);

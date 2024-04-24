@@ -2,6 +2,7 @@
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/quaternion_float.hpp>
 #include <glm/ext/quaternion_transform.hpp>
+#include <glm/gtc/quaternion.hpp>
 #include <limits>
 #include <memory>
 #include <set>
@@ -132,8 +133,12 @@ void GltfLoader::importDrawableNodes(const tinygltf::Model &model, GltfAttribute
     }
 
     for (int nodeIdx : scene.nodes){
-        glm::mat4 matrix = glm::mat4(1.0f);
-        processNode(model, nodeIdx, matrix, {0.0f, 0.0f, 0.0f});
+        glm::quat quat{};
+        quat.x = 0.0f;
+        quat.y = 0.0f;
+        quat.z = 0.0f;
+        quat.w = 1.0f;
+        processNode(model, nodeIdx, {0.0f, 0.0f, 0.0f}, quat);
     }
 
     m_meshToPrimMesh.clear();
@@ -246,25 +251,28 @@ void GltfLoader::processMesh(const tinygltf::Model &model, const tinygltf::Primi
     primMeshes.emplace_back(resultMesh);
 }
 
-void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const glm::mat4 &parentMatrix, const glm::vec3 &parentPos)
+void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const glm::vec3 &parentPos, const glm::quat &parentRot)
 {
     const tinygltf::Node &node = model.nodes[nodeIdx];
 
-    transform3D transform;
-    if (!node.translation.empty()){
-        transform.pos = glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
-    }
-    if (!node.rotation.empty()){
-        glm::quat rotationQuaternion = glm::quat(node.rotation[0], node.rotation[1], node.rotation[2], node.rotation[3]);
-        transform.rot = glm::eulerAngles(rotationQuaternion);
-    }
-    if (!node.scale.empty())
-        transform.scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
-    
-    if (!node.matrix.empty()) throw std::runtime_error("The node has some sort of matrix. Handle it");
+    transform3D transform{};
+    transform.pos = parentPos;
+    glm::quat rotationQuaternion = parentRot;
 
-    glm::mat4 worldMatrix = parentMatrix * transform.transformMat();
-    transform.pos += parentPos;
+    if (!node.translation.empty())
+        transform.pos += glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+    if (!node.rotation.empty()) {
+        glm::quat localQuat{};
+        localQuat.x = node.rotation[0];
+        localQuat.y = node.rotation[1];
+        localQuat.z = node.rotation[2];
+        localQuat.w = node.rotation[3];
+        rotationQuaternion *= localQuat;
+    }
+    transform.rot = -glm::eulerAngles(rotationQuaternion); // Don't even ask about the minus sign
+    if (!node.scale.empty())
+        transform.scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]); 
+    if (!node.matrix.empty()) throw std::runtime_error("The node has some sort of matrix. Handle it");
 
     if (node.mesh > -1){
         const std::vector<uint32_t> &meshes = m_meshToPrimMesh[node.mesh];
@@ -272,7 +280,7 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
             GltfNode dunno;
             dunno.name = node.name;
             dunno.primMesh = mesh;
-            dunno.worldMatrix = worldMatrix;
+            dunno.worldMatrix = transform.transformMat();
             dunno.position = transform.pos;
             nodes.push_back(dunno);
         }
@@ -282,14 +290,14 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
         const tinygltf::Light &light = model.lights[node.light];
         GltfLight gltfLight{};
         gltfLight.name = light.name;
-        gltfLight.position = {transform.pos.x, transform.pos.y, transform.pos.z};
+        gltfLight.position = transform.pos;
         gltfLight.color = {light.color[0], light.color[1], light.color[2]};
         gltfLight.intensity = light.intensity;
         lights.push_back(gltfLight);
     }
 
     for (int child : node.children){
-        processNode(model, child, worldMatrix, transform.pos);
+        processNode(model, child, transform.pos, rotationQuaternion);
     }
 }
 
