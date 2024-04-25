@@ -297,6 +297,7 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
             dunno.name = node.name;
             dunno.primMesh = mesh;
             dunno.worldMatrix = transform.transformMat();
+            dunno.normalMatrix = transform.normalMat();
             dunno.position = transform.pos;
             nodes.push_back(dunno);
         }

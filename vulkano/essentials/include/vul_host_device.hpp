@@ -52,6 +52,10 @@ struct PackedMaterial{
     float metalliness;
     int colorTextureIndex;
     int normalTextureIndex;
+    int roughnessMetallicTextureIndex;
+    int padding1;
+    int padding2;
+    int padding3;
 };
 
 struct ABuffer {

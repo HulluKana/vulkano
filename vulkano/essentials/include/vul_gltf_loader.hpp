@@ -68,6 +68,7 @@ class GltfLoader
         };
         struct GltfNode{
             glm::mat4 worldMatrix{1.0f};
+            glm::mat3 normalMatrix{1.0f};
             glm::vec3 position{0.0f};
             int primMesh = 0;
 

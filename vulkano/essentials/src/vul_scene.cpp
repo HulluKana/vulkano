@@ -41,6 +41,10 @@ void Scene::loadScene(std::string fileName)
         packedMat.metalliness = mat.metalliness;
         packedMat.colorTextureIndex = mat.colorTextureIndex;
         packedMat.normalTextureIndex = mat.normalTextureIndex;
+        packedMat.roughnessMetallicTextureIndex = mat.roughnessMetallinessTextureIndex;
+        packedMat.padding1 = 14;
+        packedMat.padding2 = 69;
+        packedMat.padding3 = 420;
         packedMaterials.push_back(packedMat);
     }
 

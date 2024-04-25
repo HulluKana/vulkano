@@ -56,6 +56,7 @@ void main()
         float ior;
         int colorTextureIndex; 
         int normalTextureIndex;
+        int roughnessMetallicTextureIndex;
     } mat;
     if (push.matIdx > -1){
         PackedMaterial packedMat = matBuf.m[push.matIdx];
@@ -67,6 +68,7 @@ void main()
         mat.metalliness = packedMat.metalliness;
         mat.colorTextureIndex = packedMat.colorTextureIndex;
         mat.normalTextureIndex = packedMat.normalTextureIndex;
+        mat.roughnessMetallicTextureIndex = packedMat.roughnessMetallicTextureIndex;
     } else{
         mat.color = vec3(0.8);
         mat.alpha = 1.0;
@@ -76,6 +78,7 @@ void main()
         mat.metalliness = 0.0;
         mat.colorTextureIndex = -1;
         mat.normalTextureIndex = -1;
+        mat.roughnessMetallicTextureIndex = -1;
     }
 
     float epsilon = 0.0001;
@@ -85,13 +88,24 @@ void main()
 
     vec3 surfaceNormal = fragNormalWorld;
     if (mat.normalTextureIndex >= 0) {
-        const vec3 bitangent = cross(fragNormalWorld, fragTangentWorld.xyz) * fragTangentWorld.w;
+        const vec3 bitangent = normalize(cross(fragNormalWorld, fragTangentWorld.xyz) * fragTangentWorld.w);
         const mat3 TBN = mat3(fragTangentWorld, bitangent, fragNormalWorld);
-        surfaceNormal = normalize((texture(texSampler[mat.normalTextureIndex], fragTexCoord).xyz * 2.0 - vec3(1.0)) * TBN);
+        surfaceNormal = normalize(TBN * (texture(texSampler[mat.normalTextureIndex], fragTexCoord).xyz * 2.0 - vec3(1.0)));
+        surfaceNormal = surfaceNormal.yzx; // Dont ask me why. It just has to be this way
+    }
+
+    float roughness = mat.roughness;
+    float metalliness = mat.metalliness;
+    if (mat.roughnessMetallicTextureIndex >= 0) {
+        const vec2 roughnessMetallic = texture(texSampler[mat.roughnessMetallicTextureIndex], fragTexCoord).yz;
+        roughness = roughnessMetallic.x;
+        metalliness = roughnessMetallic.y;
     }
 
     vec3 viewDirection = normalize(ubo.cameraPosition.xyz - fragPosWorld);
     vec3 color = vec3(0.0);
+    const vec3 specularColor = mix(vec3(0.03), rawColor, metalliness);
+    const vec3 diffuseColor = mix(rawColor, vec3(0.0), metalliness);
     for (int i = 0; i < ubo.numLights; i++){
         vec3 lightPos = ubo.lightPositions[i].xyz;
         vec4 lightColor = ubo.lightColors[i];
@@ -100,16 +114,10 @@ void main()
         float attenuation = 1.0 / dot(directionToLight, directionToLight);
         directionToLight = normalize(directionToLight);
 
-        const vec3 specularColor = vec3(0.03);
         vec3 colorFromThisLight = vec3(0.0);
-        if (mat.metalliness < 0.5){
-            colorFromThisLight += BRDF(surfaceNormal, viewDirection, directionToLight, specularColor, mat.roughness);
-            colorFromThisLight += multipleBounceBRDF(surfaceNormal, viewDirection, directionToLight, specularColor, mat.roughness);
-            colorFromThisLight += diffBRDF(surfaceNormal, viewDirection, directionToLight, specularColor, rawColor);
-        } else {
-            colorFromThisLight += BRDF(surfaceNormal, viewDirection, directionToLight, rawColor, mat.roughness);
-            colorFromThisLight += multipleBounceBRDF(surfaceNormal, viewDirection, directionToLight, rawColor, mat.roughness);
-        }
+        colorFromThisLight += BRDF(surfaceNormal, viewDirection, directionToLight, specularColor, roughness);
+        colorFromThisLight += multipleBounceBRDF(surfaceNormal, viewDirection, directionToLight, specularColor, roughness);
+        colorFromThisLight += diffBRDF(surfaceNormal, viewDirection, directionToLight, specularColor, diffuseColor);
         colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation;
         color += colorFromThisLight;
     }
@@ -117,5 +125,5 @@ void main()
     color += sRGBToAlbedo(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w) * rawColor;
     if (mat.emissiveStrength > 0.01) color += sRGBToAlbedo(mat.emissiveColor * mat.emissiveStrength);
 
-    FragColor = vec4(albedoToSRGB(color), 1.0);
+    FragColor = vec4(color, 1.0);
 }

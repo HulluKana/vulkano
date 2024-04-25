@@ -12,6 +12,7 @@ class transform3D{
         glm::vec3 rot{};
 
         glm::mat4 transformMat();
+        glm::mat3 normalMat();
 
         std::string posToStr() const {return std::to_string(pos.x) + " " + std::to_string(pos.y) + " " + std::to_string(pos.z);}
         std::string scaleToStr() const {return std::to_string(scale.x) + " " + std::to_string(scale.y) + " " + std::to_string(scale.z);}

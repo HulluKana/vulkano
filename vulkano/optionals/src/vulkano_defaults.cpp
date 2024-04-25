@@ -301,9 +301,11 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
             vulkano.renderDatas[inputData.mainRenderDataIdx].drawDatas.push_back(drawData);
         }
         else {
+            /*
             drawData.pPushData = std::make_shared<OitPushConstant>();
             drawData.pushDataSize = sizeof(OitPushConstant);
             vulkano.renderDatas[inputData.oitColoringRenderDataIdx].drawDatas.push_back(drawData);
+            */
         }
     }
 
@@ -382,18 +384,20 @@ size_t defaults::updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataI
         if (material.colorFactor.a >= 0.999f) {
             DefaultPushConstant *pushData = static_cast<DefaultPushConstant *>(vulkano.renderDatas[inputDataRender.mainRenderDataIdx].drawDatas[mainIdx].pPushData.get());
             pushData->modelMatrix = node.worldMatrix;
-            pushData->normalMatrix = glm::mat4(1.0f);
+            pushData->normalMatrix = node.normalMatrix;
             pushData->matIdx = mesh.materialIndex;
             mainIdx++;
         } else {
+            /*
             OitPushConstant *pushData = static_cast<OitPushConstant *>(vulkano.renderDatas[inputDataRender.oitColoringRenderDataIdx].drawDatas[oitIdx].pPushData.get());
             pushData->modelMatrix = node.worldMatrix;
-            pushData->normalMatrix = glm::mat4(1.0f);
+            pushData->normalMatrix = node.normalMatrix;
             pushData->matIdx = mesh.materialIndex;
             pushData->depthImageIdx = vulkano.vulRenderer.getImageIndex();
             pushData->width = static_cast<float>(vulkano.getSwapChainExtent().width);
             pushData->height = static_cast<float>(vulkano.getSwapChainExtent().height);
             oitIdx++;
+            */
         }
     }
 

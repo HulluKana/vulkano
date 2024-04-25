@@ -47,4 +47,33 @@ glm::mat4 transform3D::transformMat()
     };
 }
 
+glm::mat3 transform3D::normalMat()
+{
+    const float c3 = glm::cos(rot.z);
+    const float s3 = glm::sin(rot.z);
+    const float c2 = glm::cos(rot.y);
+    const float s2 = glm::sin(rot.y);
+    const float c1 = glm::cos(rot.x);
+    const float s1 = glm::sin(rot.x);
+    const glm::vec3 invScale = 1.0f / scale;
+
+    return glm::mat3{
+        {
+            invScale.x * (c2 * c3),
+            invScale.x * (-c2 * s3),
+            invScale.x * s2,
+        },
+        {
+            invScale.y * (c1 * s3 + c3 * s1 * s2),
+            invScale.y * (c1 * c3 - s1 * s2 * s3),
+            invScale.y * (-c2 * s1),
+        },
+        {
+            invScale.z * (s1 * s3 - c1 * c3 * s2),
+            invScale.z * (c3 * s1 + c1 * s2 * s3),
+            invScale.z * (c1 * c2),
+        },
+    };
+}
+
 };
