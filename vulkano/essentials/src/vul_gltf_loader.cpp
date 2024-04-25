@@ -4,6 +4,7 @@
 #include <glm/ext/quaternion_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
 #include <limits>
+#include <map>
 #include <memory>
 #include <set>
 #include <functional>
@@ -15,6 +16,7 @@
 
 #include<vul_gltf_loader.hpp>
 #include<vul_transform.hpp>
+#include <vulkan/vulkan_core.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define TINYGLTF_IMPLEMENTATION
@@ -63,25 +65,39 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
 
 void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
 {
-    std::function<std::shared_ptr<VulImage>(int)> importTexture = [&](int srcIdx)
+    std::set<int> colorTextures;
+    std::set<int> normalMaps;
+    std::set<int> roughnessMetallicTextures;
+    for (const tinygltf::Material &mat : model.materials) {
+        colorTextures.insert(mat.pbrMetallicRoughness.baseColorTexture.index);
+        normalMaps.insert(mat.normalTexture.index);
+        roughnessMetallicTextures.insert(mat.pbrMetallicRoughness.metallicRoughnessTexture.index);
+    }
+
+    std::function<std::shared_ptr<VulImage>(int)> importTexture = [&](int i)
     {
-        const tinygltf::Image &image = model.images[srcIdx];
+        VulImage::CompressedFromat fromat{};
+        if (colorTextures.count(i) > 0) fromat = VulImage::CompressedFromat::bc7Srgb;
+        else if (normalMaps.count(i) > 0) fromat = VulImage::CompressedFromat::bc7Unorm;
+        else if (roughnessMetallicTextures.count(i) > 0) fromat = VulImage::CompressedFromat::bc7Unorm;
+
+        const tinygltf::Image &image = model.images[model.textures[i].source];
         std::shared_ptr<VulImage> vulImage = std::make_shared<VulImage>(device);
-        vulImage->loadKtxFile("../Models/" + image.uri, image.uri[image.uri.length() - 1] == 'l');
+        vulImage->loadCompressedFromKtxFile("../Models/" + image.uri, fromat);
         vulImage->name = image.name;
         return vulImage;
     };
 
     std::vector<std::future<std::shared_ptr<VulImage>>> results(model.textures.size());
-    for (size_t i = 0; i < model.textures.size(); i++) {
-        results[i] = std::async(std::launch::async, importTexture, model.textures[i].source);
+    for (int i = 0; i < static_cast<int>(model.textures.size()); i++) {
+        results[i] = std::async(std::launch::async, importTexture, i);
     }
 
     images.reserve(model.textures.size());
     VkCommandBuffer cmdBuf = device.beginSingleTimeCommands();
     for (size_t i = 0; i < results.size(); i++) {
         images.push_back(results[i].get());
-        images[i]->createImage(true, true, VulImage::ImageType::texture, 2, cmdBuf);
+        images[i]->createImageLowLevel(true, images[i]->getFormat(), VK_IMAGE_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, cmdBuf);
     }
     device.endSingleTimeCommands(cmdBuf);
 

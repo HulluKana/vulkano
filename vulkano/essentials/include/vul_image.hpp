@@ -13,10 +13,14 @@ class VulImage
         VulImage(vulB::VulDevice &vulDevice);
         ~VulImage();
 
-        void loadFile(const std::string &fileName);
-        void loadKtxFile(const std::string &fileName, bool unorm);
-        void loadData(const void *data, uint32_t width, uint32_t height, uint32_t channels);
-        void keepEmpty(uint32_t width, uint32_t height, uint32_t channels);
+        void loadUncompressedFromFile(const std::string &fileName);
+        enum class CompressedFromat {
+            bc7Srgb,
+            bc7Unorm
+        };
+        void loadCompressedFromKtxFile(const std::string &fileName, CompressedFromat format);
+        void loadData(const void *data, uint32_t width, uint32_t height, uint32_t channels, uint32_t bytesPerPixel);
+        void keepEmpty(uint32_t width, uint32_t height, uint32_t channels, uint32_t bytesPerPixel);
 
         enum class ImageType {
             texture,
@@ -25,6 +29,7 @@ class VulImage
         };
         void createImageSingleTime(bool createSampler, bool isDeviceLocal, ImageType type, int dimensions);
         void createImage(bool createSampler, bool isDeviceLocal, ImageType type, int dimensions, VkCommandBuffer cmdBuf);
+        void createImageLowLevel(bool createSampler, VkFormat format, VkImageType type, VkImageLayout layout, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkCommandBuffer cmdBuf);
         void addSampler(VkSampler sampler);
         void modifyImage(void *data);
 
@@ -62,6 +67,7 @@ class VulImage
         uint32_t m_width = 0;
         uint32_t m_height = 0;
         uint32_t m_channels = 0;
+        uint32_t m_bytesPerPixel = 0;
         uint32_t m_mipLevels = 1;
         ImageType m_type = ImageType::texture;
         bool m_isLocal = false;
@@ -73,6 +79,7 @@ class VulImage
 
         void *m_data = nullptr;
         const void *m_constData = nullptr;
+        size_t m_dataSize = 0;
         std::vector<std::unique_ptr<vulB::VulBuffer>> m_stagingBuffers;
         VkImageLayout m_layout;
         VkImage m_image;

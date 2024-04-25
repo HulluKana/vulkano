@@ -27,45 +27,56 @@ VulImage::~VulImage()
     vkFreeMemory(m_vulDevice.device(), m_imageMemory, nullptr);
 }
 
-void VulImage::loadFile(const std::string &fileName)
+void VulImage::loadUncompressedFromFile(const std::string &fileName)
 {
     m_data = stbi_load(fileName.c_str(), (int *)&m_width, (int *)&m_height, (int *)&m_channels, STBI_rgb_alpha);
     if (!m_data) throw std::runtime_error("failed to load image!");
+    m_dataSize = m_width * m_height * m_channels;
 }
 
-void VulImage::loadKtxFile(const std::string &fileName, bool unorm)
+void VulImage::loadCompressedFromKtxFile(const std::string &fileName, CompressedFromat format)
 {
-    m_format = VK_FORMAT_BC7_SRGB_BLOCK;
-    if (unorm) m_format = VK_FORMAT_BC7_UNORM_BLOCK;
+    ktx_transcode_fmt_e ktxFormat{};
+    switch (format) {
+        case CompressedFromat::bc7Srgb: 
+            ktxFormat = KTX_TTF_BC7_RGBA;
+            m_format = VK_FORMAT_BC7_SRGB_BLOCK;
+            break;
+        case CompressedFromat::bc7Unorm: 
+            ktxFormat = KTX_TTF_BC7_RGBA;
+            m_format = VK_FORMAT_BC7_UNORM_BLOCK;
+            break;
+    }
 
     ktxTexture2 *ktxTexture;
     KTX_error_code result = ktxTexture2_CreateFromNamedFile(fileName.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture); 
     if (result != KTX_SUCCESS) throw std::runtime_error("Failed to create ktxTexture: " + std::to_string(result));
 
-    result = ktxTexture2_TranscodeBasis(ktxTexture, KTX_TTF_BC7_RGBA, 0);
+    result = ktxTexture2_TranscodeBasis(ktxTexture, ktxFormat, 0);
     if (result != KTX_SUCCESS)
-        throw std::runtime_error("Failed to transcode ktxTexture to format " + std::to_string(KTX_TTF_BC7_RGBA) + ": " + std::to_string(result));
+        throw std::runtime_error("Failed to transcode ktxTexture to format " + std::to_string(ktxFormat) + ": " + std::to_string(result));
 
     m_data = malloc(ktxTexture->dataSize);
     memcpy(m_data, ktxTexture->pData, ktxTexture->dataSize);
 
-    keepEmpty(ktxTexture->baseWidth, ktxTexture->baseHeight, 4);
+    keepEmpty(ktxTexture->baseWidth, ktxTexture->baseHeight, 4, 1);
     m_mipLevels = ktxTexture->numLevels;
     free(ktxTexture);
 }
 
-void VulImage::loadData(const void *data, uint32_t width, uint32_t height, uint32_t channels)
+void VulImage::loadData(const void *data, uint32_t width, uint32_t height, uint32_t channels, uint32_t bytesPerPixel)
 {
     m_constData = data;
-    keepEmpty(width, height, channels);
+    keepEmpty(width, height, channels, bytesPerPixel);
 }
 
-void VulImage::keepEmpty(uint32_t width, uint32_t height, uint32_t channels)
+void VulImage::keepEmpty(uint32_t width, uint32_t height, uint32_t channels, uint32_t bytesPerPixel)
 {
     if (channels != 1 && channels != 2 && channels != 4) throw std::runtime_error("The amount of channels in an image must be 1, 2 or 4, but it is " + std::to_string(channels));
     m_width = width;
     m_height = height;
     m_channels = channels;
+    m_bytesPerPixel = bytesPerPixel;
 }
 
 void VulImage::createImageSingleTime(bool createSampler, bool isDeviceLocal, ImageType type, int dimensions)
@@ -78,18 +89,15 @@ void VulImage::createImageSingleTime(bool createSampler, bool isDeviceLocal, Ima
 
 void VulImage::createImage(bool createSampler, bool isDeviceLocal, ImageType type, int dimensions, VkCommandBuffer cmdBuf)
 {
-    if (dimensions < 1 || dimensions > 3) throw std::runtime_error("Vul image must have between 1 and 3 dimensions");
+    if (dimensions < 1 || dimensions > 2) throw std::runtime_error("Vul image must have between 1 and 2 dimensions");
     if (createSampler && type != ImageType::texture) throw std::runtime_error("Cannot create a sampler for a storage image");
+    if (m_format != VK_FORMAT_UNDEFINED) throw std::runtime_error("Get fucked lol");
     m_isLocal = isDeviceLocal;
     m_type = type;
 
-    const void *data = nullptr;
-    if (m_constData != nullptr) data = m_constData;
-    else if (m_data != nullptr) data = m_data;
-
-    VkDeviceSize imageSize = m_width * m_height * m_channels;
+    m_dataSize = m_width * m_height * m_channels;
     if (m_format == VK_FORMAT_UNDEFINED) {
-        if (type != ImageType::texture) imageSize *= sizeof(float);
+        if (type != ImageType::texture) m_dataSize *= sizeof(float);
 
         if (type == ImageType::storageFloat){
             if (m_channels == 1) m_format = VK_FORMAT_R32_SFLOAT;
@@ -105,7 +113,6 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, ImageType typ
             else if (m_channels == 4) m_format = VK_FORMAT_R8G8B8A8_SRGB;
         }
     }
-    else imageSize /= 4;
 
     VkImageUsageFlags usage = 0;
     if (type == ImageType::texture) usage |= VK_IMAGE_USAGE_SAMPLED_BIT;
@@ -123,29 +130,38 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, ImageType typ
     if (type == ImageType::texture) m_layout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
     VkImageType imageType = VK_IMAGE_TYPE_2D;
-    VkImageViewType imageViewType = VK_IMAGE_VIEW_TYPE_2D;
-    if (dimensions == 1){
-        imageType = VK_IMAGE_TYPE_1D;
-        imageViewType = VK_IMAGE_VIEW_TYPE_1D;
-    }
-    if (dimensions == 3){
-        imageType = VK_IMAGE_TYPE_3D;
-        imageViewType = VK_IMAGE_VIEW_TYPE_3D;
-    }
+    if (dimensions == 1) imageType = VK_IMAGE_TYPE_1D;
 
-    createVkImage(m_format, tiling, usage, memoryProperties, imageType);
+    createImageLowLevel(createSampler, m_format, imageType, m_layout, usage, memoryProperties, tiling, cmdBuf);
+}
+
+void VulImage::createImageLowLevel(bool createSampler, VkFormat format, VkImageType type, VkImageLayout layout, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkCommandBuffer cmdBuf)
+{
+    m_format = format;
+    m_layout = layout;
+    bool isDeviceLocal = memoryProperties & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+    VkImageViewType imageViewType{};
+    if (type == VK_IMAGE_TYPE_1D) imageViewType = VK_IMAGE_VIEW_TYPE_1D;
+    else if (type == VK_IMAGE_TYPE_2D) imageViewType = VK_IMAGE_VIEW_TYPE_2D;
+
+    const void *data = nullptr;
+    if (m_constData != nullptr) data = m_constData;
+    else if (m_data != nullptr) data = m_data;
+
+    createVkImage(m_format, tiling, usage, memoryProperties, type);
     if (data != nullptr && isDeviceLocal){
         transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
-        uint32_t size = 16;
-        uint32_t usedSize = 32;
-        m_stagingBuffers.push_back(std::make_unique<vulB::VulBuffer>(m_vulDevice));
-        m_stagingBuffers.push_back(std::make_unique<vulB::VulBuffer>(m_vulDevice));
-        for (uint32_t i = 2; i < m_mipLevels; i++) {
+        uint32_t width = m_width / static_cast<uint32_t>(pow(2, m_mipLevels - 1));
+        uint32_t height = m_height / static_cast<uint32_t>(pow(2, m_mipLevels - 1));
+        uint32_t size = width * height * m_bytesPerPixel;
+        uint32_t usedSize = 0;
+        for (uint32_t i = 0; i < m_mipLevels; i++) {
             m_stagingBuffers.push_back(std::make_unique<vulB::VulBuffer>(m_vulDevice));
-            m_stagingBuffers[i]->loadData(reinterpret_cast<void *>(reinterpret_cast<size_t>(data) + usedSize), 1, size);
+            m_stagingBuffers[i]->loadData(reinterpret_cast<void *>(reinterpret_cast<size_t>(data) + usedSize), 1, std::max(size, 16u));
             m_stagingBuffers[i]->createBuffer(false, vulB::VulBuffer::usage_transferSrc);;
             copyBufferToImage(m_stagingBuffers[i]->getBuffer(), m_mipLevels - i - 1, cmdBuf);
-            usedSize += size;
+            usedSize += std::max(size, 16u);
             size *= 4;
         }
         transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_layout, cmdBuf);
@@ -153,10 +169,10 @@ void VulImage::createImage(bool createSampler, bool isDeviceLocal, ImageType typ
     else if (data != nullptr && !isDeviceLocal){
         transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL, cmdBuf);
 
-        vkMapMemory(m_vulDevice.device(), m_imageMemory, 0, imageSize, 0, &m_mappedMemory);
-        memcpy(m_mappedMemory, data, (size_t)imageSize);
+        vkMapMemory(m_vulDevice.device(), m_imageMemory, 0, m_dataSize, 0, &m_mappedMemory);
+        memcpy(m_mappedMemory, data, m_dataSize);
 
-        if (type != ImageType::texture) transitionImageLayout(VK_IMAGE_LAYOUT_GENERAL, m_layout, cmdBuf);
+        if (m_layout != VK_IMAGE_LAYOUT_GENERAL) transitionImageLayout(VK_IMAGE_LAYOUT_GENERAL, m_layout, cmdBuf);
     }
     else transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, m_layout, cmdBuf);
     

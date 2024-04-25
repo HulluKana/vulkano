@@ -118,11 +118,11 @@ defaults::Default3dInputData defaults::createDefault3dInputData(Vulkano &vulkano
 
     Default3dInputData output{};
     output.multipleBounce2dImage = std::make_shared<VulImage>(vulkano.getVulDevice());
-    output.multipleBounce2dImage->loadData(&results[0][0], LIGHT_DIR_COUNT, ROUGHNESS_COUNT, 1);
+    output.multipleBounce2dImage->loadData(&results[0][0], LIGHT_DIR_COUNT, ROUGHNESS_COUNT, 1, 1);
     output.multipleBounce2dImage->createImageSingleTime(true, true, VulImage::ImageType::texture, 2);
 
     output.multipleBounce1dImage = std::make_shared<VulImage>(vulkano.getVulDevice());
-    output.multipleBounce1dImage->loadData(&otherResults[0], ROUGHNESS_COUNT, 1, 1);
+    output.multipleBounce1dImage->loadData(&otherResults[0], ROUGHNESS_COUNT, 1, 1, 1);
     output.multipleBounce1dImage->createImageSingleTime(true, true, VulImage::ImageType::texture, 1);
 
     output.aBuffer = std::make_shared<VulBuffer>(vulkano.getVulDevice());
@@ -130,7 +130,7 @@ defaults::Default3dInputData defaults::createDefault3dInputData(Vulkano &vulkano
     output.aBuffer->createBuffer(true, VulBuffer::usage_ssbo);
 
     output.aBufferHeads = std::make_shared<VulImage>(vulkano.getVulDevice());
-    output.aBufferHeads->keepEmpty(2560, 1440, 1);
+    output.aBufferHeads->keepEmpty(2560, 1440, 1, 4);
     output.aBufferHeads->createImageSingleTime(false, true, VulImage::ImageType::storageUint, 2);
     
     output.aBufferCounter = std::make_shared<VulBuffer>(vulkano.getVulDevice());
