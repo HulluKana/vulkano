@@ -10,6 +10,12 @@ vec3 albedoToSRGB(vec3 albedo)
     return vec3(pow(prePow.x, 0.41667), pow(prePow.y, 0.41667), pow(prePow.z, 0.41167)) - vec3(0.055);
 }
 
+float albedoToSRGB(float albedo)
+{
+    const float prePow = albedo * 1.055;
+    return pow(prePow, 0.41667) - 0.055;
+}
+
 float lambda(vec3 someVector, vec3 surfaceNormal, float roughness)
 {
     const float dotP = dot(surfaceNormal, someVector);

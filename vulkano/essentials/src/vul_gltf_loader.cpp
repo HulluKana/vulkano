@@ -34,15 +34,19 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
     for (const tinygltf::Material &tmat : model.materials){
         Material omat{};
         omat.name = tmat.name;
+        if (tmat.alphaMode == "OPAQUE" || tmat.alphaMode.length() == 0) omat.alphaMode = GltfAlphaMode::opaque;
+        else if (tmat.alphaMode == "MASK") omat.alphaMode = GltfAlphaMode::mask;
+        else if (tmat.alphaMode == "BLEND") omat.alphaMode = GltfAlphaMode::blend;
+        else throw std::runtime_error("Unsupported alpha mode while importing materials. Alpha mode: " + tmat.alphaMode);
         
         omat.emissiveFactor = (tmat.emissiveFactor.size() == 3) ? glm::vec3(tmat.emissiveFactor[0], tmat.emissiveFactor[1], tmat.emissiveFactor[2]) : glm::vec3(0.0f);
         
         tinygltf::PbrMetallicRoughness pbr = tmat.pbrMetallicRoughness;
         omat.colorFactor = glm::vec4(pbr.baseColorFactor[0], pbr.baseColorFactor[1], pbr.baseColorFactor[2], pbr.baseColorFactor[3]);
-        omat.colorTextureIndex = pbr.baseColorTexture.index;
         omat.roughness = pbr.roughnessFactor;
         omat.metalliness = pbr.metallicFactor;
         omat.roughnessMetallinessTextureIndex = pbr.metallicRoughnessTexture.index;
+        omat.colorTextureIndex = pbr.baseColorTexture.index;
         omat.normalTextureIndex = tmat.normalTexture.index;
 
         if (tmat.extensions.find("KHR_materials_ior") != tmat.extensions.end()){
@@ -154,7 +158,7 @@ void GltfLoader::importDrawableNodes(const tinygltf::Model &model, GltfAttribute
         quat.y = 0.0f;
         quat.z = 0.0f;
         quat.w = 1.0f;
-        processNode(model, nodeIdx, {0.0f, 0.0f, 0.0f}, quat);
+        processNode(model, nodeIdx, {0.0f, 0.0f, 0.0f}, quat, {1.0f, 1.0f, 1.0f});
     }
 
     m_meshToPrimMesh.clear();
@@ -248,8 +252,10 @@ void GltfLoader::processMesh(const tinygltf::Model &model, const tinygltf::Primi
             if (!normalCreated) throw std::runtime_error("The mesh doesnt have normals");
         }
         if (gltfAttribAnd(requestedAttributes, GltfAttributes::Tangent) == GltfAttributes::Tangent) {
-            if (!getAttribute<glm::vec4>(model, mesh, tangents, "TANGENT"))
-                throw std::runtime_error("The mesh doesnt have tangents");
+            if (!getAttribute<glm::vec4>(model, mesh, tangents, "TANGENT")) {
+                std::cout << "The mesh doesnt have tangents\n";
+                createTangents(resultMesh.vertexCount);
+            }
         }
         if (gltfAttribAnd(requestedAttributes, GltfAttributes::TexCoord) == GltfAttributes::TexCoord){
             bool texCoordCreated = getAttribute<glm::vec2>(model, mesh, uvCoords, "TEXCOORD_0");
@@ -267,12 +273,13 @@ void GltfLoader::processMesh(const tinygltf::Model &model, const tinygltf::Primi
     primMeshes.emplace_back(resultMesh);
 }
 
-void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const glm::vec3 &parentPos, const glm::quat &parentRot)
+void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const glm::vec3 &parentPos, const glm::quat &parentRot, const glm::vec3 &parentScale)
 {
     const tinygltf::Node &node = model.nodes[nodeIdx];
 
     transform3D transform{};
     transform.pos = parentPos;
+    transform.scale = parentScale;
     glm::quat rotationQuaternion = parentRot;
 
     if (!node.translation.empty())
@@ -287,7 +294,7 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
     }
     transform.rot = -glm::eulerAngles(rotationQuaternion); // Don't even ask about the minus sign
     if (!node.scale.empty())
-        transform.scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]); 
+        transform.scale *= glm::vec3(node.scale[0], node.scale[1], node.scale[2]); 
     if (!node.matrix.empty()) throw std::runtime_error("The node has some sort of matrix. Handle it");
 
     if (node.mesh > -1){
@@ -314,7 +321,15 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
     }
 
     for (int child : node.children){
-        processNode(model, child, transform.pos, rotationQuaternion);
+        processNode(model, child, transform.pos, rotationQuaternion, transform.scale);
+    }
+}
+
+void GltfLoader::createTangents(size_t amount)
+{
+    tangents.reserve(amount);
+    for (size_t i = 0; i < amount; i++) {
+        tangents.push_back({});     
     }
 }
 

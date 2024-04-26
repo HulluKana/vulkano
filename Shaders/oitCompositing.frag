@@ -38,11 +38,27 @@ void main()
         fragCount++;
     }
 
+    bool keepSorting = true;
+    while (keepSorting) {
+        keepSorting = false;
+        for (uint i = 0; i < fragCount - 1; i++) {
+            if (frags[i].depth < frags[i + 1].depth) {
+                UnpackedABuffer temp = frags[i + 1];
+                frags[i + 1] = frags[i];
+                frags[i] = temp;
+                keepSorting = true;
+            }
+        }
+    }
+
     vec3 color = frags[0].color;
     float alphaInverted = 1.0 - frags[0].alpha;
     for (uint i = 1; i < fragCount; i++) {
-        color *= frags[i].color;
+        // color *= frags[i].color;
+        color = color * (1.0 - frags[i].alpha) + frags[i].color * frags[i].alpha;
         alphaInverted *= 1.0 - frags[i].alpha;
     }
     FragColor = vec4(color, 1.0 - alphaInverted);
+
+    imageStore(aBufferHeads, ivec2(gl_FragCoord.xy), uvec4(0));
 }

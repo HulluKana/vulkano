@@ -86,12 +86,11 @@ void main()
     if (mat.colorTextureIndex >= 0) rawColor = texture(texSampler[mat.colorTextureIndex], fragTexCoord).xyz;
     else rawColor = sRGBToAlbedo(mat.color);
 
-    vec3 surfaceNormal = fragNormalWorld;
+    vec3 surfaceNormal = normalize(fragNormalWorld);
     if (mat.normalTextureIndex >= 0) {
-        const vec3 bitangent = normalize(cross(fragNormalWorld, fragTangentWorld.xyz) * fragTangentWorld.w);
-        const mat3 TBN = mat3(fragTangentWorld, bitangent, fragNormalWorld);
-        surfaceNormal = normalize(TBN * (texture(texSampler[mat.normalTextureIndex], fragTexCoord).xyz * 2.0 - vec3(1.0)));
-        surfaceNormal = surfaceNormal.yzx; // Dont ask me why. It just has to be this way
+        const vec3 bitangent = normalize(cross(surfaceNormal, normalize(fragTangentWorld.xyz)) * fragTangentWorld.w);
+        const mat3 TBN = mat3(normalize(fragTangentWorld.xyz), bitangent, surfaceNormal);
+        surfaceNormal = normalize(TBN * normalize(texture(texSampler[mat.normalTextureIndex], fragTexCoord).xyz * 2.0 - vec3(1.0)));
     }
 
     float roughness = mat.roughness;
@@ -125,5 +124,5 @@ void main()
     color += sRGBToAlbedo(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w) * rawColor;
     if (mat.emissiveStrength > 0.01) color += sRGBToAlbedo(mat.emissiveColor * mat.emissiveStrength);
 
-    FragColor = vec4(color, 1.0);
+    FragColor = vec4(albedoToSRGB(color), 1.0);
 }

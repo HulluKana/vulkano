@@ -165,8 +165,8 @@ defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano 
     returnValue.mainRenderDataIdx = vulkano.renderDatas.size();
     returnValue.oitColoringRenderDataIdx = returnValue.mainRenderDataIdx + 1;
     returnValue.oitCompositingRenderDataIdx = returnValue.oitColoringRenderDataIdx + 1;
-    returnValue.oitReflectionRenderDataIdx = returnValue.oitCompositingRenderDataIdx + 1;
-    vulkano.renderDatas.push_back({});
+    // returnValue.oitReflectionRenderDataIdx = returnValue.oitCompositingRenderDataIdx + 1;
+    // vulkano.renderDatas.push_back({});
     vulkano.renderDatas.push_back({});
     vulkano.renderDatas.push_back({});
     vulkano.renderDatas.push_back({});
@@ -251,7 +251,7 @@ defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano 
         if (!retVal.succeeded) throw std::runtime_error("Failed to create default OIT descriptor sets");
         vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i].push_back(std::move(retVal.set));
         vulkano.renderDatas[returnValue.oitCompositingRenderDataIdx].descriptorSets[i].push_back(vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i][1]);
-        vulkano.renderDatas[returnValue.oitReflectionRenderDataIdx].descriptorSets[i].push_back(vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i][1]);
+        // vulkano.renderDatas[returnValue.oitReflectionRenderDataIdx].descriptorSets[i].push_back(vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i][1]);
     }
 
     return returnValue;
@@ -295,17 +295,15 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
         drawData.firstIndex = mesh.firstIndex;
         drawData.indexCount = mesh.indexCount;
         drawData.vertexOffset = mesh.vertexOffset;
-        if (material.colorFactor.a >= 0.999f) {
+        if (material.alphaMode != GltfLoader::GltfAlphaMode::blend) {
             drawData.pPushData = std::make_shared<DefaultPushConstant>();
             drawData.pushDataSize = sizeof(DefaultPushConstant);
             vulkano.renderDatas[inputData.mainRenderDataIdx].drawDatas.push_back(drawData);
         }
         else {
-            /*
             drawData.pPushData = std::make_shared<OitPushConstant>();
             drawData.pushDataSize = sizeof(OitPushConstant);
             vulkano.renderDatas[inputData.oitColoringRenderDataIdx].drawDatas.push_back(drawData);
-            */
         }
     }
 
@@ -322,9 +320,11 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     oitCompositingConfig.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
     oitCompositingConfig.cullMode = VK_CULL_MODE_NONE;
     oitCompositingConfig.enableColorBlending = true;
-    oitCompositingConfig.blendOp = VK_BLEND_OP_MULTIPLY_EXT;
+    oitCompositingConfig.blendOp = VK_BLEND_OP_ADD;
+    // oitCompositingConfig.blendOp = VK_BLEND_OP_MULTIPLY_EXT;
     oitCompositingConfig.blendSrcFactor = VK_BLEND_FACTOR_SRC_ALPHA;
-    oitCompositingConfig.blendDstFactor = VK_BLEND_FACTOR_ONE;
+    oitCompositingConfig.blendDstFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+    // oitCompositingConfig.blendDstFactor = VK_BLEND_FACTOR_ONE;
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].pipeline =
         std::make_shared<VulPipeline>(vulkano.getVulDevice(), "default2D.vert.spv", "oitCompositing.frag.spv", oitCompositingConfig);
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].is3d = false;
@@ -332,6 +332,7 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].depthImageMode = VulRenderer::DepthImageMode::noDepthImage;
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].sampleFromDepth = false;
 
+    /*
     VulPipeline::PipelineConfigInfo oitReflectionConfig{};
     oitReflectionConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32_SFLOAT, 0}};
     oitReflectionConfig.bindingDescriptions = {{0, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
@@ -349,11 +350,12 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].swapChainImageMode = VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent;
     vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].depthImageMode = VulRenderer::DepthImageMode::noDepthImage;
     vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].sampleFromDepth = false;
+    */
 
     VUL_NAME_VK(vulkano.renderDatas[inputData.mainRenderDataIdx].pipeline->getPipeline())
     VUL_NAME_VK(vulkano.renderDatas[inputData.oitColoringRenderDataIdx].pipeline->getPipeline())
     VUL_NAME_VK(vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].pipeline->getPipeline())
-    VUL_NAME_VK(vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].pipeline->getPipeline())
+    //VUL_NAME_VK(vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].pipeline->getPipeline())
 }
 
 size_t defaults::updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataInputData inputDataRender, Default3dInputData inputData3d)
@@ -381,14 +383,13 @@ size_t defaults::updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataI
         const GltfLoader::GltfPrimMesh &mesh = scene.meshes[node.primMesh];
         const GltfLoader::Material &material = scene.materials[mesh.materialIndex];
 
-        if (material.colorFactor.a >= 0.999f) {
+        if (material.alphaMode != GltfLoader::GltfAlphaMode::blend) {
             DefaultPushConstant *pushData = static_cast<DefaultPushConstant *>(vulkano.renderDatas[inputDataRender.mainRenderDataIdx].drawDatas[mainIdx].pPushData.get());
             pushData->modelMatrix = node.worldMatrix;
             pushData->normalMatrix = node.normalMatrix;
             pushData->matIdx = mesh.materialIndex;
             mainIdx++;
         } else {
-            /*
             OitPushConstant *pushData = static_cast<OitPushConstant *>(vulkano.renderDatas[inputDataRender.oitColoringRenderDataIdx].drawDatas[oitIdx].pPushData.get());
             pushData->modelMatrix = node.worldMatrix;
             pushData->normalMatrix = node.normalMatrix;
@@ -397,7 +398,6 @@ size_t defaults::updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataI
             pushData->width = static_cast<float>(vulkano.getSwapChainExtent().width);
             pushData->height = static_cast<float>(vulkano.getSwapChainExtent().height);
             oitIdx++;
-            */
         }
     }
 

@@ -152,17 +152,21 @@ void VulImage::createImageLowLevel(bool createSampler, VkFormat format, VkImageT
     createVkImage(m_format, tiling, usage, memoryProperties, type);
     if (data != nullptr && isDeviceLocal){
         transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
-        uint32_t width = m_width / static_cast<uint32_t>(pow(2, m_mipLevels - 1));
-        uint32_t height = m_height / static_cast<uint32_t>(pow(2, m_mipLevels - 1));
-        uint32_t size = width * height * m_bytesPerPixel;
         uint32_t usedSize = 0;
         for (uint32_t i = 0; i < m_mipLevels; i++) {
+            uint32_t width = m_width / static_cast<uint32_t>(pow(2, m_mipLevels - i - 1));
+            uint32_t height = m_height / static_cast<uint32_t>(pow(2, m_mipLevels - i - 1));
+            bool skipThisOne = width == 0 || height == 0;
+            width = (std::max(width, 1u) + 3) & ~3;
+            height = (std::max(height, 1u) + 3) & ~3;
+            uint32_t size = width * height * m_bytesPerPixel;
+            usedSize += size;
             m_stagingBuffers.push_back(std::make_unique<vulB::VulBuffer>(m_vulDevice));
-            m_stagingBuffers[i]->loadData(reinterpret_cast<void *>(reinterpret_cast<size_t>(data) + usedSize), 1, std::max(size, 16u));
-            m_stagingBuffers[i]->createBuffer(false, vulB::VulBuffer::usage_transferSrc);;
+            if (skipThisOne) continue;
+
+            m_stagingBuffers[i]->loadData(reinterpret_cast<void *>(reinterpret_cast<size_t>(data) + usedSize - size), 1, size);
+            m_stagingBuffers[i]->createBuffer(false, vulB::VulBuffer::usage_transferSrc);
             copyBufferToImage(m_stagingBuffers[i]->getBuffer(), m_mipLevels - i - 1, cmdBuf);
-            usedSize += std::max(size, 16u);
-            size *= 4;
         }
         transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, m_layout, cmdBuf);
     }

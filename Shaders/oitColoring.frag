@@ -50,9 +50,18 @@ void main()
 
     float epsilon = 0.0001;
     vec3 rawColor;
-    if (mat.colorTextureIndex >= 0) rawColor = texture(texSampler[mat.colorTextureIndex], fragTexCoord).xyz;
-    else rawColor = sRGBToAlbedo(mat.color);
+    float alpha;
+    if (mat.colorTextureIndex >= 0) {
+        const vec4 colorFactor = texture(texSampler[mat.colorTextureIndex], fragTexCoord);
+        rawColor = colorFactor.xyz;
+        alpha = albedoToSRGB(colorFactor.w);
+    }
+    else {
+        rawColor = sRGBToAlbedo(mat.color);
+        alpha = mat.alpha;
+    }
 
+    /*
     vec3 surfaceNormal = normalize(fragNormalWorld);
     vec3 viewDirection = normalize(ubo.cameraPosition.xyz - fragPosWorld);
     if (dot(surfaceNormal, viewDirection) < 0.0) surfaceNormal = -surfaceNormal;
@@ -72,12 +81,13 @@ void main()
     }
 
     color += sRGBToAlbedo(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w) * specularColor;
+    */
 
     const uint newOffset = atomicAdd(aBufferCounter, 1) + 1;
     const uint oldOffset = imageAtomicExchange(aBufferHeads, ivec2(gl_FragCoord.xy), newOffset);
     ABuffer storeValue;
-    storeValue.color = packUnorm4x8(vec4(albedoToSRGB(rawColor), mat.alpha));
-    storeValue.reflectionColor = packUnorm4x8(vec4(albedoToSRGB(color), mat.alpha));
+    storeValue.color = packUnorm4x8(vec4(albedoToSRGB(rawColor), alpha));
+    // storeValue.reflectionColor = packUnorm4x8(vec4(albedoToSRGB(color), alpha));
     storeValue.depth = gl_FragCoord.z;
     storeValue.next = oldOffset;
     aBuffer[newOffset] = storeValue;

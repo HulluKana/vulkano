@@ -39,20 +39,28 @@ class GltfLoader
         {
             return static_cast<GltfAttributes>(static_cast<uint8_t>(lhs) & static_cast<uint8_t>(rhs));
         }
+
+        enum class GltfAlphaMode {
+            opaque,
+            mask,
+            blend
+        };
         struct Material{
             glm::vec4 colorFactor = glm::vec4(1.0f);
-            int colorTextureIndex = -1;
+            glm::vec3 emissiveFactor = glm::vec3(0.0f);
             float roughness = 1.0f;
             float metalliness = 0.0f;
+
+            int colorTextureIndex = -1;
             int roughnessMetallinessTextureIndex = -1;
             int normalTextureIndex = -1;
-            glm::vec3 emissiveFactor = glm::vec3(0.0f);
+
+            std::string name;
+            GltfAlphaMode alphaMode;
 
             // Stuff added by extensions
             float emissionStrength = 0.0f;
             float ior = 1.5f;
-
-            std::string name;
         };
         struct GltfPrimMesh{
             uint32_t firstIndex = 0;
@@ -102,7 +110,9 @@ class GltfLoader
     private:
         void processMesh(   const tinygltf::Model &model, const tinygltf::Primitive &mesh, 
                             GltfAttributes requestedAttributes, const std::string &name);
-        void processNode(const tinygltf::Model &model, int nodeIdx, const glm::vec3 &parentPos, const glm::quat &parentRot);
+        void processNode(const tinygltf::Model &model, int nodeIdx, const glm::vec3 &parentPos, const glm::quat &parentRot, const glm::vec3 &parentScale);
+
+        void createTangents(size_t amount);
 
 
         float getFloat(const tinygltf::Value &value, const std::string &name);
