@@ -9,7 +9,6 @@
 #include<vul_movement_controller.hpp>
 #include<vul_image.hpp>
 #include<vul_settings.hpp>
-#include<vul_host_device.hpp>
 #include<vul_2d_object.hpp>
 #include<vul_swap_chain.hpp>
 #include<vul_transform.hpp>

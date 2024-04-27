@@ -3,7 +3,8 @@
 #extension GL_GOOGLE_include_directive : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
-#include"../vulkano/essentials/include/vul_host_device.hpp"
+#include"../include/host_device.hpp"
+#include"../../../essentials/include/vul_scene.hpp"
 #include"common.glsl"
 
 layout (location = 0) in vec3 fragPosWorld;

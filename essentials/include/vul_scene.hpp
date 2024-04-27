@@ -1,5 +1,7 @@
-#pragma once
+#ifndef VUL_SCENE
+#define VUL_SCENE
 
+#ifdef __cplusplus
 #include <cstdint>
 #include <memory>
 
@@ -12,6 +14,7 @@ namespace vul
 class Scene
 {
     public:
+
         Scene(vulB::VulDevice &vulDevice);
 
         void loadScene(std::string fileName);
@@ -28,8 +31,34 @@ class Scene
         std::unique_ptr<vulB::VulBuffer> uvBuffer;
         std::unique_ptr<vulB::VulBuffer> indexBuffer;
         std::unique_ptr<vulB::VulBuffer> materialBuffer;
+
+        using vec2 = glm::vec2;
+        using vec3 = glm::vec3;
+        using vec4 = glm::vec4;
+        using mat4 = glm::mat4;
+        using uint = uint32_t;
+        #endif
+
+        struct PackedMaterial{
+            vec4 colorFactor;
+            vec4 emissiveFactor;
+            float roughness;
+            float metalliness;
+            int colorTextureIndex;
+            int normalTextureIndex;
+            int roughnessMetallicTextureIndex;
+            int padding1;
+            int padding2;
+            int padding3;
+        };
+
+        #ifdef __cplusplus
+
     private:
         vulB::VulDevice &m_vulDevice; 
 };
 
 }
+
+#endif
+#endif

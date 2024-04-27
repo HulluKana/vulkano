@@ -2,7 +2,7 @@
 
 #extension GL_GOOGLE_include_directive : enable
 
-#include"../vulkano/essentials/include/vul_host_device.hpp"
+#include"../include/host_device.hpp"
 
 layout (location = 0) in vec2 fragPos;
 layout (location = 1) in vec2 fragTexCoord;
@@ -13,8 +13,8 @@ layout (set = 0, binding = 0) readonly buffer AlphaBuffer{ABuffer aBuffer[];};
 layout (set = 0, binding = 1, r32ui) uniform uimage2D aBufferHeads;
 
 struct UnpackedABuffer {
-    vec3 reflection;
-    vec3 multipliedColor;
+    vec3 color;
+    float alpha;
     float depth;
 };
 
@@ -30,8 +30,8 @@ void main()
         vec4 storedColorFactor = unpackUnorm4x8(stored.color);
         vec4 storedReflection = unpackUnorm4x8(stored.reflectionColor);
         UnpackedABuffer unpacked;
-        unpacked.reflection = storedReflection.xyz;
-        unpacked.multipliedColor = storedColorFactor.xyz * (1.0 - storedColorFactor.w);
+        unpacked.color = storedColorFactor.xyz;
+        unpacked.alpha = storedColorFactor.w;
         unpacked.depth = stored.depth;
         frags[fragCount] = unpacked;
         offset = stored.next;
@@ -51,11 +51,14 @@ void main()
         }
     }
 
-    vec3 color = frags[0].reflection;
+    vec3 color = frags[0].color;
+    float alphaInverted = 1.0 - frags[0].alpha;
     for (uint i = 1; i < fragCount; i++) {
-        color = frags[i].reflection + frags[i].multipliedColor * color;
+        // color *= frags[i].color;
+        color = color * (1.0 - frags[i].alpha) + frags[i].color * frags[i].alpha;
+        alphaInverted *= 1.0 - frags[i].alpha;
     }
-    FragColor = vec4(color, 1.0);
+    FragColor = vec4(color, 1.0 - alphaInverted);
 
     imageStore(aBufferHeads, ivec2(gl_FragCoord.xy), uvec4(0));
 }

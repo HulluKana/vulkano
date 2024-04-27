@@ -1,29 +1,26 @@
-#include "vul_attachment_image.hpp"
-#include "vul_buffer.hpp"
-#include "vul_descriptors.hpp"
-#include "vul_gltf_loader.hpp"
-#include "vul_host_device.hpp"
-#include "vul_image.hpp"
-#include "vul_pipeline.hpp"
-#include <vul_debug_tools.hpp>
-#include "vul_swap_chain.hpp"
-#include <vulkan/vulkan_core.h>
-#include<vulkano_defaults.hpp>
+#include<vulkano_program.hpp>
+#include<host_device.hpp>
+#include<vul_debug_tools.hpp>
 
-#include <cstdint>
-#include <cstring>
-#include <glm/common.hpp>
-#include <glm/ext/scalar_constants.hpp>
-#include <glm/gtc/constants.hpp>
-#include <memory>
-#include<stdexcept>
+#include<imgui.h>
 #include <iostream>
 
-using namespace vulB;
-namespace vul
-{
+struct Resources {
+    std::shared_ptr<vul::VulImage> multipleBounce2dImage = nullptr;
+    std::shared_ptr<vul::VulImage> multipleBounce1dImage = nullptr;
+    std::shared_ptr<vulB::VulBuffer> aBuffer = nullptr;
+    std::shared_ptr<vul::VulImage> aBufferHeads = nullptr;
+    std::shared_ptr<vulB::VulBuffer> aBufferCounter = nullptr;
+};
 
-defaults::Default3dInputData defaults::createDefault3dInputData(Vulkano &vulkano)
+struct RenderDataIndices {
+    size_t mainRenderDataIdx;
+    size_t oitColoringRenderDataIdx;
+    size_t oitCompositingRenderDataIdx;
+    // size_t oitReflectionRenderDataIdx;
+};
+
+Resources createReources(vul::Vulkano &vulkano)
 {
     constexpr int ROUGHNESS_COUNT = 32;
     constexpr int LIGHT_DIR_COUNT = 32;
@@ -116,26 +113,26 @@ defaults::Default3dInputData defaults::createDefault3dInputData(Vulkano &vulkano
         otherResults[i] = 2 * result / ROUGHNESS_COUNT; 
     }
 
-    Default3dInputData output{};
-    output.multipleBounce2dImage = std::make_shared<VulImage>(vulkano.getVulDevice());
+    Resources output{};
+    output.multipleBounce2dImage = std::make_shared<vul::VulImage>(vulkano.getVulDevice());
     output.multipleBounce2dImage->loadData(&results[0][0], LIGHT_DIR_COUNT, ROUGHNESS_COUNT, 1, 1);
-    output.multipleBounce2dImage->createImageSingleTime(true, true, VulImage::ImageType::texture, 2);
+    output.multipleBounce2dImage->createImageSingleTime(true, true, vul::VulImage::ImageType::texture, 2);
 
-    output.multipleBounce1dImage = std::make_shared<VulImage>(vulkano.getVulDevice());
+    output.multipleBounce1dImage = std::make_shared<vul::VulImage>(vulkano.getVulDevice());
     output.multipleBounce1dImage->loadData(&otherResults[0], ROUGHNESS_COUNT, 1, 1, 1);
-    output.multipleBounce1dImage->createImageSingleTime(true, true, VulImage::ImageType::texture, 1);
+    output.multipleBounce1dImage->createImageSingleTime(true, true, vul::VulImage::ImageType::texture, 1);
 
-    output.aBuffer = std::make_shared<VulBuffer>(vulkano.getVulDevice());
+    output.aBuffer = std::make_shared<vulB::VulBuffer>(vulkano.getVulDevice());
     output.aBuffer->keepEmpty(sizeof(ABuffer), 10'000'000 / sizeof(ABuffer));
-    output.aBuffer->createBuffer(true, VulBuffer::usage_ssbo);
+    output.aBuffer->createBuffer(true, vulB::VulBuffer::usage_ssbo);
 
-    output.aBufferHeads = std::make_shared<VulImage>(vulkano.getVulDevice());
+    output.aBufferHeads = std::make_shared<vul::VulImage>(vulkano.getVulDevice());
     output.aBufferHeads->keepEmpty(2560, 1440, 1, 4);
-    output.aBufferHeads->createImageSingleTime(false, true, VulImage::ImageType::storageUint, 2);
+    output.aBufferHeads->createImageSingleTime(false, true, vul::VulImage::ImageType::storageUint, 2);
     
-    output.aBufferCounter = std::make_shared<VulBuffer>(vulkano.getVulDevice());
+    output.aBufferCounter = std::make_shared<vulB::VulBuffer>(vulkano.getVulDevice());
     output.aBufferCounter->keepEmpty(sizeof(uint32_t), 1);
-    output.aBufferCounter->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc));
+    output.aBufferCounter->createBuffer(true, static_cast<vulB::VulBuffer::Usage>(vulB::VulBuffer::usage_ssbo | vulB::VulBuffer::usage_transferDst | vulB::VulBuffer::usage_transferSrc));
     output.aBufferCounter->addStagingBuffer();
 
     VUL_NAME_VK(output.multipleBounce2dImage->getImage())
@@ -147,12 +144,12 @@ defaults::Default3dInputData defaults::createDefault3dInputData(Vulkano &vulkano
     return output;
 }
 
-defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano &vulkano, Default3dInputData inputData)
+RenderDataIndices createDescriptors(vul::Vulkano &vulkano, Resources inputData)
 {
-    for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-        std::unique_ptr<VulBuffer> globalBuffer = std::make_unique<VulBuffer>(vulkano.getVulDevice());
+    for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
+        std::unique_ptr<vulB::VulBuffer> globalBuffer = std::make_unique<vulB::VulBuffer>(vulkano.getVulDevice());
         globalBuffer->keepEmpty(sizeof(GlobalUbo), 1);
-        globalBuffer->createBuffer(false, VulBuffer::usage_ubo);
+        globalBuffer->createBuffer(false, vulB::VulBuffer::usage_ubo);
         globalBuffer->mapAll();
 
         VUL_NAME_VK(globalBuffer->getBuffer())
@@ -161,7 +158,7 @@ defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano 
         vulkano.buffers.push_back(std::move(globalBuffer));
     }
 
-    DefaultRenderDataInputData returnValue{};
+    RenderDataIndices returnValue{};
     returnValue.mainRenderDataIdx = vulkano.renderDatas.size();
     returnValue.oitColoringRenderDataIdx = returnValue.mainRenderDataIdx + 1;
     returnValue.oitCompositingRenderDataIdx = returnValue.oitColoringRenderDataIdx + 1;
@@ -170,44 +167,44 @@ defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano 
     vulkano.renderDatas.push_back({});
     vulkano.renderDatas.push_back({});
     vulkano.renderDatas.push_back({});
-    for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-        std::vector<Vulkano::Descriptor> descs;
-        Vulkano::Descriptor ubo{}; 
-        ubo.type = Vulkano::DescriptorType::ubo;
+    for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
+        std::vector<vul::Vulkano::Descriptor> descs;
+        vul::Vulkano::Descriptor ubo{}; 
+        ubo.type = vul::Vulkano::DescriptorType::ubo;
         ubo.content = vulkano.buffers[i].get();
-        ubo.stages = {Vulkano::ShaderStage::vert, Vulkano::ShaderStage::frag};
+        ubo.stages = {vul::Vulkano::ShaderStage::vert, vul::Vulkano::ShaderStage::frag};
         descs.push_back(ubo);
 
-        Vulkano::Descriptor image{};
-        image.type = Vulkano::DescriptorType::spCombinedTexSampler;
+        vul::Vulkano::Descriptor image{};
+        image.type = vul::Vulkano::DescriptorType::spCombinedTexSampler;
         image.content = &vulkano.images[0];
         image.count = static_cast<uint32_t>(vulkano.images.size());
-        image.stages = {Vulkano::ShaderStage::frag};
+        image.stages = {vul::Vulkano::ShaderStage::frag};
         descs.push_back(image);
 
         if (vulkano.hasScene){
-            Vulkano::Descriptor matBuf{};
-            matBuf.type = Vulkano::DescriptorType::ssbo;
+            vul::Vulkano::Descriptor matBuf{};
+            matBuf.type = vul::Vulkano::DescriptorType::ssbo;
             matBuf.content = vulkano.scene.materialBuffer.get();
-            matBuf.stages = {Vulkano::ShaderStage::frag};
+            matBuf.stages = {vul::Vulkano::ShaderStage::frag};
             descs.push_back(matBuf);
         }
         if (inputData.multipleBounce2dImage != nullptr){
-            Vulkano::Descriptor mb2dImg{};
-            mb2dImg.type = Vulkano::DescriptorType::combinedTexSampler;
+            vul::Vulkano::Descriptor mb2dImg{};
+            mb2dImg.type = vul::Vulkano::DescriptorType::combinedTexSampler;
             mb2dImg.content = inputData.multipleBounce2dImage.get();
-            mb2dImg.stages = {Vulkano::ShaderStage::frag};
+            mb2dImg.stages = {vul::Vulkano::ShaderStage::frag};
             descs.push_back(mb2dImg);
         }
         if (inputData.multipleBounce1dImage != nullptr){
-            Vulkano::Descriptor mb1dImg{};
-            mb1dImg.type = Vulkano::DescriptorType::combinedTexSampler;
+            vul::Vulkano::Descriptor mb1dImg{};
+            mb1dImg.type = vul::Vulkano::DescriptorType::combinedTexSampler;
             mb1dImg.content = inputData.multipleBounce1dImage.get();
-            mb1dImg.stages = {Vulkano::ShaderStage::frag};
+            mb1dImg.stages = {vul::Vulkano::ShaderStage::frag};
             descs.push_back(mb1dImg);
         }
 
-        Vulkano::descSetReturnVal retVal = vulkano.createDescriptorSet(descs);
+        vul::Vulkano::descSetReturnVal retVal = vulkano.createDescriptorSet(descs);
 
         if (!retVal.succeeded) throw std::runtime_error("Failed to create default main descriptor sets");
         vulkano.renderDatas[returnValue.mainRenderDataIdx].descriptorSets[i].push_back(std::move(retVal.set));
@@ -217,37 +214,37 @@ defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano 
         VUL_NAME_VK(vulkano.renderDatas[returnValue.mainRenderDataIdx].descriptorSets[i][0]->getLayout()->getDescriptorSetLayout())
     }
     
-    for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-        std::vector<Vulkano::Descriptor> descs;
-        Vulkano::Descriptor aBuffer{};
-        aBuffer.type = Vulkano::DescriptorType::ssbo;
+    for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+        std::vector<vul::Vulkano::Descriptor> descs;
+        vul::Vulkano::Descriptor aBuffer{};
+        aBuffer.type = vul::Vulkano::DescriptorType::ssbo;
         aBuffer.content = inputData.aBuffer.get();
         aBuffer.count = 1;
-        aBuffer.stages = {Vulkano::ShaderStage::frag};
+        aBuffer.stages = {vul::Vulkano::ShaderStage::frag};
         descs.push_back(aBuffer);
 
-        Vulkano::Descriptor aBufferHeads{};
-        aBufferHeads.type = Vulkano::DescriptorType::storageImage;
+        vul::Vulkano::Descriptor aBufferHeads{};
+        aBufferHeads.type = vul::Vulkano::DescriptorType::storageImage;
         aBufferHeads.content = inputData.aBufferHeads.get();
         aBufferHeads.count = 1;
-        aBufferHeads.stages = {Vulkano::ShaderStage::frag};
+        aBufferHeads.stages = {vul::Vulkano::ShaderStage::frag};
         descs.push_back(aBufferHeads);
 
-        Vulkano::Descriptor aBufferCounter{};
-        aBufferCounter.type = Vulkano::DescriptorType::ssbo;
+        vul::Vulkano::Descriptor aBufferCounter{};
+        aBufferCounter.type = vul::Vulkano::DescriptorType::ssbo;
         aBufferCounter.content = inputData.aBufferCounter.get();
         aBufferCounter.count = 1;
-        aBufferCounter.stages = {Vulkano::ShaderStage::frag};
+        aBufferCounter.stages = {vul::Vulkano::ShaderStage::frag};
         descs.push_back(aBufferCounter);
 
-        Vulkano::Descriptor depthImages{};
-        depthImages.type = Vulkano::DescriptorType::upCombinedAttachmentSampler;
+        vul::Vulkano::Descriptor depthImages{};
+        depthImages.type = vul::Vulkano::DescriptorType::upCombinedAttachmentSampler;
         depthImages.content = vulkano.vulRenderer.getDepthImages().data();
         depthImages.count = vulkano.vulRenderer.getDepthImages().size();
-        depthImages.stages = {Vulkano::ShaderStage::frag};
+        depthImages.stages = {vul::Vulkano::ShaderStage::frag};
         descs.push_back(depthImages);
 
-        Vulkano::descSetReturnVal retVal = vulkano.createDescriptorSet(descs);
+        vul::Vulkano::descSetReturnVal retVal = vulkano.createDescriptorSet(descs);
         if (!retVal.succeeded) throw std::runtime_error("Failed to create default OIT descriptor sets");
         vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i].push_back(std::move(retVal.set));
         vulkano.renderDatas[returnValue.oitCompositingRenderDataIdx].descriptorSets[i].push_back(vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i][1]);
@@ -257,9 +254,9 @@ defaults::DefaultRenderDataInputData defaults::createDefaultDescriptors(Vulkano 
     return returnValue;
 }
 
-void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataInputData inputData)
+void createPipelines(vul::Vulkano &vulkano, RenderDataIndices inputData)
 {
-    VulPipeline::PipelineConfigInfo mainConfig{};
+    vulB::VulPipeline::PipelineConfigInfo mainConfig{};
     mainConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0},
         {2, 2, VK_FORMAT_R32G32B32A32_SFLOAT, 0}, {3, 3, VK_FORMAT_R32G32_SFLOAT, 0}};
     mainConfig.bindingDescriptions = {{0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX},
@@ -269,13 +266,13 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     mainConfig.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
     mainConfig.cullMode = VK_CULL_MODE_NONE;
     mainConfig.enableColorBlending = false;
-    vulkano.renderDatas[inputData.mainRenderDataIdx].pipeline = std::make_shared<VulPipeline>(vulkano.getVulDevice(), "default3D.vert.spv", "default3D.frag.spv", mainConfig);
+    vulkano.renderDatas[inputData.mainRenderDataIdx].pipeline = std::make_shared<vulB::VulPipeline>(vulkano.getVulDevice(), "default3D.vert.spv", "default3D.frag.spv", mainConfig);
     vulkano.renderDatas[inputData.mainRenderDataIdx].is3d = true;
-    vulkano.renderDatas[inputData.mainRenderDataIdx].swapChainImageMode = VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent;
-    vulkano.renderDatas[inputData.mainRenderDataIdx].depthImageMode = VulRenderer::DepthImageMode::clearPreviousStoreCurrent;
+    vulkano.renderDatas[inputData.mainRenderDataIdx].swapChainImageMode = vulB::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent;
+    vulkano.renderDatas[inputData.mainRenderDataIdx].depthImageMode = vulB::VulRenderer::DepthImageMode::clearPreviousStoreCurrent;
     vulkano.renderDatas[inputData.mainRenderDataIdx].sampleFromDepth = false;
 
-    VulPipeline::PipelineConfigInfo oitColoringConfig{};
+    vulB::VulPipeline::PipelineConfigInfo oitColoringConfig{};
     oitColoringConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32B32_SFLOAT, 0},
         {2, 2, VK_FORMAT_R32G32B32A32_SFLOAT, 0}, {3, 3, VK_FORMAT_R32G32_SFLOAT, 0}};
     oitColoringConfig.bindingDescriptions = {  {0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX},
@@ -287,7 +284,7 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     oitColoringConfig.cullMode = VK_CULL_MODE_NONE;
     oitColoringConfig.enableColorBlending = false;
     vulkano.renderDatas[inputData.oitColoringRenderDataIdx].pipeline =
-        std::make_shared<VulPipeline>(vulkano.getVulDevice(), "default3D.vert.spv", "oitColoring.frag.spv", oitColoringConfig);
+        std::make_shared<vulB::VulPipeline>(vulkano.getVulDevice(), "default3D.vert.spv", "oitColoring.frag.spv", oitColoringConfig);
     for (const vulB::GltfLoader::GltfNode &node : vulkano.scene.nodes) {
         const vulB::GltfLoader::GltfPrimMesh &mesh = vulkano.scene.meshes[node.primMesh];
         const vulB::GltfLoader::Material &material = vulkano.scene.materials[mesh.materialIndex];
@@ -295,7 +292,7 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
         drawData.firstIndex = mesh.firstIndex;
         drawData.indexCount = mesh.indexCount;
         drawData.vertexOffset = mesh.vertexOffset;
-        if (material.alphaMode != GltfLoader::GltfAlphaMode::blend) {
+        if (material.alphaMode != vulB::GltfLoader::GltfAlphaMode::blend) {
             drawData.pPushData = std::make_shared<DefaultPushConstant>();
             drawData.pushDataSize = sizeof(DefaultPushConstant);
             vulkano.renderDatas[inputData.mainRenderDataIdx].drawDatas.push_back(drawData);
@@ -308,11 +305,11 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     }
 
     vulkano.renderDatas[inputData.oitColoringRenderDataIdx].is3d = true;
-    vulkano.renderDatas[inputData.oitColoringRenderDataIdx].swapChainImageMode = VulRenderer::SwapChainImageMode::noSwapChainImage;
-    vulkano.renderDatas[inputData.oitColoringRenderDataIdx].depthImageMode = VulRenderer::DepthImageMode::noDepthImage;
+    vulkano.renderDatas[inputData.oitColoringRenderDataIdx].swapChainImageMode = vulB::VulRenderer::SwapChainImageMode::noSwapChainImage;
+    vulkano.renderDatas[inputData.oitColoringRenderDataIdx].depthImageMode = vulB::VulRenderer::DepthImageMode::noDepthImage;
     vulkano.renderDatas[inputData.oitColoringRenderDataIdx].sampleFromDepth = true;
 
-    VulPipeline::PipelineConfigInfo oitCompositingConfig{};
+    vulB::VulPipeline::PipelineConfigInfo oitCompositingConfig{};
     oitCompositingConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32_SFLOAT, 0}};
     oitCompositingConfig.bindingDescriptions = {{0, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
     oitCompositingConfig.setLayouts = {vulkano.renderDatas[inputData.oitColoringRenderDataIdx].descriptorSets[0][1]->getLayout()->getDescriptorSetLayout()};
@@ -326,14 +323,14 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     oitCompositingConfig.blendDstFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
     // oitCompositingConfig.blendDstFactor = VK_BLEND_FACTOR_ONE;
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].pipeline =
-        std::make_shared<VulPipeline>(vulkano.getVulDevice(), "default2D.vert.spv", "oitCompositing.frag.spv", oitCompositingConfig);
+        std::make_shared<vulB::VulPipeline>(vulkano.getVulDevice(), "default2D.vert.spv", "oitCompositing.frag.spv", oitCompositingConfig);
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].is3d = false;
-    vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].swapChainImageMode = VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent;
-    vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].depthImageMode = VulRenderer::DepthImageMode::noDepthImage;
+    vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].swapChainImageMode = vulB::VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent;
+    vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].depthImageMode = vulB::VulRenderer::DepthImageMode::noDepthImage;
     vulkano.renderDatas[inputData.oitCompositingRenderDataIdx].sampleFromDepth = false;
 
     /*
-    VulPipeline::PipelineConfigInfo oitReflectionConfig{};
+    vulB::VulPipeline::PipelineConfigInfo oitReflectionConfig{};
     oitReflectionConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32_SFLOAT, 0}};
     oitReflectionConfig.bindingDescriptions = {{0, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
     oitReflectionConfig.setLayouts = {vulkano.renderDatas[inputData.oitColoringRenderDataIdx].descriptorSets[0][1]->getLayout()->getDescriptorSetLayout()};
@@ -345,7 +342,7 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     oitReflectionConfig.blendSrcFactor = VK_BLEND_FACTOR_ONE;
     oitReflectionConfig.blendDstFactor = VK_BLEND_FACTOR_ONE;
     vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].pipeline =
-        std::make_shared<VulPipeline>(vulkano.getVulDevice(), "default2D.vert.spv", "oitReflection.frag.spv", oitReflectionConfig);
+        std::make_shared<vulB::VulPipeline>(vulkano.getVulDevice(), "default2D.vert.spv", "oitReflection.frag.spv", oitReflectionConfig);
     vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].is3d = false;
     vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].swapChainImageMode = VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent;
     vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].depthImageMode = VulRenderer::DepthImageMode::noDepthImage;
@@ -358,10 +355,10 @@ void defaults::createDefault3dRenderSystem(Vulkano &vulkano, DefaultRenderDataIn
     //VUL_NAME_VK(vulkano.renderDatas[inputData.oitReflectionRenderDataIdx].pipeline->getPipeline())
 }
 
-size_t defaults::updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataInputData inputDataRender, Default3dInputData inputData3d)
+size_t updateShaderInputs(vul::Vulkano &vulkano, RenderDataIndices inputDataRender, Resources inputData3d)
 {
     VUL_PROFILE_FUNC()
-    Scene &scene = vulkano.scene;
+    vul::Scene &scene = vulkano.scene;
 
     GlobalUbo ubo{};
     ubo.projectionMatrix = vulkano.camera.getProjection();
@@ -379,11 +376,11 @@ size_t defaults::updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataI
     size_t mainIdx = 0;
     size_t oitIdx = 0;
     for (size_t i = 0; i < scene.nodes.size(); i++){
-        const GltfLoader::GltfNode &node = scene.nodes[i];
-        const GltfLoader::GltfPrimMesh &mesh = scene.meshes[node.primMesh];
-        const GltfLoader::Material &material = scene.materials[mesh.materialIndex];
+        const vulB::GltfLoader::GltfNode &node = scene.nodes[i];
+        const vulB::GltfLoader::GltfPrimMesh &mesh = scene.meshes[node.primMesh];
+        const vulB::GltfLoader::Material &material = scene.materials[mesh.materialIndex];
 
-        if (material.alphaMode != GltfLoader::GltfAlphaMode::blend) {
+        if (material.alphaMode != vulB::GltfLoader::GltfAlphaMode::blend) {
             DefaultPushConstant *pushData = static_cast<DefaultPushConstant *>(vulkano.renderDatas[inputDataRender.mainRenderDataIdx].drawDatas[mainIdx].pPushData.get());
             pushData->modelMatrix = node.worldMatrix;
             pushData->normalMatrix = node.normalMatrix;
@@ -401,7 +398,7 @@ size_t defaults::updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataI
         }
     }
 
-    const std::unique_ptr<VulBuffer> &stagingBuf = inputData3d.aBufferCounter->getStagingBuffer();
+    const std::unique_ptr<vulB::VulBuffer> &stagingBuf = inputData3d.aBufferCounter->getStagingBuffer();
     stagingBuf->copyDataFromBuffer(*inputData3d.aBufferCounter, sizeof(uint32_t), 0, 0, vulkano.vulRenderer.getCurrentCommandBuffer());
     uint32_t transparentFragmentsCount = *static_cast<uint32_t *>(stagingBuf->getMappedMemory());
     std::vector<uint32_t> aBufferCounterResetValue = {0};
@@ -415,11 +412,11 @@ size_t defaults::updateDefault3dInputValues(Vulkano &vulkano, DefaultRenderDataI
     return aBufSize;
 }
 
-void defaults::updateOitResources(Vulkano &vulkano, DefaultRenderDataInputData inputDataRender, Default3dInputData inputData3d, size_t requiredABufferSize)
+void updateOitResources(vul::Vulkano &vulkano, RenderDataIndices inputDataRender, Resources inputData3d, size_t requiredABufferSize)
 {
     if (vulkano.vulRenderer.wasSwapChainRecreated()) {
-        for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
-            std::shared_ptr<VulDescriptorSet> oitDescSet = vulkano.renderDatas[inputDataRender.oitColoringRenderDataIdx].descriptorSets[i][1];
+        for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
+            std::shared_ptr<vulB::VulDescriptorSet> oitDescSet = vulkano.renderDatas[inputDataRender.oitColoringRenderDataIdx].descriptorSets[i][1];
             for (size_t j = 0; j < vulkano.vulRenderer.getDepthImages().size(); j++) {
                 oitDescSet->descriptorInfos[3].imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 oitDescSet->descriptorInfos[3].imageInfos[j].imageView = vulkano.vulRenderer.getDepthImages()[j]->getImageView();
@@ -431,18 +428,55 @@ void defaults::updateOitResources(Vulkano &vulkano, DefaultRenderDataInputData i
 
     if (inputData3d.aBuffer->getBufferSize() != requiredABufferSize) {
         vkQueueWaitIdle(vulkano.getVulDevice().graphicsQueue());
-        for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-            std::shared_ptr<VulDescriptorSet> descSet = vulkano.renderDatas[inputDataRender.oitColoringRenderDataIdx].descriptorSets[i][1];
+        for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+            std::shared_ptr<vulB::VulDescriptorSet> descSet = vulkano.renderDatas[inputDataRender.oitColoringRenderDataIdx].descriptorSets[i][1];
             descSet->descriptorInfos[0].bufferInfos[0] = inputData3d.aBufferCounter->getDescriptorInfo();
             descSet->update();
         }
         inputData3d.aBuffer->resizeBufferAsEmpty(sizeof(ABuffer), requiredABufferSize / sizeof(ABuffer));
-        for (int i = 0; i < VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-            std::shared_ptr<VulDescriptorSet> descSet = vulkano.renderDatas[inputDataRender.oitColoringRenderDataIdx].descriptorSets[i][1];
+        for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+            std::shared_ptr<vulB::VulDescriptorSet> descSet = vulkano.renderDatas[inputDataRender.oitColoringRenderDataIdx].descriptorSets[i][1];
             descSet->descriptorInfos[0].bufferInfos[0] = inputData3d.aBuffer->getDescriptorInfo(); 
             descSet->update();
         }
     }
 }
-    
+
+void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
+    ImGui::Begin("Performance");
+    ImGui::DragFloat("Max FPS", &vul::settings::maxFps, vul::settings::maxFps / 30.0f, 3.0f, 10'000.0f);
+    ImGui::Text("Fps: %f\nTotal frame time: %fms\nIdle time %fms\nOwn stuff: %fms",
+            1.0f / vulkano.getFrameTime(), vulkano.getFrameTime() * 1000.0f,
+            vulkano.getIdleTime() * 1000.0f, ownStuffTime * 1000.0f);
+    ImGui::End();
+}
+
+int main() {
+    vul::Vulkano vulkano(2560, 1440, "Vulkano");
+    vulkano.loadScene("../Models/sponza.gltf");
+    for (const std::shared_ptr<vul::VulImage> &image : vulkano.scene.images) vulkano.images.push_back(image);
+    Resources resources = createReources(vulkano);
+    RenderDataIndices renderDataIndices = createDescriptors(vulkano, resources);
+    createPipelines(vulkano, renderDataIndices);
+    vulkano.initVulkano();
+    vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
+    vul::settings::maxFps = 60.0f;
+
+    bool stop = false;
+    float ownStuffTime = 0.0f;
+    while (!stop) {
+        VkCommandBuffer commandBuffer = vulkano.startFrame();
+        if (commandBuffer == nullptr) continue;
+        double ownStuffStartTime = glfwGetTime();
+
+        size_t requiredABufferSize = updateShaderInputs(vulkano, renderDataIndices, resources);
+        if (vulkano.shouldShowGUI()) GuiStuff(vulkano, ownStuffTime);
+
+        ownStuffTime = glfwGetTime() - ownStuffStartTime;
+        stop = vulkano.endFrame(commandBuffer);
+        updateOitResources(vulkano, renderDataIndices, resources, requiredABufferSize);
+    }
+    vulkano.letVulkanoFinish();
+
+    return 0;
 }

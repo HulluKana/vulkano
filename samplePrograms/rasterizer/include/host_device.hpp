@@ -45,19 +45,6 @@ struct OitPushConstant{
     float height;
 };
 
-struct PackedMaterial{
-    vec4 colorFactor;
-    vec4 emissiveFactor;
-    float roughness;
-    float metalliness;
-    int colorTextureIndex;
-    int normalTextureIndex;
-    int roughnessMetallicTextureIndex;
-    int padding1;
-    int padding2;
-    int padding3;
-};
-
 struct ABuffer {
     uint color;
     uint reflectionColor;

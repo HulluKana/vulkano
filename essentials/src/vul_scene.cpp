@@ -1,7 +1,7 @@
-#include "vul_debug_tools.hpp"
-#include "vul_gltf_loader.hpp"
+#include <host_device.hpp>
+#include<vul_debug_tools.hpp>
+#include<vul_gltf_loader.hpp>
 #include<vul_scene.hpp>
-#include<vul_host_device.hpp>
 #include <memory>
 #include <stdexcept>
 #include <iostream>

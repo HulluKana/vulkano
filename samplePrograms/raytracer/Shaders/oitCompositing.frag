@@ -2,7 +2,7 @@
 
 #extension GL_GOOGLE_include_directive : enable
 
-#include"../vulkano/essentials/include/vul_host_device.hpp"
+#include"../include/host_device.hpp"
 
 layout (location = 0) in vec2 fragPos;
 layout (location = 1) in vec2 fragTexCoord;
