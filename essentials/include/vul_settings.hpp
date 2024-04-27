@@ -8,7 +8,11 @@ namespace vul{
 class settings{
 
 public:
-    static inline bool preferSeparateComputeQueue{false};
+    struct DeviceInitConfig {
+        bool preferSeparateComputeQueue = false;
+        bool enableRaytracingSupport = false;
+    };
+    static inline DeviceInitConfig deviceInitConfig{false, false};
 
     static inline uint32_t renderWidth{0};
     static inline uint32_t renderHeight{0};

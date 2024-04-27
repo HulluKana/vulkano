@@ -98,7 +98,7 @@ class VulDevice {
 
   const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"}; // Enabled validation layers for normal use
   // const std::vector<const char *> validationLayers = {}; // Disabled validation layers for nsight
-  const std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+  std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 };
 
 }

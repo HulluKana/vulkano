@@ -1,6 +1,7 @@
 #include <vul_debug_tools.hpp>
 #include<vul_device.hpp>
 #include<vul_settings.hpp>
+#include <vul_extensions.hpp>
 
 // std headers
 #include <cstring>
@@ -171,13 +172,28 @@ void VulDevice::createLogicalDevice() {
     queueCreateInfo.pQueuePriorities = &queuePriority;
     queueCreateInfos.push_back(queueCreateInfo);
   }
+
   VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures{};
   descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
   descriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
 
+  if (vul::settings::deviceInitConfig.enableRaytracingSupport) {
+      deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+      deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+      deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+
+      VkPhysicalDeviceAccelerationStructureFeaturesKHR accelStructFeatures{};
+      accelStructFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+      
+      VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeatures{};
+      rtPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
+      rtPipelineFeatures.pNext = &accelStructFeatures;
+
+      descriptorIndexingFeatures.pNext = &rtPipelineFeatures;
+  }
+
   VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddresFeature{};
-  bufferDeviceAddresFeature.sType =
-      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
+  bufferDeviceAddresFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
   bufferDeviceAddresFeature.bufferDeviceAddress = VK_TRUE;
   bufferDeviceAddresFeature.pNext = &descriptorIndexingFeatures;
 
@@ -223,6 +239,11 @@ void VulDevice::createLogicalDevice() {
   vkGetDeviceQueue(device_, indices.graphicsFamily, 0, &graphicsQueue_);
   vkGetDeviceQueue(device_, indices.presentFamily, 0, &presentQueue_);
   vkGetDeviceQueue(device_, indices.computeFamily, 0, &m_computeQueue);
+
+  if (vul::settings::deviceInitConfig.enableRaytracingSupport) {
+      extensions::addAccelerationStructure(device_, vkGetDeviceProcAddr);
+      extensions::addRayTracingPipeline(device_, vkGetDeviceProcAddr);
+  }
 }
 
 void VulDevice::createCommandPools() {
@@ -399,7 +420,7 @@ QueueFamilyIndices VulDevice::findQueueFamilies(VkPhysicalDevice device) {
     if (queueFamily.queueCount > 0 &&
         (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) &&
         !indices.computeFamilyHasValue) {
-      if (vul::settings::preferSeparateComputeQueue)
+      if (vul::settings::deviceInitConfig.preferSeparateComputeQueue)
         computeFamilies.push_back(i);
       else {
         indices.computeFamily = i;
@@ -417,7 +438,7 @@ QueueFamilyIndices VulDevice::findQueueFamilies(VkPhysicalDevice device) {
     i++;
   }
 
-  if (vul::settings::preferSeparateComputeQueue) {
+  if (vul::settings::deviceInitConfig.preferSeparateComputeQueue) {
     for (uint32_t computeFamilyIdx : computeFamilies) {
       if (computeFamilyIdx != indices.graphicsFamily) {
         indices.computeFamily = computeFamilyIdx;

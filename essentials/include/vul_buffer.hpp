@@ -26,10 +26,13 @@ class VulBuffer {
             usage_none = 0,
             usage_transferSrc = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             usage_transferDst = VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            usage_getAddress = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
+            usage_accelerationStructureBuildRead = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
             usage_ssbo = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
             usage_ubo = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             usage_indexBuffer = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-            usage_vertexBuffer = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
+            usage_vertexBuffer = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+            usage_accelerationStructureBuffer = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR
         };
         VkResult createBuffer(bool isLocal, Usage usage);
 
@@ -60,7 +63,12 @@ class VulBuffer {
         VkBufferUsageFlags getUsageFlags() const { return m_usageFlags; }
         VkMemoryPropertyFlags getMemoryPropertyFlags() const { return m_memoryPropertyFlags; }
         VkDeviceSize getBufferSize() const { return m_bufferSize; }
+
         VkDescriptorBufferInfo getDescriptorInfo() const {return VkDescriptorBufferInfo{m_buffer, 0, m_bufferSize};}
+        VkDeviceAddress getBufferAddress() const {
+            VkBufferDeviceAddressInfo addressInfo{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, m_buffer};
+            return vkGetBufferDeviceAddress(m_vulDevice.device(), &addressInfo);
+        }
     private:
         VulDevice &m_vulDevice; 
 

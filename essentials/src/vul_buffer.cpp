@@ -34,7 +34,8 @@ VkResult VulBuffer::createBuffer(bool isLocal, VulBuffer::Usage usage)
     VUL_PROFILE_FUNC()
 
     if (!m_creationPreparationDone) throw std::runtime_error("Buffer creation preparations need to be done before creating buffer");
-    if (~(usage_transferSrc | usage_transferDst | usage_ubo | usage_ssbo | usage_indexBuffer | usage_vertexBuffer) & usage)
+    if (~(usage_transferSrc | usage_transferDst | usage_getAddress | usage_accelerationStructureBuildRead | usage_ubo | usage_ssbo | usage_indexBuffer
+                | usage_vertexBuffer | usage_accelerationStructureBuffer) & usage)
         throw std::runtime_error("Unsupported buffer usage flag");
     if ((usage & (usage_ubo | usage_ssbo)) == (usage_ubo | usage_ssbo))
         throw std::runtime_error("Buffer can't be both storage and uniform buffer");
@@ -61,10 +62,16 @@ VkResult VulBuffer::createBuffer(bool isLocal, VulBuffer::Usage usage)
     VkMemoryRequirements memRequirements;
     vkGetBufferMemoryRequirements(m_vulDevice.device(), m_buffer, &memRequirements);
 
+    VkMemoryAllocateFlagsInfo memAllocFlagsInfo{};
+    memAllocFlagsInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO;
+    if ((usage & usage_getAddress) == usage_getAddress) memAllocFlagsInfo.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+
     VkMemoryAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    allocInfo.pNext = &memAllocFlagsInfo;
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = m_vulDevice.findMemoryType(memRequirements.memoryTypeBits, m_memoryPropertyFlags);
+    
 
     result = vkAllocateMemory(m_vulDevice.device(), &allocInfo, nullptr, &m_memory);
     if (result != VK_SUCCESS) return result;

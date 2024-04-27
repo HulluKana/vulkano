@@ -1,4 +1,4 @@
-#include <host_device.hpp>
+#include "vul_buffer.hpp"
 #include<vul_debug_tools.hpp>
 #include<vul_gltf_loader.hpp>
 #include<vul_scene.hpp>
@@ -62,8 +62,10 @@ void Scene::loadScene(std::string fileName)
     uvBuffer->loadVector(gltfLoader.uvCoords);
     materialBuffer->loadVector(packedMaterials);
 
-    indexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_indexBuffer | VulBuffer::usage_transferDst));
-    vertexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
+    indexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_indexBuffer | VulBuffer::usage_transferDst
+                | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead));
+    vertexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst
+                | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead));
     normalBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
     tangentBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
     uvBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
