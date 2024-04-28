@@ -19,7 +19,7 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 int main() {
     vul::settings::deviceInitConfig.enableRaytracingSupport = true;
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
-    vulkano.loadScene("../Models/Room.gltf");
+    vulkano.loadScene("../Models/sponza.gltf");
     vulkano.initVulkano();
     vul::settings::maxFps = 60.0f;
 

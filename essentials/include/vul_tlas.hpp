@@ -28,11 +28,11 @@ class VulAs {
         };
         
         void buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAccelerationStructureFlagsKHR flags);
-        BlasInput gltfNodeToBlasInput(const Scene &scene, const vulB::GltfLoader::GltfNode &node);
+        BlasInput gltfNodeToBlasInput(const Scene &scene, const vulB::GltfLoader::GltfPrimMesh &mesh);
 
         struct As {
             VkAccelerationStructureKHR as;
-            std::shared_ptr<vulB::VulBuffer> buffer;
+            std::unique_ptr<vulB::VulBuffer> buffer;
         };
         std::vector<As> m_blases;
 

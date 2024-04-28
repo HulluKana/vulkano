@@ -188,8 +188,12 @@ void VulDevice::createLogicalDevice() {
       VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeatures{};
       rtPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
       rtPipelineFeatures.pNext = &accelStructFeatures;
+    
+      VkPhysicalDeviceHostQueryResetFeatures reset{};
+      reset.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
+      reset.pNext = &rtPipelineFeatures;
 
-      descriptorIndexingFeatures.pNext = &rtPipelineFeatures;
+      descriptorIndexingFeatures.pNext = &reset;
   }
 
   VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddresFeature{};
