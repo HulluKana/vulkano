@@ -21,19 +21,31 @@ class VulAs {
 
         void loadScene(const Scene &scene);
     private:
+        struct As {
+            VkAccelerationStructureKHR as;
+            std::unique_ptr<vulB::VulBuffer> buffer;
+        };
         struct BlasInput {
             std::vector<VkAccelerationStructureGeometryKHR> asGeometries;
             std::vector<VkAccelerationStructureBuildRangeInfoKHR> asBuildOffsetInfos;
             VkBuildAccelerationStructureFlagsKHR flags{};
         };
-        
-        void buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAccelerationStructureFlagsKHR flags);
-        BlasInput gltfNodeToBlasInput(const Scene &scene, const vulB::GltfLoader::GltfPrimMesh &mesh);
-
-        struct As {
-            VkAccelerationStructureKHR as;
-            std::unique_ptr<vulB::VulBuffer> buffer;
+        struct BlasBuildData {
+            VkAccelerationStructureBuildGeometryInfoKHR buildInfo{};
+            VkAccelerationStructureBuildSizesInfoKHR sizeInfo{};
+            const VkAccelerationStructureBuildRangeInfoKHR* rangeInfo;
         };
+
+        void buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asInsts, VkBuildAccelerationStructureFlagsKHR flags);
+        VkAccelerationStructureInstanceKHR gltfNodeToAsInstance(const Scene &scene, uint32_t nodeIdx, const As &blas);
+
+        void buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAccelerationStructureFlagsKHR flags);
+        As buildBlas(BlasBuildData &buildData, VkDeviceAddress scratchBufferAddress, VkQueryPool queryPool, uint32_t queryIndex, VkCommandBuffer cmdBuf);
+        BlasInput gltfMeshToBlasInput(const Scene &scene, const vulB::GltfLoader::GltfPrimMesh &mesh);
+
+        As createAs(VkAccelerationStructureCreateInfoKHR &createInfo);
+
+        As m_tlas;
         std::vector<As> m_blases;
 
         vulB::VulDevice &m_vulDevice;

@@ -2,9 +2,11 @@
 #include "vul_debug_tools.hpp"
 #include "vul_device.hpp"
 #include "vul_gltf_loader.hpp"
+#include <cstring>
+#include <glm/matrix.hpp>
 #include <memory>
 #include <stdexcept>
-#include <vul_tlas.hpp>
+#include <vul_acceleration_structure.hpp>
 #include <vulkan/vulkan_core.h>
 #include <iostream>
 
@@ -18,26 +20,88 @@ VulAs::VulAs(VulDevice &vulDevice) : m_vulDevice{vulDevice}
 
 VulAs::~VulAs()
 {
+    vkDestroyAccelerationStructureKHR(m_vulDevice.device(), m_tlas.as, nullptr);
     for (As &as : m_blases) vkDestroyAccelerationStructureKHR(m_vulDevice.device(), as.as, nullptr);
 }
 
 void VulAs::loadScene(const Scene &scene)
 {
     std::vector<BlasInput> blasInputs;
-    for (const GltfLoader::GltfPrimMesh &mesh : scene.meshes) {
-        blasInputs.emplace_back(gltfNodeToBlasInput(scene, mesh)); 
-    }
+    blasInputs.reserve(scene.nodes.size());
+    for (const GltfLoader::GltfNode &node : scene.nodes) blasInputs.emplace_back(gltfMeshToBlasInput(scene, scene.meshes[node.primMesh])); 
 
     buildBlases(blasInputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
+
+    std::vector<VkAccelerationStructureInstanceKHR> asInsts;
+    asInsts.reserve(scene.nodes.size());
+    for (uint32_t i = 0; i < static_cast<uint32_t>(scene.nodes.size()); i++) asInsts.emplace_back(gltfNodeToAsInstance(scene, i, m_blases[i]));
+
+    buildTlas(asInsts, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+}
+
+void VulAs::buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asInsts, VkBuildAccelerationStructureFlagsKHR flags)
+{
+    VulBuffer instsBuf(m_vulDevice); 
+    instsBuf.loadVector(asInsts);
+    instsBuf.createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead
+                | VulBuffer::usage_transferDst));
+
+    VkCommandBuffer cmdBuf = m_vulDevice.beginSingleTimeCommands();
+    VkMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+    barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+    vkCmdPipelineBarrier(cmdBuf, VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, 0, 1, &barrier, 0, nullptr, 0, nullptr);
+
+    VkAccelerationStructureGeometryInstancesDataKHR instsData{};
+    instsData.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR;
+    instsData.data.deviceAddress = instsBuf.getBufferAddress();
+
+    VkAccelerationStructureGeometryKHR tlasGeom{};
+    tlasGeom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+    tlasGeom.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
+    tlasGeom.geometry.instances = instsData;
+
+    VkAccelerationStructureBuildGeometryInfoKHR buildInfo{};
+    buildInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
+    buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+    buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+    buildInfo.flags = flags;
+    buildInfo.geometryCount = 1;
+    buildInfo.pGeometries = &tlasGeom;
+
+    VkAccelerationStructureBuildSizesInfoKHR sizeInfo{};
+    sizeInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR;
+
+    uint32_t primitiveCount = static_cast<uint32_t>(asInsts.size());
+    vkGetAccelerationStructureBuildSizesKHR(m_vulDevice.device(), VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildInfo, &primitiveCount, &sizeInfo);
+
+    VkAccelerationStructureCreateInfoKHR creatInf{};
+    creatInf.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+    creatInf.size = sizeInfo.accelerationStructureSize;
+    m_tlas = createAs(creatInf);
+
+    VulBuffer scratchBuffer(m_vulDevice);
+    scratchBuffer.keepEmpty(1, sizeInfo.buildScratchSize);
+    scratchBuffer.createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_getAddress));
+    std::cout << creatInf.size << "\n";
+
+    buildInfo.dstAccelerationStructure = m_tlas.as;
+    buildInfo.scratchData.deviceAddress = scratchBuffer.getBufferAddress();
+
+    VkAccelerationStructureBuildRangeInfoKHR buildRangeInf{};
+    buildRangeInf.primitiveCount = primitiveCount;
+    buildRangeInf.primitiveOffset = 0;
+    buildRangeInf.firstVertex = 0;
+    buildRangeInf.transformOffset = 0;
+    const VkAccelerationStructureBuildRangeInfoKHR *pBuildRangeInf = &buildRangeInf;
+
+    vkCmdBuildAccelerationStructuresKHR(cmdBuf, 1, &buildInfo, &pBuildRangeInf);
+    m_vulDevice.endSingleTimeCommands(cmdBuf);
 }
 
 void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAccelerationStructureFlagsKHR flags)
 {
-    struct BlasBuildData {
-        VkAccelerationStructureBuildGeometryInfoKHR buildInfo{};
-        VkAccelerationStructureBuildSizesInfoKHR sizeInfo{};
-        const VkAccelerationStructureBuildRangeInfoKHR* rangeInfo;
-    };
     std::vector<BlasBuildData> buildDatas(blasInputs.size());
     VkDeviceSize maxScratchSize{};
     VkDeviceSize totalBlasesSize{};
@@ -88,24 +152,14 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
         batchSize += buildDatas[i].sizeInfo.accelerationStructureSize;
 
         if (batchSize >= batchLimit || i == blasInputs.size() - 1) {
-            std::cout << "Batch size: " << batchSize << "\n";
-
             if (queryPool) vkResetQueryPool(m_vulDevice.device(), queryPool, 0, static_cast<uint32_t>(indices.size()));
             uint32_t queryCount{};
             VkCommandBuffer cmdBuf = m_vulDevice.beginSingleTimeCommands();
             for (size_t idx : indices) {
-                As blas{};
-                blas.buffer = std::make_unique<VulBuffer>(m_vulDevice);
-                blas.buffer->keepEmpty(1, buildDatas[idx].sizeInfo.accelerationStructureSize);
-                blas.buffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_accelerationStructureBuffer | VulBuffer::usage_getAddress));
-
                 VkAccelerationStructureCreateInfoKHR createInfo{};
-                createInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
                 createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-                createInfo.size = blas.buffer->getBufferSize();
-                createInfo.buffer = blas.buffer->getBuffer();
-
-                vkCreateAccelerationStructureKHR(m_vulDevice.device(), &createInfo, nullptr, &blas.as);
+                createInfo.size = buildDatas[idx].sizeInfo.accelerationStructureSize;
+                As blas = createAs(createInfo);
 
                 buildDatas[idx].buildInfo.dstAccelerationStructure = blas.as;
                 buildDatas[idx].buildInfo.scratchData.deviceAddress = scratchBuffer.getBufferAddress();
@@ -139,20 +193,11 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
 
                 VkDeviceSize compactBatchSize{};
                 for (VkDeviceSize compactSize : compactSizes) compactBatchSize += compactSize;
-                std::cout << "Compact batch size: " << compactBatchSize << "\n";
                 for (size_t idx : indices) {
-                    As blas{};
-                    blas.buffer = std::make_unique<VulBuffer>(m_vulDevice);
-                    blas.buffer->keepEmpty(1, compactSizes[queryCnt++]);
-                    blas.buffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_accelerationStructureBuffer | VulBuffer::usage_getAddress));
-
                     VkAccelerationStructureCreateInfoKHR assCreate{};
-                    assCreate.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
                     assCreate.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-                    assCreate.size = blas.buffer->getBufferSize();
-                    assCreate.buffer = blas.buffer->getBuffer();
-
-                    vkCreateAccelerationStructureKHR(m_vulDevice.device(), &assCreate, nullptr, &blas.as);
+                    assCreate.size = compactSizes[queryCnt++];
+                    As blas = createAs(assCreate);
 
                     // I am sane
                     VkCopyAccelerationStructureInfoKHR cloneI{};
@@ -180,7 +225,26 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
     if (queryPool) vkDestroyQueryPool(m_vulDevice.device(), queryPool, nullptr);
 }
 
-VulAs::BlasInput VulAs::gltfNodeToBlasInput(const Scene &scene, const GltfLoader::GltfPrimMesh &mesh)
+VkAccelerationStructureInstanceKHR VulAs::gltfNodeToAsInstance(const Scene &scene, uint32_t nodeIdx, const As &blas)
+{
+    glm::mat4 trasposedTransformMat = glm::transpose(scene.nodes[nodeIdx].worldMatrix);
+
+    VkAccelerationStructureDeviceAddressInfoKHR blasAddrInfo{};
+    blasAddrInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
+    blasAddrInfo.accelerationStructure = blas.as;
+
+    VkAccelerationStructureInstanceKHR asInst{};
+    memcpy(&asInst.transform, &trasposedTransformMat, sizeof(VkTransformMatrixKHR));
+    asInst.instanceCustomIndex = nodeIdx;
+    asInst.accelerationStructureReference = vkGetAccelerationStructureDeviceAddressKHR(m_vulDevice.device(), &blasAddrInfo);
+    asInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+    asInst.mask = 0xFF;
+    asInst.instanceShaderBindingTableRecordOffset = 0;
+    
+    return asInst;
+}
+
+VulAs::BlasInput VulAs::gltfMeshToBlasInput(const Scene &scene, const GltfLoader::GltfPrimMesh &mesh)
 {
     VkAccelerationStructureGeometryTrianglesDataKHR triangles{};
     triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
@@ -208,6 +272,20 @@ VulAs::BlasInput VulAs::gltfNodeToBlasInput(const Scene &scene, const GltfLoader
     blasInput.asBuildOffsetInfos.push_back(offsetInfo);
 
     return blasInput;
+}
+
+VulAs::As VulAs::createAs(VkAccelerationStructureCreateInfoKHR &createInfo)
+{
+    As as{};
+    as.buffer = std::make_unique<VulBuffer>(m_vulDevice);
+    as.buffer->keepEmpty(1, createInfo.size);
+    as.buffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_accelerationStructureBuffer | VulBuffer::usage_getAddress));
+
+    createInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
+    createInfo.buffer = as.buffer->getBuffer();
+
+    vkCreateAccelerationStructureKHR(m_vulDevice.device(), &createInfo, nullptr, &as.as);
+    return as;
 }
 
 }

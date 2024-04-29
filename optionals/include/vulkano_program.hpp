@@ -51,6 +51,7 @@ class Vulkano{
 
         bool shouldShowGUI() const {return !cameraController.hideGUI;}
         bool windowWasResized() {return m_vulWindow.wasWindowResized();}
+        bool shouldClose() {return m_vulWindow.shouldClose();}
         
         void createSquare(float x, float y, float width, float height);
         void createTriangle(glm::vec2 corner1, glm::vec2 corner2, glm::vec2 corner3);

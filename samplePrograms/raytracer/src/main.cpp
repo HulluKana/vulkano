@@ -1,8 +1,7 @@
-#include "vul_settings.hpp"
-#include "vul_tlas.hpp"
 #include<vulkano_program.hpp>
 #include<host_device.hpp>
 #include<vul_debug_tools.hpp>
+#include <vul_acceleration_structure.hpp>
 
 #include<imgui.h>
 #include <iostream>
@@ -19,7 +18,7 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 int main() {
     vul::settings::deviceInitConfig.enableRaytracingSupport = true;
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
-    vulkano.loadScene("../Models/sponza.gltf");
+    vulkano.loadScene("../Models/Room.gltf");
     vulkano.initVulkano();
     vul::settings::maxFps = 60.0f;
 
