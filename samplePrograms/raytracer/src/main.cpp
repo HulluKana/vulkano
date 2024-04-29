@@ -6,7 +6,6 @@
 #include <vul_acceleration_structure.hpp>
 
 #include<imgui.h>
-#include <iostream>
 
 void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
     ImGui::Begin("Performance");
@@ -46,7 +45,7 @@ int main() {
 
     vul::Vulkano::descSetReturnVal dsrv = vulkano.createDescriptorSet(descriptors);
 
-    vul::VulRtPipeline rtPipeline(vulkano.getVulDevice(), {"../bin/raytrace.rgen.spv"}, {"../bin/raytrace.rmiss.spv"}, {"../bin/raytrace.rchit.spv"},
+    vul::VulRtPipeline rtPipeline(vulkano.getVulDevice(), "../bin/raytrace.rgen.spv", {"../bin/raytrace.rmiss.spv"}, {"../bin/raytrace.rchit.spv"},
             {dsrv.set->getLayout()->getDescriptorSetLayout()});
 
     bool stop = false;

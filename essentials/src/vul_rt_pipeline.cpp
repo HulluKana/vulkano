@@ -1,15 +1,19 @@
+#include "vul_buffer.hpp"
 #include "vul_debug_tools.hpp"
 #include "vul_pipeline.hpp"
+#include <functional>
+#include <stdexcept>
 #include <vul_rt_pipeline.hpp>
 #include <vulkan/vulkan_core.h>
 
 using namespace vulB;
 namespace vul {
 
-VulRtPipeline::VulRtPipeline(vulB::VulDevice &vulDevice, const std::vector<std::string> &raygenShaders, const std::vector<std::string> &missShaders,
+VulRtPipeline::VulRtPipeline(vulB::VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
                 const std::vector<std::string> &closestHitShaders, const std::vector<VkDescriptorSetLayout> &setLayouts) : m_vulDevice{vulDevice}
 {
-    createPipeline(raygenShaders, missShaders, closestHitShaders, setLayouts);
+    createPipeline(raygenShader, missShaders, closestHitShaders, setLayouts);
+    createSBT(static_cast<uint32_t>(missShaders.size()), static_cast<uint32_t>(closestHitShaders.size()));
 }
 
 VulRtPipeline::~VulRtPipeline()
@@ -18,11 +22,10 @@ VulRtPipeline::~VulRtPipeline()
     vkDestroyPipelineLayout(m_vulDevice.device(), m_layout, nullptr);
 }
 
-void VulRtPipeline::createPipeline(const std::vector<std::string> &raygenShaders, const std::vector<std::string> &missShaders,
+void VulRtPipeline::createPipeline(const std::string &raygenShader, const std::vector<std::string> &missShaders,
         const std::vector<std::string> &closestHitShaders, const std::vector<VkDescriptorSetLayout> &setLayouts)
 {
-    const uint32_t raygenIdx = 0;
-    const uint32_t missIdx = raygenIdx + raygenShaders.size();
+    const uint32_t missIdx = 1;
     const uint32_t closestIdx = missIdx + missShaders.size();
     const uint32_t shadersCount = closestIdx + closestHitShaders.size();
 
@@ -38,14 +41,13 @@ void VulRtPipeline::createPipeline(const std::vector<std::string> &raygenShaders
     group.intersectionShader = VK_SHADER_UNUSED_KHR;
 
     group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-    for (size_t i = 0; i < raygenShaders.size(); i++) {
-        vulB::VulPipeline::createShaderModule(m_vulDevice, raygenShaders[i], &stage.module);
-        stage.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
-        stages[i + raygenIdx] = stage;
+    vulB::VulPipeline::createShaderModule(m_vulDevice, raygenShader, &stage.module);
+    stage.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
+    stages[0] = stage;
 
-        group.generalShader = i + raygenIdx;
-        m_shaderGroups.push_back(group);
-    }
+    group.generalShader = 0;
+    m_shaderGroups.push_back(group);
+
     for (size_t i = 0; i < missShaders.size(); i++) {
         vulB::VulPipeline::createShaderModule(m_vulDevice, missShaders[i], &stage.module);
         stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
@@ -92,6 +94,67 @@ void VulRtPipeline::createPipeline(const std::vector<std::string> &raygenShaders
 
     VUL_NAME_VK(m_pipeline)    
     VUL_NAME_VK(m_layout)    
+}
+
+void VulRtPipeline::createSBT(uint32_t missCount, uint32_t hitCount)
+{
+    std::function<uint32_t(uint32_t, uint32_t)> alignUp = [](uint32_t victim, uint32_t murderer) {return (victim + murderer - 1) & ~(victim - 1);};
+
+    VkPhysicalDeviceRayTracingPipelinePropertiesKHR rtProperties{};
+    rtProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+    VkPhysicalDeviceProperties2 prop2{};
+    prop2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    prop2.pNext = &rtProperties;
+    vkGetPhysicalDeviceProperties2(m_vulDevice.getPhysicalDevice(), &prop2);
+
+    const uint32_t handleCount = 1 + missCount + hitCount; 
+    const uint32_t handleSize = rtProperties.shaderGroupHandleSize;
+    const uint32_t handleSizeAligned = alignUp(handleSize, rtProperties.shaderGroupHandleAlignment);
+
+    m_rgenRegion.stride = alignUp(handleSizeAligned, rtProperties.shaderGroupBaseAlignment);
+    m_rgenRegion.size = m_rgenRegion.stride;
+    m_rmissRegion.stride = handleSizeAligned;
+    m_rmissRegion.size = alignUp(missCount * handleSizeAligned, rtProperties.shaderGroupBaseAlignment);
+    m_rhitRegion.stride = handleSizeAligned;
+    m_rhitRegion.size = alignUp(hitCount * handleSizeAligned, rtProperties.shaderGroupBaseAlignment);
+
+    const size_t dataSize = handleSize * handleCount;
+    std::vector<uint8_t> handles(dataSize);
+    if (vkGetRayTracingShaderGroupHandlesKHR(m_vulDevice.device(), m_pipeline, 0, handleCount, dataSize, handles.data()) != VK_SUCCESS)
+        throw std::runtime_error("Failed to get ray tracing shader group handles");
+
+    VkDeviceSize sbtSize = m_rgenRegion.size + m_rmissRegion.size + m_rhitRegion.size + m_callRegion.size;
+    m_SBTBuffer = std::make_unique<VulBuffer>(m_vulDevice);
+    m_SBTBuffer->keepEmpty(1, sbtSize);
+    m_SBTBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_sbt | VulBuffer::usage_getAddress | VulBuffer::usage_transferDst));
+
+    VkDeviceAddress sbtAddress = m_SBTBuffer->getBufferAddress();
+    m_rgenRegion.deviceAddress = sbtAddress;
+    m_rmissRegion.deviceAddress = sbtAddress + m_rgenRegion.size;
+    m_rhitRegion.deviceAddress = sbtAddress + m_rgenRegion.size + m_rmissRegion.size;
+
+    std::function<uint8_t *(uint32_t)> getHandle = [&](uint32_t idx) {return handles.data() + idx * handleSize;};
+
+    uint8_t *pSbtData = new uint8_t[dataSize];
+    uint8_t *pData = pSbtData;
+    uint32_t handleIdx{};
+
+    memcpy(pData, getHandle(handleIdx++), handleSize);
+    pData = pSbtData + m_rgenRegion.size;
+    for (uint32_t i = 0; i < missCount; i++) {
+        memcpy(pData, getHandle(handleIdx++), handleSize);
+        pData += m_rmissRegion.stride;
+    }
+    pData = pSbtData + m_rgenRegion.size + m_rmissRegion.size;
+    for (uint32_t i = 0; i < hitCount; i++) {
+        memcpy(pData, getHandle(handleIdx++), handleSize);
+        pData += m_rhitRegion.stride;
+    }
+    
+    m_SBTBuffer->writeData(pSbtData, dataSize, 0);
+    delete[] pSbtData;
+
+    VUL_NAME_VK(m_SBTBuffer->getBuffer())
 }
 
 }

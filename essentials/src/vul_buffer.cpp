@@ -35,7 +35,7 @@ VkResult VulBuffer::createBuffer(bool isLocal, VulBuffer::Usage usage)
 
     if (!m_creationPreparationDone) throw std::runtime_error("Buffer creation preparations need to be done before creating buffer");
     if (~(usage_transferSrc | usage_transferDst | usage_getAddress | usage_accelerationStructureBuildRead | usage_ubo | usage_ssbo | usage_indexBuffer
-                | usage_vertexBuffer | usage_accelerationStructureBuffer) & usage)
+                | usage_vertexBuffer | usage_accelerationStructureBuffer | usage_sbt) & usage)
         throw std::runtime_error("Unsupported buffer usage flag");
     if ((usage & (usage_ubo | usage_ssbo)) == (usage_ubo | usage_ssbo))
         throw std::runtime_error("Buffer can't be both storage and uniform buffer");

@@ -32,7 +32,8 @@ class VulBuffer {
             usage_ubo = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
             usage_indexBuffer = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
             usage_vertexBuffer = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            usage_accelerationStructureBuffer = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR
+            usage_accelerationStructureBuffer = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR,
+            usage_sbt = VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR
         };
         VkResult createBuffer(bool isLocal, Usage usage);
 
