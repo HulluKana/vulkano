@@ -1,10 +1,43 @@
 #version 460
-#extension GL_EXT_ray_tracing : require
 
-layout(binding = 0, set = 0) uniform accelerationStructureEXT tlas;
-layout(binding = 1, set = 0, rgba32f) uniform image2D image;
+#extension GL_EXT_ray_tracing : require
+#extension GL_GOOGLE_include_directive : enable
+
+#include "../include/host_device.hpp"
+#include "common.glsl"
+
+layout(binding = 0, set = 0, rgba32f) uniform image2D image;
+layout(binding = 1, set = 0) uniform Ubo {GlobalUbo ubo;};
+layout(binding = 2, set = 0) uniform accelerationStructureEXT tlas;
+
+layout(location = 0) rayPayloadEXT payload prd;
 
 void main() 
 {
-    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(0.5, 0.5, 0.5, 1.0));
+    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+    const vec2 uv = pixelCenter / vec2(gl_LaunchSizeEXT.xy) * 2.0 - vec2(1.0);
+
+    const mat4 viewInverse = inverse(ubo.viewMatrix);
+    const vec4 origin = viewInverse * vec4(0.0, 0.0, 0.0, 1.0);
+    const vec4 target = inverse(ubo.projectionMatrix) * vec4(uv.x, uv.y, 1.0, 1.0);
+    const vec4 dir = viewInverse * vec4(normalize(target.xyz), 0.0);
+
+    const uint rayFlags = gl_RayFlagsOpaqueEXT;
+    const float minDst = 0.001;
+    const float maxDst = 1000.0;
+
+    traceRayEXT(tlas,               // acceleration structure
+            gl_RayFlagsOpaqueEXT,   // rayFlags
+            0xFF,                   // cullMask
+            0,                      // sbtRecordOffset
+            0,                      // sbtRecordStride
+            0,                      // missIndex
+            origin.xyz,             // ray origin
+            minDst,                 // ray min range
+            dir.xyz,                // ray direction
+            maxDst,                 // ray max range
+            0                       // payload (location = 0)
+    );
+
+    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(prd.hitValue, 1.0));
 }

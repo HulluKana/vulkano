@@ -16,6 +16,9 @@ class VulRtPipeline {
         VulRtPipeline(const VulRtPipeline &) = delete;
         VulRtPipeline &operator=(const VulRtPipeline &) = delete;
         VulRtPipeline(VulRtPipeline &&) = default;
+
+        void traceRays(uint32_t width, uint32_t height, uint32_t pushConstantSize, void *pushConstant, const std::vector<VkDescriptorSet> &descSets,
+                VkCommandBuffer cmdBuf);
     private:
         void createPipeline(const std::string &raygenShader, const std::vector<std::string> &missShaders,
                 const std::vector<std::string> &closestHitShaders, const std::vector<VkDescriptorSetLayout> &setLayouts);

@@ -266,6 +266,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
                 asInfos[j].pAccelerationStructures = as->getPTlas();
             }
             tlasInfosStorage.push_back(asInfos);
+            set->writeTlas(i, tlasInfosStorage[tlasInfosStorage.size() - 1].data(), desc.count);
         }
     }
     set->build();

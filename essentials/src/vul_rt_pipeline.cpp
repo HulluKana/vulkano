@@ -22,6 +22,18 @@ VulRtPipeline::~VulRtPipeline()
     vkDestroyPipelineLayout(m_vulDevice.device(), m_layout, nullptr);
 }
 
+void VulRtPipeline::traceRays(uint32_t width, uint32_t height, uint32_t pushConstantSize, void *pushConstant, const std::vector<VkDescriptorSet> &descSets,
+                VkCommandBuffer cmdBuf)
+{
+    VUL_PROFILE_FUNC()
+
+    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_pipeline);
+    vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, m_layout, 0, static_cast<uint32_t>(descSets.size()), descSets.data(), 0, nullptr);
+    if (pushConstantSize > 0) vkCmdPushConstants(cmdBuf, m_layout, VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR |
+            VK_SHADER_STAGE_MISS_BIT_KHR, 0, pushConstantSize, pushConstant);
+    vkCmdTraceRaysKHR(cmdBuf, &m_rgenRegion, &m_rmissRegion, &m_rhitRegion, &m_callRegion, width, height, 1);
+}
+
 void VulRtPipeline::createPipeline(const std::string &raygenShader, const std::vector<std::string> &missShaders,
         const std::vector<std::string> &closestHitShaders, const std::vector<VkDescriptorSetLayout> &setLayouts)
 {
