@@ -13,18 +13,7 @@
 using namespace vulB;
 namespace vul {
 
-VulAs::VulAs(VulDevice &vulDevice) : m_vulDevice{vulDevice}
-{
-
-}
-
-VulAs::~VulAs()
-{
-    vkDestroyAccelerationStructureKHR(m_vulDevice.device(), m_tlas.as, nullptr);
-    for (As &as : m_blases) vkDestroyAccelerationStructureKHR(m_vulDevice.device(), as.as, nullptr);
-}
-
-void VulAs::loadScene(const Scene &scene)
+VulAs::VulAs(VulDevice &vulDevice, const Scene &scene) : m_vulDevice{vulDevice}
 {
     std::vector<BlasInput> blasInputs;
     blasInputs.reserve(scene.nodes.size());
@@ -37,6 +26,12 @@ void VulAs::loadScene(const Scene &scene)
     for (uint32_t i = 0; i < static_cast<uint32_t>(scene.nodes.size()); i++) asInsts.emplace_back(gltfNodeToAsInstance(scene, i, m_blases[i]));
 
     buildTlas(asInsts, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+}
+
+VulAs::~VulAs()
+{
+    vkDestroyAccelerationStructureKHR(m_vulDevice.device(), m_tlas.as, nullptr);
+    for (As &as : m_blases) vkDestroyAccelerationStructureKHR(m_vulDevice.device(), as.as, nullptr);
 }
 
 void VulAs::buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asInsts, VkBuildAccelerationStructureFlagsKHR flags)
@@ -84,7 +79,6 @@ void VulAs::buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asI
     VulBuffer scratchBuffer(m_vulDevice);
     scratchBuffer.keepEmpty(1, sizeInfo.buildScratchSize);
     scratchBuffer.createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_getAddress));
-    std::cout << creatInf.size << "\n";
 
     buildInfo.dstAccelerationStructure = m_tlas.as;
     buildInfo.scratchData.deviceAddress = scratchBuffer.getBufferAddress();

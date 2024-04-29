@@ -194,6 +194,30 @@ VulDescriptorSet &VulDescriptorSet::writeImage(uint32_t binding, VkDescriptorIma
     return *this;
 }
 
+VulDescriptorSet &VulDescriptorSet::writeTlas(uint32_t binding, VkWriteDescriptorSetAccelerationStructureKHR *tlasInfo, uint32_t descriptorCount)
+{
+    assert(m_setLayout->bindings.count(binding) == 1 && "Layout does not contain specified binding");
+
+    auto &bindingDescription = m_setLayout->bindings[binding];
+    assert(bindingDescription.descriptorCount == descriptorCount && "Binding some amount of descriptor infos, but binding expects different amount");
+
+    VkWriteDescriptorSet write{};
+    write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    write.descriptorType = bindingDescription.descriptorType;
+    write.dstBinding = binding;
+    write.pNext = tlasInfo;
+    write.descriptorCount = descriptorCount;
+
+    m_writes.push_back(write);
+
+    DescriptorInfo descInfo{};
+    for (uint32_t i = 0; i < descriptorCount; i++)
+        descInfo.tlasInfos.push_back(tlasInfo[i]);
+    descriptorInfos.push_back(descInfo);
+    return *this;
+
+}
+
 bool VulDescriptorSet::build() {
     bool success = m_pool.allocateDescriptorSet(m_setLayout->getDescriptorSetLayout(), m_set);
     if (!success) {
@@ -223,6 +247,13 @@ void VulDescriptorSet::update()
             if (m_writes[i].descriptorType != VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE &&
                 m_writes[i].descriptorType != VK_DESCRIPTOR_TYPE_STORAGE_IMAGE &&
                 m_writes[i].descriptorType != VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER)
+                fprintf(stderr, "Invalid descriptor type while updating descriptorSet");
+            continue;
+        }
+        if (descriptorInfos[i].tlasInfos.size() > 0){
+            m_writes[i].pNext = descriptorInfos[i].tlasInfos.data();
+            m_writes[i].descriptorCount = descriptorInfos[i].tlasInfos.size();
+            if (m_writes[i].descriptorType != VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR)
                 fprintf(stderr, "Invalid descriptor type while updating descriptorSet");
             continue;
         }

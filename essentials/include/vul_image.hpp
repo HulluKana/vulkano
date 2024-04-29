@@ -50,12 +50,9 @@ class VulImage
         bool usableByImGui{false};
         std::string name;
 
-        // Do I even need to explain this at this point?
         VulImage(const VulImage &) = delete;
         VulImage &operator=(const VulImage &) = delete;
-        // Move instead of reference, you know the deal
         VulImage(VulImage &&) = default;
-        VulImage &operator=(VulImage &&) = default;
     private:
         void createImageView(VkImageViewType imageViewType);
         void createTextureSampler();

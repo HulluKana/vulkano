@@ -49,7 +49,7 @@ class VulPipeline{
         VulDevice& m_vulDevice;
         VkPipeline m_pipeline;
         VkPipelineLayout m_layout;
-        VkShaderModule m_vertShaderModule;
-        VkShaderModule m_fragShaderModule;
+        VkShaderModule vertShaderModule;
+        VkShaderModule fragShaderModule;
 };
 }

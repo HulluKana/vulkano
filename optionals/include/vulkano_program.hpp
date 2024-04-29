@@ -20,6 +20,7 @@
 #include<memory>
 #include<array>
 #include<variant>
+#include <vulkan/vulkan_core.h>
 
 namespace vul{
 
@@ -70,12 +71,16 @@ class Vulkano{
             combinedTexSampler,
             spCombinedTexSampler,
             upCombinedAttachmentSampler,
-            storageImage
+            storageImage,
+            accelerationStructure 
         };
         enum class ShaderStage{
             frag = VK_SHADER_STAGE_FRAGMENT_BIT,
             vert = VK_SHADER_STAGE_VERTEX_BIT,
-            comp = VK_SHADER_STAGE_COMPUTE_BIT
+            comp = VK_SHADER_STAGE_COMPUTE_BIT,
+            rgen = VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+            rmiss = VK_SHADER_STAGE_MISS_BIT_KHR,
+            rchit = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
         };
         struct Descriptor{
             DescriptorType type;

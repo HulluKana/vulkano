@@ -10,16 +10,14 @@ namespace vul {
 
 class VulAs {
     public:
-        VulAs(vulB::VulDevice &vulDevice);
+        VulAs(vulB::VulDevice &vulDevice, const Scene &scene);
         ~VulAs();
 
         VulAs(const VulAs &) = delete;
         VulAs &operator=(const VulAs &) = delete;
-        // Move instead of reference, you know the deal
         VulAs(VulAs &&) = default;
-        VulAs &operator=(VulAs &&) = default;
 
-        void loadScene(const Scene &scene);
+        const VkAccelerationStructureKHR *getPTlas() const {return &m_tlas.as;}
     private:
         struct As {
             VkAccelerationStructureKHR as;

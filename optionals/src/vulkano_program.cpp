@@ -1,4 +1,5 @@
 #include "vul_2d_object.hpp"
+#include "vul_acceleration_structure.hpp"
 #include "vul_attachment_image.hpp"
 #include "vul_descriptors.hpp"
 #include <vul_debug_tools.hpp>
@@ -194,6 +195,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
             descriptors[i].type == DescriptorType::spCombinedTexSampler || descriptors[i].type == DescriptorType::upCombinedAttachmentSampler)
             type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         else if (descriptors[i].type == DescriptorType::storageImage) type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        else if (descriptors[i].type == DescriptorType::accelerationStructure) type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
         layoutBuilder.addBinding(i, type, stageFlags, descriptors[i].count);
     }
     std::shared_ptr<VulDescriptorSetLayout> layout = layoutBuilder.build();
@@ -201,6 +203,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
     std::unique_ptr<VulDescriptorSet> set = std::make_unique<VulDescriptorSet>(layout, *m_globalPool);
     std::vector<std::vector<VkDescriptorBufferInfo>> bufferInfosStorage;
     std::vector<std::vector<VkDescriptorImageInfo>> imageInfosStorage;
+    std::vector<std::vector<VkWriteDescriptorSetAccelerationStructureKHR>> tlasInfosStorage;
     for (size_t i = 0; i < descriptors.size(); i++){
         const Descriptor &desc = descriptors[i];
         if (desc.type == DescriptorType::ubo || desc.type == DescriptorType::ssbo){
@@ -253,6 +256,16 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
             }
             imageInfosStorage.push_back(imageInfos);
             set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
+        }
+        if (desc.type == DescriptorType::accelerationStructure) {
+            const VulAs *as = static_cast<const VulAs *>(desc.content);
+            std::vector<VkWriteDescriptorSetAccelerationStructureKHR> asInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++) {
+                asInfos[j].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+                asInfos[j].accelerationStructureCount = 1;
+                asInfos[j].pAccelerationStructures = as->getPTlas();
+            }
+            tlasInfosStorage.push_back(asInfos);
         }
     }
     set->build();

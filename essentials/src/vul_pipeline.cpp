@@ -10,13 +10,13 @@ namespace vulB{
 
 VulPipeline::VulPipeline(VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo) : m_vulDevice(device)
 {
-    createShaderModule(m_vulDevice, vertFile, &m_vertShaderModule);
-    createShaderModule(m_vulDevice, fragFile, &m_fragShaderModule);
+    createShaderModule(m_vulDevice, vertFile, &vertShaderModule);
+    createShaderModule(m_vulDevice, fragFile, &fragShaderModule);
 
     VkPipelineShaderStageCreateInfo shaderStages[2]{};
     shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-    shaderStages[0].module = m_vertShaderModule;
+    shaderStages[0].module = vertShaderModule;
     shaderStages[0].pName = "main";
     shaderStages[0].flags = 0;
     shaderStages[0].pNext = nullptr;
@@ -24,7 +24,7 @@ VulPipeline::VulPipeline(VulDevice& device, const std::string& vertFile, const s
 
     shaderStages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-    shaderStages[1].module = m_fragShaderModule;
+    shaderStages[1].module = fragShaderModule;
     shaderStages[1].pName = "main";
     shaderStages[1].flags = 0;
     shaderStages[1].pNext = nullptr;
@@ -161,15 +161,14 @@ VulPipeline::VulPipeline(VulDevice& device, const std::string& vertFile, const s
         throw std::runtime_error("Failed to create graphics pipeline in vul_pipeline.cpp file");
     }
 
-    VUL_NAME_VK(m_vertShaderModule)
-    VUL_NAME_VK(m_fragShaderModule)
+    vkDestroyShaderModule(m_vulDevice.device(), vertShaderModule, nullptr);
+    vkDestroyShaderModule(m_vulDevice.device(), fragShaderModule, nullptr);
+
     VUL_NAME_VK(m_pipeline)
     VUL_NAME_VK(m_layout)
 }
 
 VulPipeline::~VulPipeline() {
-    vkDestroyShaderModule(m_vulDevice.device(), m_vertShaderModule, nullptr);
-    vkDestroyShaderModule(m_vulDevice.device(), m_fragShaderModule, nullptr);
     vkDestroyPipeline(m_vulDevice.device(), m_pipeline, nullptr);
     vkDestroyPipelineLayout(m_vulDevice.device(), m_layout, nullptr);
 }
