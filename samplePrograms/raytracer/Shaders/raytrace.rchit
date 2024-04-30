@@ -11,5 +11,5 @@ hitAttributeEXT vec3 attribs;
 
 void main()
 {
-    prd.hitValue = vec3(0.8, 0.6, 0.4);
+    prd.hitValue = vec3(gl_HitTEXT / 50.0);
 }

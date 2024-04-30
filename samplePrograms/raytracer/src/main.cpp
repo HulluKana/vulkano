@@ -10,6 +10,7 @@
 #include<host_device.hpp>
 #include<vul_debug_tools.hpp>
 #include <vul_acceleration_structure.hpp>
+#include <iostream>
 
 #include<imgui.h>
 
@@ -25,7 +26,7 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 int main() {
     vul::settings::deviceInitConfig.enableRaytracingSupport = true;
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
-    vulkano.loadScene("../Models/Room.gltf");
+    vulkano.loadScene("../Models/sponza.gltf");
     vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
     vulkano.initVulkano();
     vul::settings::maxFps = 60.0f;
@@ -37,7 +38,9 @@ int main() {
     for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
         rtImgs[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());
         rtImgs[i]->keepEmpty(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, 4, 16);
-        rtImgs[i]->createImageSingleTime(false, true, vul::VulImage::ImageType::storageFloat, 2);
+        VkCommandBuffer cmdBuf = vulkano.getVulDevice().beginSingleTimeCommands();
+        rtImgs[i]->createImageLowLevel(false, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_TYPE_2D, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, cmdBuf);
+        vulkano.getVulDevice().endSingleTimeCommands(cmdBuf);
 
         ubos[i] = std::make_unique<vulB::VulBuffer>(vulkano.getVulDevice());
         ubos[i]->keepEmpty(sizeof(GlobalUbo), 1);
@@ -107,12 +110,26 @@ int main() {
         ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.3f);
         ubos[vulkano.vulRenderer.getFrameIndex()]->writeData(&ubo, sizeof(GlobalUbo), 0);
 
-        std::vector<VkDescriptorSet> descSets = {renderData.descriptorSets[(vulkano.vulRenderer.getFrameIndex() + 1) % vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT]
+        std::vector<VkDescriptorSet> descSets = {vulkano.renderDatas[0].descriptorSets[(vulkano.vulRenderer.getFrameIndex() + 1) % vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT]
             [0]->getSet()};
         rtPipeline.traceRays(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, 0, nullptr, descSets, commandBuffer);
             
         ownStuffTime = glfwGetTime() - ownStuffStartTime;
         stop = vulkano.endFrame(commandBuffer);
+
+        if (vulkano.vulRenderer.wasSwapChainRecreated()) {
+            for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+                VkCommandBuffer cmdBuf = vulkano.getVulDevice().beginSingleTimeCommands();
+                rtImgs[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());
+                rtImgs[i]->keepEmpty(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, 4, 16);
+                rtImgs[i]->createImageLowLevel(false, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_TYPE_2D, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, cmdBuf);
+                vulkano.getVulDevice().endSingleTimeCommands(cmdBuf);
+
+
+                vulkano.renderDatas[0].descriptorSets[i][0]->descriptorInfos[0].imageInfos[0].imageView = rtImgs[i]->getImageView();
+                vulkano.renderDatas[0].descriptorSets[i][0]->update();
+            }
+        }
     }
     vulkano.letVulkanoFinish();
 

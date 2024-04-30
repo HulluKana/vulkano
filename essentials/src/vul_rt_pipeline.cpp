@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <vul_rt_pipeline.hpp>
 #include <vulkan/vulkan_core.h>
+#include <iostream>
 
 using namespace vulB;
 namespace vul {
@@ -147,7 +148,7 @@ void VulRtPipeline::createSBT(uint32_t missCount, uint32_t hitCount)
 
     std::function<uint8_t *(uint32_t)> getHandle = [&](uint32_t idx) {return handles.data() + idx * handleSize;};
 
-    uint8_t *pSbtData = new uint8_t[dataSize];
+    uint8_t *pSbtData = new uint8_t[sbtSize];
     uint8_t *pData = pSbtData;
     uint32_t handleIdx{};
 
@@ -163,7 +164,7 @@ void VulRtPipeline::createSBT(uint32_t missCount, uint32_t hitCount)
         pData += m_rhitRegion.stride;
     }
     
-    m_SBTBuffer->writeData(pSbtData, dataSize, 0);
+    m_SBTBuffer->writeData(pSbtData, sbtSize, 0);
     delete[] pSbtData;
 
     VUL_NAME_VK(m_SBTBuffer->getBuffer())

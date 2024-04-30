@@ -29,9 +29,6 @@ Vulkano::Vulkano(uint32_t width, uint32_t height, std::string name) : m_vulWindo
     m_globalPool = VulDescriptorPool::Builder(m_vulDevice)
         .setMaxSets(m_vulDevice.properties.limits.maxBoundDescriptorSets)
         .setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 50)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 50)
-        .addPoolSize(VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 50)
         .build();
 }
 
