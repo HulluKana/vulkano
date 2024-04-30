@@ -196,10 +196,15 @@ void VulDevice::createLogicalDevice() {
       descriptorIndexingFeatures.pNext = &reset;
   }
 
+  VkPhysicalDeviceScalarBlockLayoutFeatures scalarBlockFeatures{};
+  scalarBlockFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES;
+  scalarBlockFeatures.scalarBlockLayout = VK_TRUE;
+  scalarBlockFeatures.pNext = &descriptorIndexingFeatures;
+
   VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddresFeature{};
   bufferDeviceAddresFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
   bufferDeviceAddresFeature.bufferDeviceAddress = VK_TRUE;
-  bufferDeviceAddresFeature.pNext = &descriptorIndexingFeatures;
+  bufferDeviceAddresFeature.pNext = &scalarBlockFeatures;
 
   VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature{};
   dynamic_rendering_feature.sType =

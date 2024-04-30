@@ -48,12 +48,23 @@ void Scene::loadScene(std::string fileName)
         packedMaterials.push_back(packedMat);
     }
 
+    std::vector<PrimInfo> primInfos;
+    for (const GltfLoader::GltfPrimMesh &mesh : gltfLoader.primMeshes) {
+        PrimInfo primInfo;
+        primInfo.firstIndex = mesh.firstIndex;
+        primInfo.vertexOffset = mesh.vertexOffset;
+        primInfo.materialIndex = mesh.materialIndex;
+        primInfo.padding = 69;
+        primInfos.push_back(primInfo);
+    } 
+
     indexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
     vertexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
     normalBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
     tangentBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
     uvBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
     materialBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+    primInfoBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
 
     indexBuffer->loadVector(gltfLoader.indices);
     vertexBuffer->loadVector(gltfLoader.positions);
@@ -61,15 +72,17 @@ void Scene::loadScene(std::string fileName)
     tangentBuffer->loadVector(gltfLoader.tangents);
     uvBuffer->loadVector(gltfLoader.uvCoords);
     materialBuffer->loadVector(packedMaterials);
+    primInfoBuffer->loadVector(primInfos);
 
     indexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_indexBuffer | VulBuffer::usage_transferDst
-                | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead));
+                | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead | VulBuffer::usage_ssbo));
     vertexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst
-                | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead));
-    normalBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
-    tangentBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
-    uvBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst));
+                | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead | VulBuffer::usage_ssbo));
+    normalBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst | VulBuffer::usage_ssbo));
+    tangentBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst | VulBuffer::usage_ssbo));
+    uvBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst | VulBuffer::usage_ssbo));
     materialBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_transferDst));
+    primInfoBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_transferDst));
 
     lights = gltfLoader.lights;
     nodes = gltfLoader.nodes;
@@ -82,6 +95,7 @@ void Scene::loadScene(std::string fileName)
     VUL_NAME_VK(normalBuffer->getBuffer())
     VUL_NAME_VK(uvBuffer->getBuffer())
     VUL_NAME_VK(materialBuffer->getBuffer())
+    VUL_NAME_VK(primInfoBuffer->getBuffer())
 }
 
 }

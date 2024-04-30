@@ -4,6 +4,9 @@
 #include "vul_renderer.hpp"
 #include "vul_rt_pipeline.hpp"
 #include "vul_swap_chain.hpp"
+#include <glm/detail/qualifier.hpp>
+#include <glm/ext/quaternion_common.hpp>
+#include <glm/matrix.hpp>
 #include <memory>
 #include <vulkan/vulkan_core.h>
 #include<vulkano_program.hpp>
@@ -47,26 +50,46 @@ int main() {
         ubos[i]->createBuffer(false, vulB::VulBuffer::usage_ubo);
 
         std::vector<vul::Vulkano::Descriptor> descriptors;
-        vul::Vulkano::Descriptor rtImgDesc{};
-        rtImgDesc.type = vul::Vulkano::DescriptorType::storageImage;
-        rtImgDesc.stages = {vul::Vulkano::ShaderStage::rgen, vul::Vulkano::ShaderStage::frag};
-        rtImgDesc.count = 1;
-        rtImgDesc.content = rtImgs[i].get();
-        descriptors.push_back(rtImgDesc);
+        vul::Vulkano::Descriptor desc{};
+        desc.count = 1;
 
-        vul::Vulkano::Descriptor uboDesc{};
-        uboDesc.type = vul::Vulkano::DescriptorType::ubo;
-        uboDesc.stages = {vul::Vulkano::ShaderStage::rgen, vul::Vulkano::ShaderStage::rmiss};
-        uboDesc.count = 1;
-        uboDesc.content = ubos[i].get();
-        descriptors.push_back(uboDesc);
+        desc.type = vul::Vulkano::DescriptorType::storageImage;
+        desc.stages = {vul::Vulkano::ShaderStage::rgen, vul::Vulkano::ShaderStage::frag};
+        desc.content = rtImgs[i].get();
+        descriptors.push_back(desc);
 
-        vul::Vulkano::Descriptor asDesc{};
-        asDesc.type = vul::Vulkano::DescriptorType::accelerationStructure;
-        asDesc.stages = {vul::Vulkano::ShaderStage::rgen};
-        asDesc.count = 1;
-        asDesc.content = &as;
-        descriptors.push_back(asDesc);
+        desc.type = vul::Vulkano::DescriptorType::ubo;
+        desc.stages = {vul::Vulkano::ShaderStage::rgen, vul::Vulkano::ShaderStage::rmiss, vul::Vulkano::ShaderStage::rchit};
+        desc.content = ubos[i].get();
+        descriptors.push_back(desc);
+
+        desc.type = vul::Vulkano::DescriptorType::ssbo;
+        desc.stages = {vul::Vulkano::ShaderStage::rchit};
+        desc.content = vulkano.scene.indexBuffer.get();
+        descriptors.push_back(desc);
+        desc.content = vulkano.scene.vertexBuffer.get();
+        descriptors.push_back(desc);
+        desc.content = vulkano.scene.normalBuffer.get();
+        descriptors.push_back(desc);
+        desc.content = vulkano.scene.tangentBuffer.get();
+        descriptors.push_back(desc);
+        desc.content = vulkano.scene.uvBuffer.get();
+        descriptors.push_back(desc);
+        desc.content = vulkano.scene.materialBuffer.get();
+        descriptors.push_back(desc);
+        desc.content = vulkano.scene.primInfoBuffer.get();
+        descriptors.push_back(desc);
+
+        desc.type = vul::Vulkano::DescriptorType::spCombinedTexSampler;
+        desc.content = vulkano.scene.images.data();
+        desc.count = vulkano.scene.images.size();
+        descriptors.push_back(desc);
+
+        desc.type = vul::Vulkano::DescriptorType::accelerationStructure;
+        desc.stages = {vul::Vulkano::ShaderStage::rgen};
+        desc.count = 1;
+        desc.content = &as;
+        descriptors.push_back(desc);
 
         dsrvs[i] = vulkano.createDescriptorSet(descriptors);
     }
@@ -103,11 +126,16 @@ int main() {
         if (vulkano.shouldShowGUI()) GuiStuff(vulkano, ownStuffTime);
 
         GlobalUbo ubo{};
-        ubo.viewMatrix = vulkano.camera.getView();
-        ubo.projectionMatrix = vulkano.camera.getProjection();
+        ubo.inverseViewMatrix = glm::inverse(vulkano.camera.getView());
+        ubo.inverseProjectionMatrix = glm::inverse(vulkano.camera.getProjection());
         ubo.numLights = 0;
         ubo.cameraPosition = glm::vec4(vulkano.cameraTransform.pos, 0.0f);
         ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.3f);
+        ubo.numLights = vulkano.scene.lights.size();
+        for (int i = 0; i < std::min(static_cast<int>(vulkano.scene.lights.size()), MAX_LIGHTS); i++){
+            ubo.lightPositions[i] = glm::vec4(vulkano.scene.lights[i].position, 69.0f);
+            ubo.lightColors[i] = glm::vec4(vulkano.scene.lights[i].color, vulkano.scene.lights[i].intensity);
+        }
         ubos[vulkano.vulRenderer.getFrameIndex()]->writeData(&ubo, sizeof(GlobalUbo), 0);
 
         std::vector<VkDescriptorSet> descSets = {vulkano.renderDatas[0].descriptorSets[(vulkano.vulRenderer.getFrameIndex() + 1) % vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT]

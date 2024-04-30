@@ -16,11 +16,10 @@ using uint = uint32_t;
 #endif
 
 #define MAX_LIGHTS 10
-#define OIT_LAYERS 8
 
 struct GlobalUbo {
-    mat4 projectionMatrix;
-    mat4 viewMatrix;
+    mat4 inverseProjectionMatrix;
+    mat4 inverseViewMatrix;
     vec4 cameraPosition; //4th component is ignored
 
     vec4 ambientLightColor;
@@ -28,28 +27,6 @@ struct GlobalUbo {
     vec4 lightPositions[MAX_LIGHTS]; // 4th component is ignored
     vec4 lightColors[MAX_LIGHTS];
     int numLights;
-};
-
-struct DefaultPushConstant{
-    mat4 modelMatrix;
-    mat4 normalMatrix;
-    int matIdx;
-};
-
-struct OitPushConstant{
-    mat4 modelMatrix;
-    mat4 normalMatrix;
-    int matIdx;
-    uint depthImageIdx;
-    float width;
-    float height;
-};
-
-struct ABuffer {
-    uint color;
-    uint reflectionColor;
-    float depth;
-    uint next;
 };
 
 #endif

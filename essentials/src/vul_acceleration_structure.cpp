@@ -23,7 +23,7 @@ VulAs::VulAs(VulDevice &vulDevice, const Scene &scene) : m_vulDevice{vulDevice}
 
     std::vector<VkAccelerationStructureInstanceKHR> asInsts;
     asInsts.reserve(scene.nodes.size());
-    for (uint32_t i = 0; i < static_cast<uint32_t>(scene.nodes.size()); i++) asInsts.emplace_back(gltfNodeToAsInstance(scene, i, m_blases[i]));
+    for (size_t i = 0; i < scene.nodes.size(); i++) asInsts.emplace_back(gltfNodeToAsInstance(scene.nodes[i], m_blases[i]));
 
     buildTlas(asInsts, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
@@ -219,9 +219,9 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
     if (queryPool) vkDestroyQueryPool(m_vulDevice.device(), queryPool, nullptr);
 }
 
-VkAccelerationStructureInstanceKHR VulAs::gltfNodeToAsInstance(const Scene &scene, uint32_t nodeIdx, const As &blas)
+VkAccelerationStructureInstanceKHR VulAs::gltfNodeToAsInstance(const vulB::GltfLoader::GltfNode &node, const As &blas)
 {
-    glm::mat4 trasposedTransformMat = glm::transpose(scene.nodes[nodeIdx].worldMatrix);
+    glm::mat4 trasposedTransformMat = glm::transpose(node.worldMatrix);
 
     VkAccelerationStructureDeviceAddressInfoKHR blasAddrInfo{};
     blasAddrInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
@@ -229,7 +229,7 @@ VkAccelerationStructureInstanceKHR VulAs::gltfNodeToAsInstance(const Scene &scen
 
     VkAccelerationStructureInstanceKHR asInst{};
     memcpy(&asInst.transform, &trasposedTransformMat, sizeof(VkTransformMatrixKHR));
-    asInst.instanceCustomIndex = nodeIdx;
+    asInst.instanceCustomIndex = node.primMesh;
     asInst.accelerationStructureReference = vkGetAccelerationStructureDeviceAddressKHR(m_vulDevice.device(), &blasAddrInfo);
     asInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
     asInst.mask = 0xFF;

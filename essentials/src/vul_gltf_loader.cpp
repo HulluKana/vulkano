@@ -253,7 +253,7 @@ void GltfLoader::processMesh(const tinygltf::Model &model, const tinygltf::Primi
         }
         if (gltfAttribAnd(requestedAttributes, GltfAttributes::Tangent) == GltfAttributes::Tangent) {
             if (!getAttribute<glm::vec4>(model, mesh, tangents, "TANGENT")) {
-                std::cout << "The mesh doesnt have tangents\n";
+                std::cout << "The mesh doesnt have tangents. Name: " << name << "\n";
                 createTangents(resultMesh.vertexCount);
             }
         }
