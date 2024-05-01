@@ -27,6 +27,10 @@ struct GlobalUbo {
     vec4 lightPositions[MAX_LIGHTS]; // 4th component is ignored
     vec4 lightColors[MAX_LIGHTS];
     int numLights;
+
+    float pixelSpreadAngle;
+    int padding1;
+    int padding2;
 };
 
 #endif

@@ -83,7 +83,7 @@ vec3 diffBRDF(vec3 normal, vec3 viewDirection, vec3 lightDirection, vec3 specula
     return 21.0 / (20.0 * pi) * (vec3(1.0) - specularColor) * diffuseColor * (1.0 - pow(1.0 - nl, 5.0)) * (1.0 - pow(1.0 - nv, 5.0)); 
 }
 
-void getVertexInputs(out vec3 worldPos, out vec3 worldNormal, out vec4 worldTangent, out vec2 uv, out Material material)
+void getVertexInputs(out vec3 worldPos, out vec3 worldNormal, out vec4 worldTangent, out vec2 uv, out Material material, out float normalMapLod)
 {
     const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
@@ -91,8 +91,10 @@ void getVertexInputs(out vec3 worldPos, out vec3 worldNormal, out vec4 worldTang
     const uint indexOffset = primInfo.firstIndex + gl_PrimitiveID * 3;
     const uvec3 index = uvec3(indices[indexOffset], indices[indexOffset + 1], indices[indexOffset + 2]) + uvec3(primInfo.vertexOffset);
 
-    const vec3 pos = vertices[index.x] * barycentrics.x + vertices[index.y] * barycentrics.y + vertices[index.z] * barycentrics.z;
-    worldPos = vec3(gl_ObjectToWorldEXT * vec4(pos, 1.0));
+    const vec3 worldPos1 = vec3(gl_ObjectToWorldEXT * vec4(vertices[index.x], 1.0));
+    const vec3 worldPos2 = vec3(gl_ObjectToWorldEXT * vec4(vertices[index.y], 1.0));
+    const vec3 worldPos3 = vec3(gl_ObjectToWorldEXT * vec4(vertices[index.z], 1.0));
+    worldPos = worldPos1 * barycentrics.x + worldPos2 * barycentrics.y + worldPos3 * barycentrics.z;
 
     const vec3 normal = normals[index.x] * barycentrics.x + normals[index.y] * barycentrics.y + normals[index.z] * barycentrics.z;
     worldNormal = normalize(vec3(normal * gl_WorldToObjectEXT));
@@ -100,7 +102,10 @@ void getVertexInputs(out vec3 worldPos, out vec3 worldNormal, out vec4 worldTang
     const vec4 tangent = tangents[index.x] * barycentrics.x + tangents[index.y] * barycentrics.y + tangents[index.z] * barycentrics.z;
     worldTangent = vec4(normalize(vec3(tangent.xyz * gl_WorldToObjectEXT)), tangent.w);
 
-    uv = uvs[index.x] * barycentrics.x + uvs[index.y] * barycentrics.y + uvs[index.z] * barycentrics.z;
+    const vec2 uv1 = uvs[index.x];
+    const vec2 uv2 = uvs[index.y];
+    const vec2 uv3 = uvs[index.z];
+    uv = uv1 * barycentrics.x + uv2 * barycentrics.y + uv3 * barycentrics.z;
 
     if (primInfo.materialIndex >= 0) {
         PackedMaterial packedMat = materials[primInfo.materialIndex];
@@ -124,6 +129,16 @@ void getVertexInputs(out vec3 worldPos, out vec3 worldNormal, out vec4 worldTang
         material.normalTextureIndex = -1;
         material.roughnessMetallicTextureIndex = -1;
     }
+
+    // Screen space texture lod for selecting mip map calculated using equation 26 from
+    // https://media.contentapi.ea.com/content/dam/ea/seed/presentations/2019-ray-tracing-gems-chapter-20-akenine-moller-et-al.pdf
+    if (material.normalTextureIndex >= 0) {
+        const vec2 textureDimensions = vec2(textureSize(texSampler[material.normalTextureIndex], 0));
+        const float twiceTexelSpaceTriangleArea = textureDimensions.x * textureDimensions.y * abs((uv2.x - uv1.x) * (uv3.y - uv1.y) - (uv3.x - uv1.x) * (uv2.y - uv1.y));
+        const float twiceWorldSpaceTriangleArea = length(cross(worldPos2 - worldPos1, worldPos3 - worldPos1));
+        const float baseNormalMapLod = 0.5 * log2(twiceTexelSpaceTriangleArea / twiceWorldSpaceTriangleArea);
+        normalMapLod = baseNormalMapLod + log2(ubo.pixelSpreadAngle * gl_HitTEXT * (1.0 / abs(dot(worldNormal, gl_WorldRayDirectionEXT))));
+    }
 }
 
 void main()
@@ -133,7 +148,8 @@ void main()
     vec4 tangent;
     vec2 uv;
     Material mat;
-    getVertexInputs(pos, normal, tangent, uv, mat);
+    float normalMapLod;
+    getVertexInputs(pos, normal, tangent, uv, mat, normalMapLod);
 
     float epsilon = 0.0001;
     vec3 rawColor;
@@ -143,7 +159,7 @@ void main()
     if (mat.normalTextureIndex >= 0) {
         const vec3 bitangent = normalize(cross(normal, normalize(tangent.xyz)) * tangent.w);
         const mat3 TBN = mat3(normalize(tangent.xyz), bitangent, normal);
-        normal = normalize(TBN * normalize(texture(texSampler[mat.normalTextureIndex], uv).xyz * 2.0 - vec3(1.0)));
+        normal = normalize(TBN * normalize(textureLod(texSampler[mat.normalTextureIndex], uv, normalMapLod).xyz * 2.0 - vec3(1.0)));
     }
 
     float roughness = mat.roughness;
@@ -176,5 +192,5 @@ void main()
     color += sRGBToAlbedo(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w) * rawColor;
     if (mat.emissiveStrength > 0.01) color += sRGBToAlbedo(mat.emissiveColor * mat.emissiveStrength);
 
-    prd.hitValue = vec3(albedoToSRGB(color));
+    prd.hitValue = vec3(color);
 }

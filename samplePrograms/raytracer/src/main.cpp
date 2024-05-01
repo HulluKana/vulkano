@@ -3,9 +3,10 @@
 #include "vul_pipeline.hpp"
 #include "vul_renderer.hpp"
 #include "vul_rt_pipeline.hpp"
+#include "vul_settings.hpp"
 #include "vul_swap_chain.hpp"
+#include <cmath>
 #include <glm/detail/qualifier.hpp>
-#include <glm/ext/quaternion_common.hpp>
 #include <glm/matrix.hpp>
 #include <memory>
 #include <vulkan/vulkan_core.h>
@@ -131,11 +132,18 @@ int main() {
         ubo.numLights = 0;
         ubo.cameraPosition = glm::vec4(vulkano.cameraTransform.pos, 0.0f);
         ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.3f);
-        ubo.numLights = vulkano.scene.lights.size();
-        for (int i = 0; i < std::min(static_cast<int>(vulkano.scene.lights.size()), MAX_LIGHTS); i++){
+        ubo.numLights = std::min(static_cast<int>(vulkano.scene.lights.size()), MAX_LIGHTS);
+        for (int i = 0; i < ubo.numLights; i++){
             ubo.lightPositions[i] = glm::vec4(vulkano.scene.lights[i].position, 69.0f);
             ubo.lightColors[i] = glm::vec4(vulkano.scene.lights[i].color, vulkano.scene.lights[i].intensity);
         }
+
+        // Pixel spread angle is from equation 30 from
+        // https://media.contentapi.ea.com/content/dam/ea/seed/presentations/2019-ray-tracing-gems-chapter-20-akenine-moller-et-al.pdf
+        ubo.pixelSpreadAngle = atan((2.0f * tan(vul::settings::cameraProperties.fovY / 2.0f)) / static_cast<float>(vulkano.getSwapChainExtent().height));
+        ubo.padding1 = 69;
+        ubo.padding2 = 420;
+
         ubos[vulkano.vulRenderer.getFrameIndex()]->writeData(&ubo, sizeof(GlobalUbo), 0);
 
         std::vector<VkDescriptorSet> descSets = {vulkano.renderDatas[0].descriptorSets[(vulkano.vulRenderer.getFrameIndex() + 1) % vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT]
