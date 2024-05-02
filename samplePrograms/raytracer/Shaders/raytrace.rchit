@@ -83,7 +83,7 @@ vec3 diffBRDF(vec3 normal, vec3 viewDirection, vec3 lightDirection, vec3 specula
     return 21.0 / (20.0 * pi) * (vec3(1.0) - specularColor) * diffuseColor * (1.0 - pow(1.0 - nl, 5.0)) * (1.0 - pow(1.0 - nv, 5.0)); 
 }
 
-void getVertexInputs(out vec3 worldPos, out vec3 worldNormal, out vec4 worldTangent, out vec2 uv, out Material material, out float normalMapLod)
+void getVertexInputs(out vec3 worldPos, out vec3 worldNormal, out vec4 worldTangent, out vec2 uv, out Material material, out vec4 uvGradients)
 {
     const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
@@ -132,13 +132,46 @@ void getVertexInputs(out vec3 worldPos, out vec3 worldNormal, out vec4 worldTang
 
     // Screen space texture lod for selecting mip map calculated using equation 26 from
     // https://media.contentapi.ea.com/content/dam/ea/seed/presentations/2019-ray-tracing-gems-chapter-20-akenine-moller-et-al.pdf
-    if (material.normalTextureIndex >= 0) {
-        const vec2 textureDimensions = vec2(textureSize(texSampler[material.normalTextureIndex], 0));
-        const float twiceTexelSpaceTriangleArea = textureDimensions.x * textureDimensions.y * abs((uv2.x - uv1.x) * (uv3.y - uv1.y) - (uv3.x - uv1.x) * (uv2.y - uv1.y));
-        const float twiceWorldSpaceTriangleArea = length(cross(worldPos2 - worldPos1, worldPos3 - worldPos1));
-        const float baseNormalMapLod = 0.5 * log2(twiceTexelSpaceTriangleArea / twiceWorldSpaceTriangleArea);
-        normalMapLod = baseNormalMapLod + log2(ubo.pixelSpreadAngle * gl_HitTEXT * (1.0 / abs(dot(worldNormal, gl_WorldRayDirectionEXT))));
-    }
+    // I'm using a modified version of it that uses gradients instead of lod, and it is from raytracing gems 2 book.
+    // Additionally I got some anisotropic filtering stuff from https://jcgt.org/published/0010/01/01/
+
+    // Gradients with anisotropic filtering
+    const float epsilon = 0.0001;
+    const vec3 rayDir = gl_WorldRayDirectionEXT;
+    const float projectedConeRadius = 0.5 * (ubo.pixelSpreadAngle * gl_HitTEXT) / (abs(dot(worldNormal, rayDir)));
+
+    const vec3 h1 = rayDir - dot(worldNormal, rayDir) * worldNormal;
+    const vec3 a1 = projectedConeRadius / max(length(h1 - dot(rayDir, h1) * rayDir), epsilon) * h1;
+
+    const vec3 h2 = cross(worldNormal, a1);
+    const vec3 a2 = projectedConeRadius / max(length(h2 - dot(rayDir, h2) * rayDir), epsilon) * h2;
+
+    const vec3 e1 = worldPos2 - worldPos1;
+    const vec3 e2 = worldPos3 - worldPos1;
+    const float oneOverAreaTriangle = 1.0 / dot(worldNormal, cross(e1, e2));
+
+    vec3 eP = worldPos + a1 - worldPos1;
+    const float u1 = dot(worldNormal, cross(eP, e2)) * oneOverAreaTriangle;
+    const float v1 = dot(worldNormal, cross(e1, eP)) * oneOverAreaTriangle;
+    const vec2 grad1 = (1.0 - u1 - v1) * uv1 + u1 * uv2 + v1 * uv3 - uv;
+
+    eP = worldPos + a2 - worldPos1;
+    const float u2 = dot(worldNormal, cross(eP, e2)) * oneOverAreaTriangle;
+    const float v2 = dot(worldNormal, cross(e1, eP)) * oneOverAreaTriangle;
+    const vec2 grad2 = (1.0 - u2 - v2) * uv1 + u2 * uv2 + v2 * uv3 - uv;
+
+    uvGradients = vec4(grad1, grad2);
+
+    // Gradients without anisotropic filtering
+    /*
+    const vec3 rayDir = gl_WorldRayDirectionEXT;
+    const float projectedConeWidth = (ubo.pixelSpreadAngle * gl_HitTEXT) / (abs(dot(worldNormal, rayDir)));
+    const float uvArea = abs((uv2.x - uv1.x) * (uv3.y - uv1.y) - (uv3.x - uv1.x) * (uv2.y - uv1.y));
+    const float worldSpaceArea = length(cross(worldPos2 - worldPos1, worldPos3 - worldPos1));
+    const float visibleAreaRatio = (projectedConeWidth * projectedConeWidth) / worldSpaceArea;
+    const float visibleUvSideLength = sqrt(uvArea * visibleAreaRatio);
+    uvGradients = vec4(visibleUvSideLength, 0.0, 0.0, visibleUvSideLength);
+    */
 }
 
 void main()
@@ -148,18 +181,23 @@ void main()
     vec4 tangent;
     vec2 uv;
     Material mat;
-    float normalMapLod;
-    getVertexInputs(pos, normal, tangent, uv, mat, normalMapLod);
+    vec4 uvGrads;
+    getVertexInputs(pos, normal, tangent, uv, mat, uvGrads);
 
     float epsilon = 0.0001;
     vec3 rawColor;
-    if (mat.colorTextureIndex >= 0) rawColor = texture(texSampler[mat.colorTextureIndex], uv).xyz;
+    float alpha = mat.alpha;
+    if (mat.colorTextureIndex >= 0) {
+        const vec4 rgba = textureGrad(texSampler[mat.colorTextureIndex], uv, uvGrads.xy, uvGrads.wz);
+        rawColor = rgba.xyz;
+        alpha = rgba.w;
+    }
     else rawColor = sRGBToAlbedo(mat.color);
 
     if (mat.normalTextureIndex >= 0) {
         const vec3 bitangent = normalize(cross(normal, normalize(tangent.xyz)) * tangent.w);
         const mat3 TBN = mat3(normalize(tangent.xyz), bitangent, normal);
-        normal = normalize(TBN * normalize(textureLod(texSampler[mat.normalTextureIndex], uv, normalMapLod).xyz * 2.0 - vec3(1.0)));
+        normal = normalize(TBN * normalize(textureGrad(texSampler[mat.normalTextureIndex], uv, uvGrads.xy, uvGrads.zw).xyz * 2.0 - vec3(1.0)));
     }
 
     float roughness = mat.roughness;
@@ -192,5 +230,6 @@ void main()
     color += sRGBToAlbedo(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w) * rawColor;
     if (mat.emissiveStrength > 0.01) color += sRGBToAlbedo(mat.emissiveColor * mat.emissiveStrength);
 
-    prd.hitValue = vec3(color);
+    prd.hitValue = vec4(albedoToSRGB(color), alpha);
+    prd.pos = pos;
 }

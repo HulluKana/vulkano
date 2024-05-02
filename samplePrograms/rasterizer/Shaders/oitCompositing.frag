@@ -61,4 +61,11 @@ void main()
     FragColor = vec4(color, 1.0 - alphaInverted);
 
     imageStore(aBufferHeads, ivec2(gl_FragCoord.xy), uvec4(0));
+    1
+    1 * 0,3 + 0,5 * 0,7
+    0,3 + 0,35
+    0,65 * 0,6 + 0,3 * 0,4
+    0,39 + 0,12
+    0,51
+
 }

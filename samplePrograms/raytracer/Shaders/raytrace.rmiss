@@ -12,5 +12,5 @@ layout(location = 0) rayPayloadInEXT payload prd;
 
 void main()
 {
-    prd.hitValue = vec3(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w);
+    prd.hitValue = vec4(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w, 1.0);
 }
