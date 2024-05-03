@@ -18,8 +18,10 @@ layout(binding = 6, set = 0) readonly buffer Uvs                {vec2 uvs[];};
 layout(binding = 7, set = 0) readonly buffer Materials          {PackedMaterial materials[];};
 layout(binding = 8, set = 0) readonly buffer PrimInfos          {PrimInfo primInfos[];};
 layout(binding = 9, set = 0) uniform sampler2D texSampler[];
+layout(binding = 10, set = 0) uniform accelerationStructureEXT tlas;
 
 layout(location = 0) rayPayloadInEXT payload prd;
+layout(location = 1) rayPayloadEXT bool isShadowed;
 hitAttributeEXT vec3 attribs;
 
 struct Material{
@@ -61,11 +63,11 @@ float lambda(vec3 someVector, vec3 surfaceNormal, float roughness)
 
 vec3 BRDF(vec3 surfaceNormal, vec3 viewDirection, vec3 lightDirection, vec3 specularColor, float roughness)
 {
-    if (dot(surfaceNormal, viewDirection) <= 0.0 || dot(surfaceNormal, lightDirection) <= 0.0) return vec3(0.0);
+    // if (dot(surfaceNormal, viewDirection) <= 0.0 || dot(surfaceNormal, lightDirection) <= 0.0) return vec3(0.0);
     const float pi = 3.14159265359;
     const vec3 halfVector = normalize(lightDirection + viewDirection);
     const float dotHalfNorm = dot(halfVector, surfaceNormal);
-    if (dot(halfVector, viewDirection) <= 0.0 || dot(halfVector, lightDirection) <= 0.0 || dotHalfNorm <= 0.0) return vec3(0.0);
+    // if (dot(halfVector, viewDirection) <= 0.0 || dot(halfVector, lightDirection) <= 0.0 || dotHalfNorm <= 0.0) return vec3(0.0);
     const vec3 freshnelColor = specularColor + (vec3(1.0) - specularColor) * pow((1.0 - dot(halfVector, lightDirection)), 5.0);
     const float visibleFraction = 1.0 / (1.0 + lambda(viewDirection, surfaceNormal, roughness) + lambda(lightDirection, surfaceNormal, roughness));
     const float roughnessPow2 = roughness * roughness;
@@ -79,7 +81,7 @@ vec3 diffBRDF(vec3 normal, vec3 viewDirection, vec3 lightDirection, vec3 specula
     const float pi = 3.14159265359;
     const float nl = dot(normal, lightDirection);
     const float nv = dot(normal, viewDirection);
-    if (nl <= 0.0 || nv <= 0.0) return vec3(0.0);
+    // if (nl <= 0.0 || nv <= 0.0) return vec3(0.0);
     return 21.0 / (20.0 * pi) * (vec3(1.0) - specularColor) * diffuseColor * (1.0 - pow(1.0 - nl, 5.0)) * (1.0 - pow(1.0 - nv, 5.0)); 
 }
 
@@ -209,21 +211,52 @@ void main()
     }
 
     vec3 viewDirection = normalize(ubo.cameraPosition.xyz - pos);
+    if (dot(normal, viewDirection) <= 0.0) {
+        vec3 color = sRGBToAlbedo(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w) * rawColor;
+        if (mat.emissiveStrength > 0.01) color += sRGBToAlbedo(mat.emissiveColor * mat.emissiveStrength);
+
+        prd.hitValue = vec4(albedoToSRGB(color), alpha);
+        prd.pos = pos;
+        return;
+    }
+
     vec3 color = vec3(0.0);
     const vec3 specularColor = mix(vec3(0.03), rawColor, metalliness);
     const vec3 diffuseColor = mix(rawColor, vec3(0.0), metalliness);
     for (int i = 0; i < ubo.numLights; i++){
-        vec3 lightPos = ubo.lightPositions[i].xyz;
-        vec4 lightColor = ubo.lightColors[i];
+        const vec3 lightPos = ubo.lightPositions[i].xyz;
+        const vec4 lightColor = ubo.lightColors[i];
 
-        vec3 directionToLight = lightPos - pos;
-        float attenuation = 1.0 / dot(directionToLight, directionToLight);
-        directionToLight = normalize(directionToLight);
+        vec3 lightDir = lightPos - pos;
+        const float lightDstSquared = dot(lightDir, lightDir);
+        const float lightDst = sqrt(lightDstSquared);
+        const float attenuation = 1.0 / lightDstSquared;
+        const vec3 lightContribution = sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation;
+        if (length(lightContribution) <= 0.05 || lightDst > ubo.lightPositions[i].w) continue;
+
+        lightDir = normalize(lightDir);
+        if (dot(normal, lightDir) <= 0.0) continue;
+
+        isShadowed = true;
+        const uint flags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+        traceRayEXT(tlas,               // acceleration structure
+                flags,                  // rayFlags
+                0xFF,                   // cullMask
+                0,                      // sbtRecordOffset
+                0,                      // sbtRecordStride
+                1,                      // missIndex
+                pos,                    // ray origin
+                0.001,                  // ray min range
+                lightDir,               // ray direction
+                lightDst,               // ray max range
+                1                       // payload (location = 1)
+        );
+        if (isShadowed) continue;
 
         vec3 colorFromThisLight = vec3(0.0);
-        colorFromThisLight += BRDF(normal, viewDirection, directionToLight, specularColor, roughness);
-        colorFromThisLight += diffBRDF(normal, viewDirection, directionToLight, specularColor, diffuseColor);
-        colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation;
+        colorFromThisLight += BRDF(normal, viewDirection, lightDir, specularColor, roughness);
+        colorFromThisLight += diffBRDF(normal, viewDirection, lightDir, specularColor, diffuseColor);
+        colorFromThisLight *= lightContribution;
         color += colorFromThisLight;
     }
 

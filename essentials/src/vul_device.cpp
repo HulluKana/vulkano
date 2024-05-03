@@ -184,11 +184,6 @@ void VulDevice::createLogicalDevice() {
   reset.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
   reset.pNext = &rtPipelineFeatures;
 
-  VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures{};
-  descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-  descriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
-  descriptorIndexingFeatures.pNext = &reset;
-
   VkPhysicalDeviceScalarBlockLayoutFeatures scalarBlockFeatures{};
   scalarBlockFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES;
   scalarBlockFeatures.scalarBlockLayout = VK_TRUE;
@@ -197,13 +192,18 @@ void VulDevice::createLogicalDevice() {
       deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
       deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
       deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-      scalarBlockFeatures.pNext = &descriptorIndexingFeatures;
+      scalarBlockFeatures.pNext = &reset;
   }
+
+  VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures{};
+  descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
+  descriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
+  descriptorIndexingFeatures.pNext = &scalarBlockFeatures;
 
   VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddresFeature{};
   bufferDeviceAddresFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
   bufferDeviceAddresFeature.bufferDeviceAddress = VK_TRUE;
-  bufferDeviceAddresFeature.pNext = &scalarBlockFeatures;
+  bufferDeviceAddresFeature.pNext = &descriptorIndexingFeatures;
 
   VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature{};
   dynamic_rendering_feature.sType =

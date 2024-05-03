@@ -85,7 +85,8 @@ class GltfLoader
         struct GltfLight{
             glm::vec3 position{0.0f};
             glm::vec3 color{0.0f};
-            double intensity = 0.0;
+            float intensity = 0.0;
+            float range = 0.0;
 
             std::string name;
         };

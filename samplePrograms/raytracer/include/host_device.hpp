@@ -15,7 +15,7 @@ using mat4 = glm::mat4;
 using uint = uint32_t;
 #endif
 
-#define MAX_LIGHTS 10
+#define MAX_LIGHTS 25
 
 struct GlobalUbo {
     mat4 inverseProjectionMatrix;
@@ -24,7 +24,7 @@ struct GlobalUbo {
 
     vec4 ambientLightColor;
 
-    vec4 lightPositions[MAX_LIGHTS]; // 4th component is ignored
+    vec4 lightPositions[MAX_LIGHTS]; // 4th component is the lights max range
     vec4 lightColors[MAX_LIGHTS];
     int numLights;
 

@@ -15,7 +15,7 @@ using mat4 = glm::mat4;
 using uint = uint32_t;
 #endif
 
-#define MAX_LIGHTS 10
+#define MAX_LIGHTS 25
 #define OIT_LAYERS 8
 
 struct GlobalUbo {

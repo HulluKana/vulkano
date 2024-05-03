@@ -87,7 +87,7 @@ int main() {
         descriptors.push_back(desc);
 
         desc.type = vul::Vulkano::DescriptorType::accelerationStructure;
-        desc.stages = {vul::Vulkano::ShaderStage::rgen};
+        desc.stages = {vul::Vulkano::ShaderStage::rgen, vul::Vulkano::ShaderStage::rchit};
         desc.count = 1;
         desc.content = &as;
         descriptors.push_back(desc);
@@ -112,8 +112,8 @@ int main() {
     for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) renderData.descriptorSets[i].push_back(std::move(dsrvs[i].set));
     renderData.pipeline = std::make_shared<vulB::VulPipeline>(vulkano.getVulDevice(), "../bin/raytrace.vert.spv", "../bin/raytrace.frag.spv", pipConf);
 
-    vul::VulRtPipeline rtPipeline(vulkano.getVulDevice(), "../bin/raytrace.rgen.spv", {"../bin/raytrace.rmiss.spv"}, {"../bin/raytrace.rchit.spv"},
-            {renderData.descriptorSets[0][0]->getLayout()->getDescriptorSetLayout()});
+    vul::VulRtPipeline rtPipeline(vulkano.getVulDevice(), "../bin/raytrace.rgen.spv", {"../bin/raytrace.rmiss.spv", "../bin/raytraceShadow.rmiss.spv"},
+            {"../bin/raytrace.rchit.spv"}, {renderData.descriptorSets[0][0]->getLayout()->getDescriptorSetLayout()});
 
     vulkano.renderDatas.push_back(renderData);
 
@@ -129,14 +129,14 @@ int main() {
         GlobalUbo ubo{};
         ubo.inverseViewMatrix = glm::inverse(vulkano.camera.getView());
         ubo.inverseProjectionMatrix = glm::inverse(vulkano.camera.getProjection());
-        ubo.numLights = 0;
         ubo.cameraPosition = glm::vec4(vulkano.cameraTransform.pos, 0.0f);
-        ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.3f);
+
         ubo.numLights = std::min(static_cast<int>(vulkano.scene.lights.size()), MAX_LIGHTS);
         for (int i = 0; i < ubo.numLights; i++){
-            ubo.lightPositions[i] = glm::vec4(vulkano.scene.lights[i].position, 69.0f);
+            ubo.lightPositions[i] = glm::vec4(vulkano.scene.lights[i].position, vulkano.scene.lights[i].range);
             ubo.lightColors[i] = glm::vec4(vulkano.scene.lights[i].color, vulkano.scene.lights[i].intensity);
         }
+        ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.3f);
 
         // Pixel spread angle is from equation 30 from
         // https://media.contentapi.ea.com/content/dam/ea/seed/presentations/2019-ray-tracing-gems-chapter-20-akenine-moller-et-al.pdf

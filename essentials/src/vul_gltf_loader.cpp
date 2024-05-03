@@ -317,6 +317,8 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
         gltfLight.position = transform.pos;
         gltfLight.color = {light.color[0], light.color[1], light.color[2]};
         gltfLight.intensity = light.intensity;
+        gltfLight.range = light.range;
+        if (gltfLight.range < 0.01f) gltfLight.range = 10'000.0f;
         lights.push_back(gltfLight);
     }
 
