@@ -1,0 +1,40 @@
+#version 460
+
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+
+#include "common.glsl"
+#include "../include/host_device.hpp"
+#include"../../../essentials/include/vul_scene.hpp"
+
+layout(binding = 2, set = 0) readonly buffer Indices            {uint indices[];};
+layout(binding = 3, set = 0, scalar) readonly buffer Vertices   {vec3 vertices[];};
+layout(binding = 6, set = 0) readonly buffer Uvs                {vec2 uvs[];};
+layout(binding = 7, set = 0) readonly buffer Materials          {PackedMaterial materials[];};
+layout(binding = 8, set = 0) readonly buffer PrimInfos          {PrimInfo primInfos[];};
+layout(binding = 9, set = 0) uniform sampler2D texSampler[];
+
+layout(location = 0) rayPayloadInEXT float visibility;
+
+hitAttributeEXT vec3 attribs;
+
+void main()
+{
+    const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
+
+    PrimInfo primInfo = primInfos[gl_GeometryIndexEXT];
+    const uint indexOffset = primInfo.firstIndex + gl_PrimitiveID * 3;
+    const uvec3 index = uvec3(indices[indexOffset], indices[indexOffset + 1], indices[indexOffset + 2]) + uvec3(primInfo.vertexOffset);
+    const vec3 pos = vertices[index.x] * barycentrics.x + vertices[index.y] * barycentrics.y + vertices[index.z] * barycentrics.z;
+    const vec3 worldPos = vec3(primInfo.transformMatrix * vec4(pos, 1.0));
+    const vec2 uv = uvs[index.x] * barycentrics.x + uvs[index.y] * barycentrics.y + uvs[index.z] * barycentrics.z;
+
+    PackedMaterial packedMat = materials[primInfo.materialIndex];
+    float alpha;
+    if (packedMat.colorTextureIndex >= 0) alpha = texture(texSampler[packedMat.colorTextureIndex], uv).w;
+    else alpha = packedMat.colorFactor.w;
+    visibility *= 1.0 - alpha;
+    if (visibility > 0.01) ignoreIntersectionEXT;
+}

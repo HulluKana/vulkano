@@ -1,15 +1,6 @@
-#include "vul_buffer.hpp"
-#include "vul_debug_tools.hpp"
-#include "vul_device.hpp"
-#include "vul_gltf_loader.hpp"
-#include "vul_transform.hpp"
-#include <cstdlib>
-#include <cstring>
-#include <glm/matrix.hpp>
-#include <memory>
-#include <stdexcept>
+#include <vul_debug_tools.hpp>
+#include <vul_transform.hpp>
 #include <vul_acceleration_structure.hpp>
-#include <vulkan/vulkan_core.h>
 #include <iostream>
 
 using namespace vulB;
@@ -25,7 +16,7 @@ VulAs::VulAs(VulDevice &vulDevice, const Scene &scene) : m_vulDevice{vulDevice}
     buildBlases(blasInputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 
     std::vector<VkAccelerationStructureInstanceKHR> asInsts;
-    for (size_t i = 0; i < m_blases.size(); i++) asInsts.emplace_back(blasToAsInstance(m_blases[i]));
+    for (size_t i = 0; i < m_blases.size(); i++) asInsts.emplace_back(blasToAsInstance(0, m_blases[i]));
 
     buildTlas(asInsts, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
@@ -217,7 +208,7 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
     if (queryPool) vkDestroyQueryPool(m_vulDevice.device(), queryPool, nullptr);
 }
 
-VkAccelerationStructureInstanceKHR VulAs::blasToAsInstance(const As &blas)
+VkAccelerationStructureInstanceKHR VulAs::blasToAsInstance(uint32_t index, const As &blas)
 {
     transform3D defaultTransform{};
     defaultTransform.pos = glm::vec3(0.0f);
@@ -231,7 +222,7 @@ VkAccelerationStructureInstanceKHR VulAs::blasToAsInstance(const As &blas)
 
     VkAccelerationStructureInstanceKHR asInst{};
     memcpy(&asInst.transform, &trasposedTransformMat, sizeof(VkTransformMatrixKHR));
-    asInst.instanceCustomIndex = 0;
+    asInst.instanceCustomIndex = index;
     asInst.accelerationStructureReference = vkGetAccelerationStructureDeviceAddressKHR(m_vulDevice.device(), &blasAddrInfo);
     asInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
     asInst.mask = 0xFF;
@@ -259,7 +250,7 @@ VulAs::BlasInput VulAs::gltfNodesToBlasInput(const Scene &scene, uint32_t firstN
         VkAccelerationStructureGeometryKHR asGeom{};
         asGeom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
         asGeom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-        asGeom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+        if (scene.materials[mesh.materialIndex].alphaMode == GltfLoader::GltfAlphaMode::opaque) asGeom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
         asGeom.geometry.triangles = triangles;
 
         VkAccelerationStructureBuildRangeInfoKHR offsetInfo{};

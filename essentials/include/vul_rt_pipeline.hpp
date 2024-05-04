@@ -10,7 +10,8 @@ namespace vul {
 class VulRtPipeline {
     public:
         VulRtPipeline(vulB::VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
-                const std::vector<std::string> &closestHitShaders, const std::vector<VkDescriptorSetLayout> &setLayouts);
+                const std::vector<std::string> &closestHitShaders, const std::vector<std::string> &anyHitShaders,
+                const std::vector<VkDescriptorSetLayout> &setLayouts);
         ~VulRtPipeline();
 
         VulRtPipeline(const VulRtPipeline &) = delete;
@@ -21,7 +22,8 @@ class VulRtPipeline {
                 VkCommandBuffer cmdBuf);
     private:
         void createPipeline(const std::string &raygenShader, const std::vector<std::string> &missShaders,
-                const std::vector<std::string> &closestHitShaders, const std::vector<VkDescriptorSetLayout> &setLayouts);
+                const std::vector<std::string> &closestHitShaders, const std::vector<std::string> &anyHitShaders,
+                const std::vector<VkDescriptorSetLayout> &setLayouts);
         void createSBT(uint32_t missCount, uint32_t hitCount);
 
         std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_shaderGroups;

@@ -1,6 +1,7 @@
 #include "vul_buffer.hpp"
 #include "vul_debug_tools.hpp"
 #include "vul_pipeline.hpp"
+#include <algorithm>
 #include <functional>
 #include <stdexcept>
 #include <vul_rt_pipeline.hpp>
@@ -11,10 +12,11 @@ using namespace vulB;
 namespace vul {
 
 VulRtPipeline::VulRtPipeline(vulB::VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
-                const std::vector<std::string> &closestHitShaders, const std::vector<VkDescriptorSetLayout> &setLayouts) : m_vulDevice{vulDevice}
+                const std::vector<std::string> &closestHitShaders, const std::vector<std::string> &anyHitShaders,
+                const std::vector<VkDescriptorSetLayout> &setLayouts) : m_vulDevice{vulDevice}
 {
-    createPipeline(raygenShader, missShaders, closestHitShaders, setLayouts);
-    createSBT(static_cast<uint32_t>(missShaders.size()), static_cast<uint32_t>(closestHitShaders.size()));
+    createPipeline(raygenShader, missShaders, closestHitShaders, anyHitShaders, setLayouts);
+    createSBT(static_cast<uint32_t>(missShaders.size()), static_cast<uint32_t>(std::max(closestHitShaders.size(), anyHitShaders.size())));
 }
 
 VulRtPipeline::~VulRtPipeline()
@@ -36,11 +38,12 @@ void VulRtPipeline::traceRays(uint32_t width, uint32_t height, uint32_t pushCons
 }
 
 void VulRtPipeline::createPipeline(const std::string &raygenShader, const std::vector<std::string> &missShaders,
-        const std::vector<std::string> &closestHitShaders, const std::vector<VkDescriptorSetLayout> &setLayouts)
+        const std::vector<std::string> &closestHitShaders, const std::vector<std::string> &anyHitShaders, const std::vector<VkDescriptorSetLayout> &setLayouts)
 {
     const uint32_t missIdx = 1;
     const uint32_t closestIdx = missIdx + missShaders.size();
-    const uint32_t shadersCount = closestIdx + closestHitShaders.size();
+    const uint32_t anyHitIdx = closestIdx + closestHitShaders.size();
+    const uint32_t shadersCount = anyHitIdx + anyHitShaders.size();
 
     std::vector<VkPipelineShaderStageCreateInfo> stages(shadersCount);
     VkPipelineShaderStageCreateInfo stage{};
@@ -69,19 +72,30 @@ void VulRtPipeline::createPipeline(const std::string &raygenShader, const std::v
         group.generalShader = i + missIdx;
         m_shaderGroups.push_back(group);
     }
-    group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-    group.generalShader = VK_SHADER_UNUSED_KHR;
     for (size_t i = 0; i < closestHitShaders.size(); i++) {
         vulB::VulPipeline::createShaderModule(m_vulDevice, closestHitShaders[i], &stage.module);
         stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
         stages[i + closestIdx] = stage;
+    }
+    for (size_t i = 0; i < anyHitShaders.size(); i++) {
+        vulB::VulPipeline::createShaderModule(m_vulDevice, anyHitShaders[i], &stage.module);
+        stage.stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
+        stages[i + anyHitIdx] = stage;
+    }
 
-        group.closestHitShader = i + closestIdx;
+    group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+    group.generalShader = VK_SHADER_UNUSED_KHR;
+    for (size_t i = 0; i < std::max(closestHitShaders.size(), anyHitShaders.size()); i++) {
+        if (i < closestHitShaders.size()) group.closestHitShader = i + closestIdx;
+        else group.closestHitShader = VK_SHADER_UNUSED_KHR;
+        if (i < anyHitShaders.size()) group.anyHitShader = i + anyHitIdx;
+        else group.anyHitShader = VK_SHADER_UNUSED_KHR;
         m_shaderGroups.push_back(group);
     }
 
     VkPushConstantRange pushRange{};
-    pushRange.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_MISS_BIT_KHR;
+    pushRange.stageFlags = VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_ANY_HIT_BIT_KHR
+        | VK_SHADER_STAGE_MISS_BIT_KHR;
     pushRange.size = m_vulDevice.properties.limits.maxPushConstantsSize;
     pushRange.offset = 0;
 

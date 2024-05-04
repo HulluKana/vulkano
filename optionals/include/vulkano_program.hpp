@@ -80,7 +80,8 @@ class Vulkano{
             comp = VK_SHADER_STAGE_COMPUTE_BIT,
             rgen = VK_SHADER_STAGE_RAYGEN_BIT_KHR,
             rmiss = VK_SHADER_STAGE_MISS_BIT_KHR,
-            rchit = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR
+            rchit = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+            rahit = VK_SHADER_STAGE_ANY_HIT_BIT_KHR
         };
         struct Descriptor{
             DescriptorType type;

@@ -21,7 +21,7 @@ layout(binding = 9, set = 0) uniform sampler2D texSampler[];
 layout(binding = 10, set = 0) uniform accelerationStructureEXT tlas;
 
 layout(location = 0) rayPayloadInEXT payload prd;
-layout(location = 1) rayPayloadEXT bool isShadowed;
+layout(location = 1) rayPayloadEXT float visibility;
 
 hitAttributeEXT vec3 attribs;
 
@@ -90,7 +90,7 @@ void getVertexInputs(out vec3 worldPos, out vec3 worldNormal, out vec4 worldTang
 {
     const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
-    PrimInfo primInfo = primInfos[gl_GeometryIndexEXT];
+    PrimInfo primInfo = primInfos[gl_InstanceCustomIndexEXT + gl_GeometryIndexEXT];
     const uint indexOffset = primInfo.firstIndex + gl_PrimitiveID * 3;
     const uvec3 index = uvec3(indices[indexOffset], indices[indexOffset + 1], indices[indexOffset + 2]) + uvec3(primInfo.vertexOffset);
 
@@ -238,8 +238,8 @@ void main()
         lightDir = normalize(lightDir);
         if (dot(normal, lightDir) <= 0.0) continue;
 
-        isShadowed = true;
-        const uint flags = gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsOpaqueEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+        visibility = 1.0;
+        const uint flags = gl_RayFlagsSkipClosestHitShaderEXT | gl_RayFlagsTerminateOnFirstHitEXT;
         traceRayEXT(tlas,               // acceleration structure
                 flags,                  // rayFlags
                 0xFF,                   // cullMask
@@ -252,12 +252,12 @@ void main()
                 lightDst,               // ray max range
                 1                       // payload (location = 1)
         );
-        if (isShadowed) continue;
+        if (visibility < 10.01) continue;
 
         vec3 colorFromThisLight = vec3(0.0);
         colorFromThisLight += BRDF(normal, viewDirection, lightDir, specularColor, roughness);
         colorFromThisLight += diffBRDF(normal, viewDirection, lightDir, specularColor, diffuseColor);
-        colorFromThisLight *= lightContribution;
+        colorFromThisLight *= lightContribution * (visibility - 10.0);
         color += colorFromThisLight;
     }
 

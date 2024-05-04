@@ -65,15 +65,21 @@ int main() {
         descriptors.push_back(desc);
 
         desc.type = vul::Vulkano::DescriptorType::ssbo;
-        desc.stages = {vul::Vulkano::ShaderStage::rchit};
+        desc.stages = {vul::Vulkano::ShaderStage::rchit, vul::Vulkano::ShaderStage::rahit};
         desc.content = vulkano.scene.indexBuffer.get();
         descriptors.push_back(desc);
         desc.content = vulkano.scene.vertexBuffer.get();
         descriptors.push_back(desc);
+
+        desc.stages = {vul::Vulkano::ShaderStage::rchit};
+        desc.content = vulkano.scene.indexBuffer.get();
         desc.content = vulkano.scene.normalBuffer.get();
         descriptors.push_back(desc);
         desc.content = vulkano.scene.tangentBuffer.get();
         descriptors.push_back(desc);
+
+        desc.stages = {vul::Vulkano::ShaderStage::rchit, vul::Vulkano::ShaderStage::rahit};
+        desc.content = vulkano.scene.indexBuffer.get();
         desc.content = vulkano.scene.uvBuffer.get();
         descriptors.push_back(desc);
         desc.content = vulkano.scene.materialBuffer.get();
@@ -113,7 +119,8 @@ int main() {
     renderData.pipeline = std::make_shared<vulB::VulPipeline>(vulkano.getVulDevice(), "../bin/raytrace.vert.spv", "../bin/raytrace.frag.spv", pipConf);
 
     vul::VulRtPipeline rtPipeline(vulkano.getVulDevice(), "../bin/raytrace.rgen.spv", {"../bin/raytrace.rmiss.spv", "../bin/raytraceShadow.rmiss.spv"},
-            {"../bin/raytrace.rchit.spv"}, {renderData.descriptorSets[0][0]->getLayout()->getDescriptorSetLayout()});
+            {"../bin/raytrace.rchit.spv"}, {"../bin/raytraceShadow.rahit.spv"},
+            {renderData.descriptorSets[0][0]->getLayout()->getDescriptorSetLayout()});
 
     vulkano.renderDatas.push_back(renderData);
 
