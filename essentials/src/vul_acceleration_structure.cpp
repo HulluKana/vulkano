@@ -2,6 +2,8 @@
 #include "vul_debug_tools.hpp"
 #include "vul_device.hpp"
 #include "vul_gltf_loader.hpp"
+#include "vul_transform.hpp"
+#include <cstdlib>
 #include <cstring>
 #include <glm/matrix.hpp>
 #include <memory>
@@ -15,15 +17,15 @@ namespace vul {
 
 VulAs::VulAs(VulDevice &vulDevice, const Scene &scene) : m_vulDevice{vulDevice}
 {
+    m_transformsBuffer = createTransformsBuffer(scene);
+
     std::vector<BlasInput> blasInputs;
-    blasInputs.reserve(scene.nodes.size());
-    for (const GltfLoader::GltfNode &node : scene.nodes) blasInputs.emplace_back(gltfMeshToBlasInput(scene, scene.meshes[node.primMesh])); 
+    blasInputs.emplace_back(gltfNodesToBlasInput(scene, 0, static_cast<uint32_t>(scene.nodes.size()), m_transformsBuffer));
 
     buildBlases(blasInputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 
     std::vector<VkAccelerationStructureInstanceKHR> asInsts;
-    asInsts.reserve(scene.nodes.size());
-    for (size_t i = 0; i < scene.nodes.size(); i++) asInsts.emplace_back(gltfNodeToAsInstance(scene.nodes[i], m_blases[i]));
+    for (size_t i = 0; i < m_blases.size(); i++) asInsts.emplace_back(blasToAsInstance(m_blases[i]));
 
     buildTlas(asInsts, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
@@ -98,7 +100,6 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
 {
     std::vector<BlasBuildData> buildDatas(blasInputs.size());
     VkDeviceSize maxScratchSize{};
-    VkDeviceSize totalBlasesSize{};
     uint32_t compactionsCount{};
 
     for (size_t i = 0; i < blasInputs.size(); i++) {
@@ -119,7 +120,6 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
                 &buildDatas[i].buildInfo, maxPrimCounts.data(), &buildDatas[i].sizeInfo);
 
         maxScratchSize = std::max(maxScratchSize, buildDatas[i].sizeInfo.buildScratchSize);
-        totalBlasesSize += buildDatas[i].sizeInfo.accelerationStructureSize;
         if ((buildDatas[i].buildInfo.flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR)
                 == VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR) compactionsCount++;
     }
@@ -185,8 +185,6 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
                 uint32_t queryCnt{};
                 VkCommandBuffer cmdBuf = m_vulDevice.beginSingleTimeCommands();
 
-                VkDeviceSize compactBatchSize{};
-                for (VkDeviceSize compactSize : compactSizes) compactBatchSize += compactSize;
                 for (size_t idx : indices) {
                     VkAccelerationStructureCreateInfoKHR assCreate{};
                     assCreate.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
@@ -219,9 +217,13 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
     if (queryPool) vkDestroyQueryPool(m_vulDevice.device(), queryPool, nullptr);
 }
 
-VkAccelerationStructureInstanceKHR VulAs::gltfNodeToAsInstance(const vulB::GltfLoader::GltfNode &node, const As &blas)
+VkAccelerationStructureInstanceKHR VulAs::blasToAsInstance(const As &blas)
 {
-    glm::mat4 trasposedTransformMat = glm::transpose(node.worldMatrix);
+    transform3D defaultTransform{};
+    defaultTransform.pos = glm::vec3(0.0f);
+    defaultTransform.rot = glm::vec3(0.0f);
+    defaultTransform.scale = glm::vec3(1.0f);
+    glm::mat4 trasposedTransformMat = glm::transpose(defaultTransform.transformMat());
 
     VkAccelerationStructureDeviceAddressInfoKHR blasAddrInfo{};
     blasAddrInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR;
@@ -229,7 +231,7 @@ VkAccelerationStructureInstanceKHR VulAs::gltfNodeToAsInstance(const vulB::GltfL
 
     VkAccelerationStructureInstanceKHR asInst{};
     memcpy(&asInst.transform, &trasposedTransformMat, sizeof(VkTransformMatrixKHR));
-    asInst.instanceCustomIndex = node.primMesh;
+    asInst.instanceCustomIndex = 0;
     asInst.accelerationStructureReference = vkGetAccelerationStructureDeviceAddressKHR(m_vulDevice.device(), &blasAddrInfo);
     asInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
     asInst.mask = 0xFF;
@@ -238,34 +240,53 @@ VkAccelerationStructureInstanceKHR VulAs::gltfNodeToAsInstance(const vulB::GltfL
     return asInst;
 }
 
-VulAs::BlasInput VulAs::gltfMeshToBlasInput(const Scene &scene, const GltfLoader::GltfPrimMesh &mesh)
+VulAs::BlasInput VulAs::gltfNodesToBlasInput(const Scene &scene, uint32_t firstNode, uint32_t nodeCount, const std::unique_ptr<vulB::VulBuffer> &transformsBuffer)
 {
-    VkAccelerationStructureGeometryTrianglesDataKHR triangles{};
-    triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
-    triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
-    triangles.vertexData.deviceAddress = scene.vertexBuffer->getBufferAddress();
-    triangles.vertexStride = sizeof(glm::vec3);
-    triangles.maxVertex = mesh.vertexCount - 1;
-    triangles.indexType = VK_INDEX_TYPE_UINT32;
-    triangles.indexData.deviceAddress = scene.indexBuffer->getBufferAddress();
-
-    VkAccelerationStructureGeometryKHR asGeom{};
-    asGeom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
-    asGeom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-    asGeom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
-    asGeom.geometry.triangles = triangles;
-
-    VkAccelerationStructureBuildRangeInfoKHR offsetInfo{};
-    offsetInfo.firstVertex = mesh.vertexOffset;
-    offsetInfo.primitiveCount = mesh.indexCount / 3;
-    offsetInfo.primitiveOffset = mesh.firstIndex * sizeof(uint32_t);
-    offsetInfo.transformOffset = 0;
-
     BlasInput blasInput{};
-    blasInput.asGeometries.push_back(asGeom);
-    blasInput.asBuildOffsetInfos.push_back(offsetInfo);
+    for (uint32_t i = firstNode; i < firstNode + nodeCount; i++) {
+        const GltfLoader::GltfPrimMesh &mesh = scene.meshes[scene.nodes[i].primMesh];
+
+        VkAccelerationStructureGeometryTrianglesDataKHR triangles{};
+        triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
+        triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
+        triangles.vertexData.deviceAddress = scene.vertexBuffer->getBufferAddress();
+        triangles.vertexStride = sizeof(glm::vec3);
+        triangles.maxVertex = mesh.vertexCount - 1;
+        triangles.indexType = VK_INDEX_TYPE_UINT32;
+        triangles.indexData.deviceAddress = scene.indexBuffer->getBufferAddress();
+        triangles.transformData.deviceAddress = transformsBuffer->getBufferAddress();
+
+        VkAccelerationStructureGeometryKHR asGeom{};
+        asGeom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+        asGeom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
+        asGeom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+        asGeom.geometry.triangles = triangles;
+
+        VkAccelerationStructureBuildRangeInfoKHR offsetInfo{};
+        offsetInfo.firstVertex = mesh.vertexOffset;
+        offsetInfo.primitiveCount = mesh.indexCount / 3;
+        offsetInfo.primitiveOffset = mesh.firstIndex * sizeof(uint32_t);
+        offsetInfo.transformOffset = i * sizeof(VkTransformMatrixKHR);
+
+        blasInput.asGeometries.push_back(asGeom);
+        blasInput.asBuildOffsetInfos.push_back(offsetInfo);
+    }
 
     return blasInput;
+}
+
+std::unique_ptr<VulBuffer> VulAs::createTransformsBuffer(const Scene &scene)
+{
+    std::vector<VkTransformMatrixKHR> transforms(scene.nodes.size());
+    for (size_t i = 0; i < scene.nodes.size(); i++) {
+        glm::mat4 trasposedTransformMat = glm::transpose(scene.nodes[i].worldMatrix);
+        memcpy(&transforms[i], &trasposedTransformMat, sizeof(VkTransformMatrixKHR));
+    }
+
+    std::unique_ptr<vulB::VulBuffer> transformsBuffer = std::make_unique<VulBuffer>(m_vulDevice);
+    transformsBuffer->loadVector(transforms);
+    transformsBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_transferDst | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead));
+    return transformsBuffer;
 }
 
 VulAs::As VulAs::createAs(VkAccelerationStructureCreateInfoKHR &createInfo)

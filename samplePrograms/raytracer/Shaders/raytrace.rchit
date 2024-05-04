@@ -22,6 +22,7 @@ layout(binding = 10, set = 0) uniform accelerationStructureEXT tlas;
 
 layout(location = 0) rayPayloadInEXT payload prd;
 layout(location = 1) rayPayloadEXT bool isShadowed;
+
 hitAttributeEXT vec3 attribs;
 
 struct Material{
@@ -89,20 +90,20 @@ void getVertexInputs(out vec3 worldPos, out vec3 worldNormal, out vec4 worldTang
 {
     const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
-    PrimInfo primInfo = primInfos[gl_InstanceCustomIndexEXT];
+    PrimInfo primInfo = primInfos[gl_GeometryIndexEXT];
     const uint indexOffset = primInfo.firstIndex + gl_PrimitiveID * 3;
     const uvec3 index = uvec3(indices[indexOffset], indices[indexOffset + 1], indices[indexOffset + 2]) + uvec3(primInfo.vertexOffset);
 
-    const vec3 worldPos1 = vec3(gl_ObjectToWorldEXT * vec4(vertices[index.x], 1.0));
-    const vec3 worldPos2 = vec3(gl_ObjectToWorldEXT * vec4(vertices[index.y], 1.0));
-    const vec3 worldPos3 = vec3(gl_ObjectToWorldEXT * vec4(vertices[index.z], 1.0));
+    const vec3 worldPos1 = vec3(primInfo.transformMatrix * vec4(vertices[index.x], 1.0));
+    const vec3 worldPos2 = vec3(primInfo.transformMatrix * vec4(vertices[index.y], 1.0));
+    const vec3 worldPos3 = vec3(primInfo.transformMatrix * vec4(vertices[index.z], 1.0));
     worldPos = worldPos1 * barycentrics.x + worldPos2 * barycentrics.y + worldPos3 * barycentrics.z;
 
     const vec3 normal = normals[index.x] * barycentrics.x + normals[index.y] * barycentrics.y + normals[index.z] * barycentrics.z;
-    worldNormal = normalize(vec3(normal * gl_WorldToObjectEXT));
+    worldNormal = normalize(vec3(mat3(primInfo.normalMatrix) * normal));
 
     const vec4 tangent = tangents[index.x] * barycentrics.x + tangents[index.y] * barycentrics.y + tangents[index.z] * barycentrics.z;
-    worldTangent = vec4(normalize(vec3(tangent.xyz * gl_WorldToObjectEXT)), tangent.w);
+    worldTangent = vec4(normalize(vec3(mat3(primInfo.normalMatrix) * tangent.xyz)), tangent.w);
 
     const vec2 uv1 = uvs[index.x];
     const vec2 uv2 = uvs[index.y];

@@ -54,6 +54,8 @@ class Scene
         };
 
         struct PrimInfo {
+            mat4 transformMatrix;
+            mat4 normalMatrix;
             uint firstIndex;
             uint vertexOffset;
             int materialIndex;

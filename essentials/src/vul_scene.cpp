@@ -1,4 +1,5 @@
 #include "vul_buffer.hpp"
+#include <cstdlib>
 #include<vul_debug_tools.hpp>
 #include<vul_gltf_loader.hpp>
 #include<vul_scene.hpp>
@@ -49,8 +50,12 @@ void Scene::loadScene(std::string fileName)
     }
 
     std::vector<PrimInfo> primInfos;
-    for (const GltfLoader::GltfPrimMesh &mesh : gltfLoader.primMeshes) {
+    for (const GltfLoader::GltfNode &node : gltfLoader.nodes) {
+        const GltfLoader::GltfPrimMesh &mesh = gltfLoader.primMeshes[node.primMesh];
+
         PrimInfo primInfo;
+        primInfo.transformMatrix = node.worldMatrix;
+        primInfo.normalMatrix = node.normalMatrix;
         primInfo.firstIndex = mesh.firstIndex;
         primInfo.vertexOffset = mesh.vertexOffset;
         primInfo.materialIndex = mesh.materialIndex;

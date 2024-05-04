@@ -35,16 +35,19 @@ class VulAs {
         };
 
         void buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asInsts, VkBuildAccelerationStructureFlagsKHR flags);
-        VkAccelerationStructureInstanceKHR gltfNodeToAsInstance(const vulB::GltfLoader::GltfNode &node, const As &blas);
 
         void buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAccelerationStructureFlagsKHR flags);
         As buildBlas(BlasBuildData &buildData, VkDeviceAddress scratchBufferAddress, VkQueryPool queryPool, uint32_t queryIndex, VkCommandBuffer cmdBuf);
-        BlasInput gltfMeshToBlasInput(const Scene &scene, const vulB::GltfLoader::GltfPrimMesh &mesh);
+
+        VkAccelerationStructureInstanceKHR blasToAsInstance(const As &blas);
+        BlasInput gltfNodesToBlasInput(const Scene &scene, uint32_t fistNode, uint32_t nodeCount, const std::unique_ptr<vulB::VulBuffer> &transformsBuffer);
+        std::unique_ptr<vulB::VulBuffer> createTransformsBuffer(const Scene &scene);
 
         As createAs(VkAccelerationStructureCreateInfoKHR &createInfo);
 
         As m_tlas;
         std::vector<As> m_blases;
+        std::unique_ptr<vulB::VulBuffer> m_transformsBuffer;
 
         vulB::VulDevice &m_vulDevice;
 };
