@@ -1,4 +1,5 @@
 #include "vul_debug_tools.hpp"
+#include <cmath>
 #include <memory>
 #include<vul_image.hpp>
 #include<vul_buffer.hpp>
@@ -6,7 +7,6 @@
 #include <vulkan/vulkan_core.h>
 
 #include <ktx.h>
-#define STB_IMAGE_IMPLEMENTATION
 #include<stb_image.h>
 
 #include<stdexcept>

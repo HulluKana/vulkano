@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vul_device.hpp"
+#include <ktx.h>
 #include <variant>
 #include <vul_buffer.hpp>
 #include <vulkan/vulkan_core.h>
@@ -15,7 +16,7 @@ Y   Create mipmaps from several uncompressed files
 YX  Create mipmaps from compressed ktx file
 Y   Create mipmaps from memory
 Y   Create mipmaps from several memory
-    Create mipmaps from base image at runtime for raw images
+Y   Create mipmaps from base image at runtime for raw images
 
 Y   Support 1D, 2D, 3D and cubemap images
 YX  Support 1, 2 and 4 channels for raw images 
@@ -86,7 +87,6 @@ Pointer to the start of each mip levels data, or nullptr to signal lack of data
 Array layer count
 Data format
 Size of each texel
-Alignment of each texel
 Total data size
 Pointer to start of the data, or nullptr to signal lack of data
 */
@@ -101,17 +101,20 @@ class VulSampler {
         VulSampler &operator=(const VulSampler &) = delete;
         VulSampler(VulSampler &&) = default;
 
-        static std::shared_ptr<VulSampler> createDefaultTexSampler(vulB::VulDevice &vulDevice);
-        static std::shared_ptr<VulSampler> createCustomSampler(vulB::VulDevice &vulDevice, VkFilter filter, VkSamplerAddressMode addressMode,
-                float maxAnisotropy, VkBorderColor borderColor, float mipLodBias, float mipMinLod, float mipMaxLod);
+        static std::shared_ptr<VulSampler> createDefaultTexSampler(vulB::VulDevice &vulDevice, uint32_t mipLevels);
+        static std::shared_ptr<VulSampler> createCustomSampler(vulB::VulDevice &vulDevice, VkFilter filter,
+                VkSamplerAddressMode addressMode, float maxAnisotropy, VkBorderColor borderColor,
+                VkSamplerMipmapMode mipMapMode,float mipLodBias, float mipMinLod, float mipMaxLod);
 
         VkSampler getVulSampler() const {return m_sampler;}
     private:
         VulSampler(vulB::VulDevice &vulDevice, VkFilter filter, VkSamplerAddressMode addressMode, float maxAnisotropy,
-                VkBorderColor borderColor, float mipLodBias, float mipMinLod, float mipMaxLod);
+                VkBorderColor borderColor, VkSamplerMipmapMode mipMapMode, float mipLodBias, float mipMinLod, float mipMaxLod);
         vulB::VulDevice &m_vulDevice;
-        VkSampler m_sampler;
+        VkSampler m_sampler = VK_NULL_HANDLE;
 };
+
+
 
 class VulNewImage {
     public:
@@ -138,8 +141,6 @@ class VulNewImage {
             bc5rgSigned,
             bc7rgbaNonLinear,
             bc7rgbaLinear,
-            bc1rgbIfNoAlphaElseBc3rgbaNonLinear,
-            bc1rgbIfNoAlphaElseBc3rgbaLinear
         };
         enum class ImageType {
             texture1d, 
@@ -214,8 +215,13 @@ class VulNewImage {
 
         void keepRegularRaw2d8bitRgbaEmpty(uint32_t width, uint32_t height);
         void keepRegularRaw2d32bitRgbaEmpty(uint32_t width, uint32_t height);
-        void keepEmpty(uint32_t width, uint32_t height, uint32_t depth, uint32_t mipLevels,
-                uint32_t arrayLayers, VkFormat format);
+        void keepEmpty(const std::vector<VkExtent3D> mipSizes, uint32_t arrayLayers, VkFormat format,
+                uint32_t baseOutputMipLevel, uint32_t baseOutputArrayLayer);
+
+        void createMipmapsDefaultSizeSingleTime(uint32_t mipCount);
+        void createMipmapsDefaultSize(uint32_t mipCount, VkCommandBuffer cmdBuf);
+        void createMipMapsSingleTime(const std::vector<VkExtent3D> &mipSizes);
+        void createMipMaps(const std::vector<VkExtent3D> &mipSizes, VkCommandBuffer cmdBuf);
 
         void createDefaultImageSingleTime(ImageType type);
         void createDefaultImage(ImageType type, VkCommandBuffer cmdBuf);
@@ -248,6 +254,15 @@ class VulNewImage {
         
         std::shared_ptr<VulSampler> vulSampler = nullptr;
     private:
+        struct KtxCompressionFormatProperties {
+            ktx_transcode_fmt_e transcodeFormat;
+            VkFormat vkFormat;
+            uint32_t bitsPerTexel;
+            uint32_t sideLengthAlignment;
+        };
+
+        KtxCompressionFormatProperties getKtxCompressionFormatProperties(KtxCompressionFormat compressionFormat);
+
         VkFormat m_format = VK_FORMAT_UNDEFINED;
         uint32_t m_bitsPerTexel = 0;
         uint32_t m_arrayLayers = 0;
