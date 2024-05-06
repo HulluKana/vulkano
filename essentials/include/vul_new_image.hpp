@@ -84,7 +84,6 @@ THE FOLLOWING MUST BE SPECIFIED BY DATA LOADER
 Mip level count
 Width, height and depth of each mip level
 Pointer to the start of each mip levels data, or nullptr to signal lack of data
-Array layer count
 Data format
 Size of each texel
 Total data size
@@ -257,11 +256,15 @@ class VulNewImage {
         struct KtxCompressionFormatProperties {
             ktx_transcode_fmt_e transcodeFormat;
             VkFormat vkFormat;
+        };
+        struct VkFormatProperties {
             uint32_t bitsPerTexel;
             uint32_t sideLengthAlignment;
         };
 
+        uint32_t alignUp(uint32_t alignee, uint32_t aligner);
         KtxCompressionFormatProperties getKtxCompressionFormatProperties(KtxCompressionFormat compressionFormat);
+        VkFormatProperties getVkFormatProperties(VkFormat format);
 
         VkFormat m_format = VK_FORMAT_UNDEFINED;
         uint32_t m_bitsPerTexel = 0;
@@ -272,7 +275,7 @@ class VulNewImage {
         VkImageTiling m_tiling = VK_IMAGE_TILING_LINEAR;
 
         std::vector<MipLevel> m_mipLevels;
-        void *m_data = nullptr;
+        std::unique_ptr<uint8_t> m_data;
         size_t m_dataSize = 0;
         std::vector<std::unique_ptr<vulB::VulBuffer>> m_stagingBuffers;
 
