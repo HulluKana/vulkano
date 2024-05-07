@@ -40,6 +40,7 @@ Vulkano::~Vulkano()
 
 void Vulkano::initVulkano()
 {
+    /*
     for (size_t i = 0; i < images.size(); i++){
         if (!images[i]->usableByImGui) continue;
 
@@ -53,6 +54,7 @@ void Vulkano::initVulkano()
         images[i]->setDescriptorSet(retVal.set->getSet());
         m_imGuiDescriptorSets.push_back(std::move(retVal.set));
     }
+    */
 
     m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), vulRenderer, m_vulDevice);
 
@@ -217,7 +219,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
             for (uint32_t j = 0; j < desc.count; j++){
                 imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 imageInfos[j].imageView = image[j].getImageView();
-                imageInfos[j].sampler = image[j].getTextureSampler();
+                imageInfos[j].sampler = image[j].vulSampler->getSampler();
             }
             imageInfosStorage.push_back(imageInfos);
             set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
@@ -228,7 +230,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
             for (uint32_t j = 0; j < desc.count; j++){
                 imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 imageInfos[j].imageView = image[j]->getImageView();
-                imageInfos[j].sampler = image[j]->getTextureSampler();
+                imageInfos[j].sampler = image[j]->vulSampler->getSampler();
             }
             imageInfosStorage.push_back(imageInfos);
             set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);

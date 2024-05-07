@@ -80,15 +80,15 @@ void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
 
     std::function<std::shared_ptr<VulImage>(int)> importTexture = [&](int i)
     {
-        VulImage::CompressedFromat fromat{};
-        if (colorTextures.count(i) > 0) fromat = VulImage::CompressedFromat::bc7Srgb;
-        else if (normalMaps.count(i) > 0) fromat = VulImage::CompressedFromat::bc7Unorm;
-        else if (roughnessMetallicTextures.count(i) > 0) fromat = VulImage::CompressedFromat::bc7Unorm;
+        VulImage::KtxCompressionFormat fromat{};
+        if (colorTextures.count(i) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaNonLinear;
+        else if (normalMaps.count(i) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaLinear;
+        else if (roughnessMetallicTextures.count(i) > 0) fromat = VulImage::KtxCompressionFormat::bc5rgUnsigned;
 
         const tinygltf::Image &image = model.images[model.textures[i].source];
         std::shared_ptr<VulImage> vulImage = std::make_shared<VulImage>(device);
-        vulImage->loadCompressedFromKtxFile("../Models/" + image.uri, fromat);
-        vulImage->name = image.name;
+        vulImage->loadCompressedKtxFromFileWhole("../Models/" + image.uri, fromat);
+
         return vulImage;
     };
 
@@ -99,13 +99,19 @@ void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
 
     images.reserve(model.textures.size());
     VkCommandBuffer cmdBuf = device.beginSingleTimeCommands();
+    uint32_t prevMips = 0;
     for (size_t i = 0; i < results.size(); i++) {
         images.push_back(results[i].get());
-        images[i]->createImageLowLevel(true, images[i]->getFormat(), VK_IMAGE_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, cmdBuf);
+        images[i]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT |
+                VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, cmdBuf);
+        if (images[i]->getMipCount() != prevMips) {
+            prevMips = images[i]->getMipCount();
+            images[i]->vulSampler = VulSampler::createDefaultTexSampler(device, prevMips);
+        } else images[i]->vulSampler = images[i - 1]->vulSampler;
     }
     device.endSingleTimeCommands(cmdBuf);
 
-    for (std::shared_ptr<VulImage> &image : images) image->deleteCpuResources();
+    // for (std::shared_ptr<VulImage> &image : images) image->deleteCpuResources();
 }
 
 void GltfLoader::importDrawableNodes(const tinygltf::Model &model, GltfAttributes requestedAttributes)

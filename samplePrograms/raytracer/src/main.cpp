@@ -41,9 +41,10 @@ int main() {
     std::array<vul::Vulkano::descSetReturnVal, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> dsrvs;
     for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
         rtImgs[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());
-        rtImgs[i]->keepEmpty(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, 4, 16);
+        rtImgs[i]->loadRawFromMemoryWhole(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, 1, {{nullptr}}, VK_FORMAT_R32G32B32A32_SFLOAT);
+        // rtImgs[i]->keepEmpty(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, 4, 16);
         VkCommandBuffer cmdBuf = vulkano.getVulDevice().beginSingleTimeCommands();
-        rtImgs[i]->createImageLowLevel(false, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_TYPE_2D, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, cmdBuf);
+        rtImgs[i]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, cmdBuf);
         vulkano.getVulDevice().endSingleTimeCommands(cmdBuf);
 
         ubos[i] = std::make_unique<vulB::VulBuffer>(vulkano.getVulDevice());
@@ -163,11 +164,12 @@ int main() {
         if (vulkano.vulRenderer.wasSwapChainRecreated()) {
             for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
                 VkCommandBuffer cmdBuf = vulkano.getVulDevice().beginSingleTimeCommands();
-                rtImgs[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());
-                rtImgs[i]->keepEmpty(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, 4, 16);
-                rtImgs[i]->createImageLowLevel(false, VK_FORMAT_R32G32B32A32_SFLOAT, VK_IMAGE_TYPE_2D, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, cmdBuf);
-                vulkano.getVulDevice().endSingleTimeCommands(cmdBuf);
 
+                rtImgs[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());
+                // rtImgs[i]->keepEmpty(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, 4, 16);
+                rtImgs[i]->loadRawFromMemoryWhole(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, 1, {{nullptr}}, VK_FORMAT_R32G32B32A32_SFLOAT);
+                rtImgs[i]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, cmdBuf);
+                vulkano.getVulDevice().endSingleTimeCommands(cmdBuf);
 
                 vulkano.renderDatas[0].descriptorSets[i][0]->descriptorInfos[0].imageInfos[0].imageView = rtImgs[i]->getImageView();
                 vulkano.renderDatas[0].descriptorSets[i][0]->update();
