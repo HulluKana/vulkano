@@ -234,6 +234,9 @@ class VulImage {
         void readImageSingleTime(std::vector<DataSection> &readSections);
         void readImage(std::vector<DataSection> &readSections, VkCommandBuffer cmdBuf);
 
+        void deleteStagingResources() {m_stagingBuffers.clear();}
+        void deleteCpuData() {delete m_data.release(); m_dataSize = 0;}
+
         uint32_t getBaseWidth() const {return m_baseWidth;}
         uint32_t getBaseHeight() const {return m_baseHeight;}
         uint32_t getBaseDepth() const {return m_baseDepth;}

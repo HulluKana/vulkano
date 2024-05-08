@@ -1,4 +1,8 @@
+#include "vul_device.hpp"
+#include <GLFW/glfw3.h>
+#include <atomic>
 #include <cstddef>
+#include <cstdlib>
 #include <glm/ext/matrix_transform.hpp>
 #include <glm/ext/quaternion_float.hpp>
 #include <glm/ext/quaternion_transform.hpp>
@@ -14,6 +18,7 @@
 #include <iostream>
 #include <future>
 
+#include <thread>
 #include<vul_gltf_loader.hpp>
 #include<vul_transform.hpp>
 #include <vulkan/vulkan_core.h>
@@ -73,45 +78,85 @@ void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
     std::set<int> normalMaps;
     std::set<int> roughnessMetallicTextures;
     for (const tinygltf::Material &mat : model.materials) {
-        colorTextures.insert(mat.pbrMetallicRoughness.baseColorTexture.index);
-        normalMaps.insert(mat.normalTexture.index);
-        roughnessMetallicTextures.insert(mat.pbrMetallicRoughness.metallicRoughnessTexture.index);
+        colorTextures.insert(model.textures[mat.pbrMetallicRoughness.baseColorTexture.index].source);
+        normalMaps.insert(model.textures[mat.normalTexture.index].source);
+        roughnessMetallicTextures.insert(model.textures[mat.pbrMetallicRoughness.metallicRoughnessTexture.index].source);
     }
 
-    std::function<std::shared_ptr<VulImage>(int)> importTexture = [&](int i)
+    QueueFamilyIndices queueFamilyIndices = device.findPhysicalQueueFamilies();
+    std::vector<std::thread> threads(std::thread::hardware_concurrency());
+    std::vector<VkCommandPool> pools(threads.size());
+    std::vector<VkCommandBuffer> cmdBufs(pools.size());
+    for (size_t i = 0; i < pools.size(); i++) {
+        VkCommandPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        assert(vkCreateCommandPool(device.device(), &poolInfo, nullptr, &pools[i]) == VK_SUCCESS);
+
+        VkCommandBufferAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
+        allocInfo.commandPool = pools[i];
+        allocInfo.commandBufferCount = 1;
+        vkAllocateCommandBuffers(device.device(), &allocInfo, &cmdBufs[i]);
+
+        VkCommandBufferInheritanceInfo inheritance{};
+        inheritance.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        beginInfo.pInheritanceInfo = &inheritance;
+        vkBeginCommandBuffer(cmdBufs[i], &beginInfo);
+    }
+
+    std::vector<std::shared_ptr<VulImage>> imgSources(model.images.size());
+    std::atomic<uint32_t> atomImgIdx = 0;
+    std::function<void(uint32_t)> importTexture = [&](uint32_t threadIdx)
     {
-        VulImage::KtxCompressionFormat fromat{};
-        if (colorTextures.count(i) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaNonLinear;
-        else if (normalMaps.count(i) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaLinear;
-        else if (roughnessMetallicTextures.count(i) > 0) fromat = VulImage::KtxCompressionFormat::bc5rgUnsigned;
+        while (true) {
+            uint32_t imgIdx = atomImgIdx++; 
+            if (imgIdx >= imgSources.size()) break;
 
-        const tinygltf::Image &image = model.images[model.textures[i].source];
-        std::shared_ptr<VulImage> vulImage = std::make_shared<VulImage>(device);
-        vulImage->loadCompressedKtxFromFileWhole("../Models/" + image.uri, fromat);
+            VulImage::KtxCompressionFormat fromat{};
+            if (colorTextures.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaNonLinear;
+            else if (normalMaps.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaLinear;
+            else if (roughnessMetallicTextures.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaLinear;
 
-        return vulImage;
+            const tinygltf::Image &image = model.images[imgIdx];
+            imgSources[imgIdx] = std::make_shared<VulImage>(device);
+            imgSources[imgIdx]->loadCompressedKtxFromFileWhole("../Models/" + image.uri, fromat);
+            imgSources[imgIdx]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT |
+                    VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, cmdBufs[threadIdx]);
+        }
     };
 
-    std::vector<std::future<std::shared_ptr<VulImage>>> results(model.textures.size());
-    for (int i = 0; i < static_cast<int>(model.textures.size()); i++) {
-        results[i] = std::async(std::launch::async, importTexture, i);
+    for (size_t i = 0; i < threads.size(); i++) threads[i] = std::thread(importTexture, i);
+    for (size_t i = 0; i < threads.size(); i++) {
+        threads[i].join();
+        vkEndCommandBuffer(cmdBufs[i]);
     }
 
-    images.reserve(model.textures.size());
     VkCommandBuffer cmdBuf = device.beginSingleTimeCommands();
+    vkCmdExecuteCommands(cmdBuf, cmdBufs.size(), cmdBufs.data());
+    device.endSingleTimeCommands(cmdBuf);
+    for (size_t i = 0; i < pools.size(); i++) {
+        vkFreeCommandBuffers(device.device(), pools[i], 1, &cmdBufs[i]);
+        vkDestroyCommandPool(device.device(), pools[i], nullptr);
+    }
+
     uint32_t prevMips = 0;
-    for (size_t i = 0; i < results.size(); i++) {
-        images.push_back(results[i].get());
-        images[i]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT |
-                VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, cmdBuf);
+    images.resize(model.textures.size());
+    for (size_t i = 0; i < images.size(); i++) {
+        images[i] = imgSources[model.textures[i].source];
         if (images[i]->getMipCount() != prevMips) {
             prevMips = images[i]->getMipCount();
             images[i]->vulSampler = VulSampler::createDefaultTexSampler(device, prevMips);
         } else images[i]->vulSampler = images[i - 1]->vulSampler;
-    }
-    device.endSingleTimeCommands(cmdBuf);
 
-    // for (std::shared_ptr<VulImage> &image : images) image->deleteCpuResources();
+        images[i]->deleteStagingResources();
+        images[i]->deleteCpuData();
+    }
 }
 
 void GltfLoader::importDrawableNodes(const tinygltf::Model &model, GltfAttributes requestedAttributes)

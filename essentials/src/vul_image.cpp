@@ -113,17 +113,20 @@ void VulImage::loadCompressedKtxFromFile(const std::string &fileName, KtxCompres
 
     uint32_t width = ktxTexture->baseWidth;
     uint32_t height = ktxTexture->baseHeight;
-    const uint32_t baseWidth = alignUp(width / std::pow(2, baseOutputMipLevel), formatProperties.sideLengthAlignment);
-    const uint32_t baseHeight = alignUp(height / std::pow(2, baseOutputMipLevel), formatProperties.sideLengthAlignment);
+    uint32_t depth = ktxTexture->baseDepth;
+    const uint32_t baseWidth = alignUp(width * std::pow(2, baseOutputMipLevel), formatProperties.sideLengthAlignment);
+    const uint32_t baseHeight = alignUp(height * std::pow(2, baseOutputMipLevel), formatProperties.sideLengthAlignment);
+    const uint32_t baseDepth = depth * std::pow(2, baseOutputMipLevel);
 
     uint32_t layerSize = alignUp(width, formatProperties.sideLengthAlignment) *
-        alignUp(height, formatProperties.sideLengthAlignment) * formatProperties.bitsPerTexel / 8;
+        alignUp(height, formatProperties.sideLengthAlignment) * depth * formatProperties.bitsPerTexel / 8;
     uint8_t *pCopySrc = ktxTexture->pData + ktxTexture->dataSize - layerSize * ktxTexture->numLayers;
     for (uint32_t i = 0; i < baseInputMipLevel; i++) {
         width = std::max(width / 2, 1u);
         height = std::max(height / 2, 1u);
+        depth = std::max(depth / 2, 1u);
         layerSize = alignUp(width, formatProperties.sideLengthAlignment) *
-            alignUp(height, formatProperties.sideLengthAlignment) * formatProperties.bitsPerTexel / 8;
+            alignUp(height, formatProperties.sideLengthAlignment) * depth * formatProperties.bitsPerTexel / 8;
         pCopySrc -= layerSize * ktxTexture->numLayers;
     }
 
@@ -133,8 +136,9 @@ void VulImage::loadCompressedKtxFromFile(const std::string &fileName, KtxCompres
     for (uint32_t i = 0; i < mipLevelCopyCount; i++) {
         width = std::max(width / 2, 1u);
         height = std::max(height / 2, 1u);
+        depth = std::max(depth / 2, 1u);
         layerSize = alignUp(width, formatProperties.sideLengthAlignment) *
-            alignUp(height, formatProperties.sideLengthAlignment) * formatProperties.bitsPerTexel / 8;
+            alignUp(height, formatProperties.sideLengthAlignment) * depth * formatProperties.bitsPerTexel / 8;
 
         pCopySrc -= layerSize * baseInputArrayLayer;
         data[i].resize(arrayLayerCopyCount);
@@ -146,7 +150,13 @@ void VulImage::loadCompressedKtxFromFile(const std::string &fileName, KtxCompres
         pCopySrc -= layerSize * (ktxTexture->numLayers - baseInputArrayLayer - arrayLayerCopyCount);
     }
 
-    loadRawFromMemory(baseWidth, baseHeight, 1, data, ktxFormatProperties.vkFormat, baseOutputMipLevel, baseOutputArrayLayer); 
+    loadRawFromMemory(baseWidth, baseHeight, baseDepth, data, ktxFormatProperties.vkFormat, baseOutputMipLevel, baseOutputArrayLayer); 
+    free(ktxTexture->pData);
+    free(ktxTexture->pDfd);
+    free(ktxTexture->vvtbl);
+    free(ktxTexture->kvData);
+    free(ktxTexture->_private);
+    free(ktxTexture->_protected);
     free(ktxTexture);
 }
 
@@ -247,17 +257,17 @@ void VulImage::loadRawFromMemory(uint32_t baseWidth, uint32_t baseHeight, uint32
             offset += m_mipLevels[i].layerSize;
         }
     }
+
+    if (oldData != nullptr) delete[] oldData; 
 }
 
 void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
         VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkCommandBuffer cmdBuf)
 {
-    VkImageType imageType{};
-    if (type == VK_IMAGE_VIEW_TYPE_1D || type == VK_IMAGE_VIEW_TYPE_1D_ARRAY) imageType = VK_IMAGE_TYPE_1D;
+    if (type == VK_IMAGE_VIEW_TYPE_1D || type == VK_IMAGE_VIEW_TYPE_1D_ARRAY) m_imageType = VK_IMAGE_TYPE_1D;
     else if (type == VK_IMAGE_VIEW_TYPE_2D || type == VK_IMAGE_VIEW_TYPE_2D_ARRAY || type == VK_IMAGE_VIEW_TYPE_CUBE
-            || type == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY) imageType = VK_IMAGE_TYPE_2D;
-    else if (type == VK_IMAGE_VIEW_TYPE_3D) imageType = VK_IMAGE_TYPE_3D;
-    m_imageType = imageType;
+            || type == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY) m_imageType = VK_IMAGE_TYPE_2D;
+    else if (type == VK_IMAGE_VIEW_TYPE_3D) m_imageType = VK_IMAGE_TYPE_3D;
     m_imageViewType = type;
     m_layout = layout;
     m_usage = usage;
@@ -305,7 +315,7 @@ void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkI
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
     viewInfo.image = m_image;
-    viewInfo.viewType = type;
+    viewInfo.viewType = m_imageViewType;
     viewInfo.format = m_format;
     viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
     viewInfo.subresourceRange.baseMipLevel = 0;
