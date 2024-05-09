@@ -33,7 +33,6 @@ class Vulkano{
         Vulkano(uint32_t width, uint32_t height, std::string name);
         ~Vulkano();
 
-        void initVulkano();
         void letVulkanoFinish() {vkDeviceWaitIdle(m_vulDevice.device());}
 
         /* These 2 lines remove the copy constructor and operator from Vulkano class.
@@ -113,9 +112,7 @@ class Vulkano{
         bool hasScene = false;
 
         std::vector<std::unique_ptr<vulB::VulBuffer>> buffers;
-
         std::vector<Object2D> object2Ds;
-        std::vector<std::shared_ptr<VulImage>> images;
 
         vulB::VulRenderer vulRenderer{m_vulWindow, m_vulDevice};
         vulB::VulCamera camera{};
@@ -127,10 +124,7 @@ class Vulkano{
         double m_idleTime;
 
         VkExtent2D m_prevWindowSize;
-
         vulB::VulGUI m_vulGUI;
-
         std::unique_ptr<vulB::VulDescriptorPool> m_globalPool{};
-        std::vector<std::unique_ptr<vulB::VulDescriptorSet>> m_imGuiDescriptorSets;
    };
 }

@@ -30,36 +30,17 @@ Vulkano::Vulkano(uint32_t width, uint32_t height, std::string name) : m_vulWindo
         .setMaxSets(m_vulDevice.properties.limits.maxBoundDescriptorSets)
         .setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
         .build();
+
+    m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), vulRenderer, m_vulDevice);
+
+    m_currentTime = glfwGetTime();
+    m_prevWindowSize = vulRenderer.getSwapChainExtent();
 }
 
 Vulkano::~Vulkano()
 {
     letVulkanoFinish();
     m_vulGUI.destroyImGui();
-}
-
-void Vulkano::initVulkano()
-{
-    /*
-    for (size_t i = 0; i < images.size(); i++){
-        if (!images[i]->usableByImGui) continue;
-
-        Descriptor image{};
-        image.type = DescriptorType::combinedTexSampler;
-        image.content = images[i].get();
-        image.stages = {ShaderStage::frag};
-
-        descSetReturnVal retVal = createDescriptorSet({image});
-        if (!retVal.succeeded) throw std::runtime_error("Failed to create imgui image descriptor sets");
-        images[i]->setDescriptorSet(retVal.set->getSet());
-        m_imGuiDescriptorSets.push_back(std::move(retVal.set));
-    }
-    */
-
-    m_vulGUI.initImGui(m_vulWindow.getGLFWwindow(), m_globalPool->getDescriptorPoolReference(), vulRenderer, m_vulDevice);
-
-    m_currentTime = glfwGetTime();
-    m_prevWindowSize = vulRenderer.getSwapChainExtent();
 }
 
 VkCommandBuffer Vulkano::startFrame()

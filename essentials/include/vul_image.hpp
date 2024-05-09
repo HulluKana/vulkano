@@ -6,90 +6,6 @@
 #include <vul_buffer.hpp>
 #include <vulkan/vulkan_core.h>
 
-/*
-REQUIRED FEATURES
-Y   Load raw data from memory
-YX  Load uncompressed from regular file
-YX  Load compressed from ktx
-
-Y   Create mipmaps from several uncompressed files
-YX  Create mipmaps from compressed ktx file
-Y   Create mipmaps from memory
-Y   Create mipmaps from several memory
-Y   Create mipmaps from base image at runtime for raw images
-
-Y   Support 1D, 2D, 3D and cubemap images
-YX  Support 1, 2 and 4 channels for raw images 
-Y   Support multiple layers for all except 3D
-Y   Support mipmaps for all sampled variants, including their layered variants
-
-Y   Support sampled format for all image types that vulkan supports sampled for 
-Y   Support storage format for all image types that vulkan supports storage for 
-    Support all bc compression formats except bc2 for sampled images
-YX  Support 8bit unorm and srgb for sampled images
-Y   Support 16bit sfloat for sampled images
-YX  Support 32bit sfloat and uint for storage images
-
-YX  Create device local images
-YX  Create host visible and coherent images
-
-YX  Modify device local images
-YX  Modify host visible images
-Y   Modify individual mipmap levels
-Y   Modify individual array layers, including those in mipmaps
-
-Y   Read data from device local images
-Y   Read data from host visible images
-Y   Read data from individual mipmap levels
-Y   Read data from individual array layers, including those in mipmaps
-
-YX  Allow creating few different good types of images using higher level and easier to use function
-YX  Allow creating all types of supported images using lower level and harder to use function
-Y   Allow creating few different types good types of images using a single higher level all-in-ones static function
-Y   Allow passing own command buffer to both low and high level functions
-YX  Allow not having to pass own command buffer to both low and high level functions
-YX  Allow passing image data at the creation time
-Y   Allow not passing image data at the creation time
-Y   Allow creating a good high quality texture sampler with higher level and easier to use function
-Y   Allow creating a custom texture sampler with lover level and easier to use function
-Y   Allow passing in a pre-existing sampler
-
-OPTIONAL FEATURES
-    Load uncompressed from memory
-    Load compressed from memory
-    Load uncompressed from ktx
-
-Y   Create mipmaps from several compressed files
-
-    Support 3 channels for raw images
-
-    Support bc2 compression format for sampled images
-Y   Support all 8, 16 and 32 bits for sampled images
-Y   Support all 8, 16 and 32 bits for storage images
-Y   Support single channel 64bit uint and sint for storage images
-
-YX  Support sharing sampler
-    Support sharing image source
-
-Y   Create host visible and host cached, but not host coherent images
-Y   Create host visible, host cached and host coherent images
-
-    Allow creating all types of supported images using higher level and easier to use function
-Y   Allow creating all types of supported images using a single static lower-level all-in-one function
-    Allow creating all types of supported images using a single static higher level all-in-one function
-
-    Allow using image as attachment image
-
-THE FOLLOWING MUST BE SPECIFIED BY DATA LOADER
-Mip level count
-Width, height and depth of each mip level
-Pointer to the start of each mip levels data, or nullptr to signal lack of data
-Data format
-Size of each texel
-Total data size
-Pointer to start of the data, or nullptr to signal lack of data
-*/
-
 namespace vul {
 
 class VulSampler {
@@ -270,6 +186,7 @@ class VulImage {
         };
         struct MipLevel {
             std::vector<void *> layers;
+            std::vector<bool> containsData;
             uint32_t width;
             uint32_t height;
             uint32_t depth;
