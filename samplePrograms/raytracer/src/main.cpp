@@ -86,7 +86,7 @@ int main() {
         desc.content = vulkano.scene.primInfoBuffer.get();
         descriptors.push_back(desc);
 
-        desc.type = vul::Vulkano::DescriptorType::spCombinedTexSampler;
+        desc.type = vul::Vulkano::DescriptorType::spCombinedImgSampler;
         desc.content = vulkano.scene.images.data();
         desc.count = vulkano.scene.images.size();
         descriptors.push_back(desc);

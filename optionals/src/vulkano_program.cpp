@@ -1,11 +1,8 @@
 #include "vul_2d_object.hpp"
 #include "vul_acceleration_structure.hpp"
-#include "vul_attachment_image.hpp"
 #include "vul_descriptors.hpp"
 #include <vul_debug_tools.hpp>
-#include "vul_gltf_loader.hpp"
 #include "vul_renderer.hpp"
-#include "vul_swap_chain.hpp"
 #include <cstdlib>
 #include <vulkan/vulkan_core.h>
 #include<vulkano_program.hpp>
@@ -95,8 +92,8 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 
             if (firstPass || renderData.swapChainImageMode != prevSwapChainMode || renderData.depthImageMode != prevDepthImageMode || renderData.attachmentImages[vulRenderer.getFrameIndex()].size() > 0) {
                 if (!firstPass) vulRenderer.stopRendering(commandBuffer);
-                if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, false);
-                if (renderData.sampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, true);
+                if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, commandBuffer);
+                if (renderData.sampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionImageLayout(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
                 vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::renderWidth, settings::renderHeight);
                 prevSwapChainMode = renderData.swapChainImageMode;
                 prevDepthImageMode = renderData.depthImageMode;
@@ -117,7 +114,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 
             if (firstPass || renderData.swapChainImageMode != prevSwapChainMode || renderData.depthImageMode != prevDepthImageMode || renderData.attachmentImages[vulRenderer.getFrameIndex()].size() > 0) {
                 if (!firstPass) vulRenderer.stopRendering(commandBuffer);
-                if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, false);
+                if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, commandBuffer);
                 vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::renderWidth, settings::renderHeight);
                 prevSwapChainMode = renderData.swapChainImageMode;
                 prevDepthImageMode = renderData.depthImageMode;
@@ -171,8 +168,8 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
         VkDescriptorType type{};
         if (descriptors[i].type == DescriptorType::ubo) type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         else if (descriptors[i].type == DescriptorType::ssbo) type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        else if (descriptors[i].type == DescriptorType::combinedTexSampler ||
-            descriptors[i].type == DescriptorType::spCombinedTexSampler || descriptors[i].type == DescriptorType::upCombinedAttachmentSampler)
+        else if (descriptors[i].type == DescriptorType::combinedImgSampler ||
+            descriptors[i].type == DescriptorType::spCombinedImgSampler || descriptors[i].type == DescriptorType::upCombinedImgSampler)
             type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         else if (descriptors[i].type == DescriptorType::storageImage) type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         else if (descriptors[i].type == DescriptorType::accelerationStructure) type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
@@ -194,7 +191,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
             bufferInfosStorage.push_back(bufferInfos);
             set->writeBuffer(i, bufferInfosStorage[bufferInfosStorage.size() - 1].data(), desc.count);
         }
-        if (desc.type == DescriptorType::combinedTexSampler){
+        if (desc.type == DescriptorType::combinedImgSampler){
             const VulImage *image = static_cast<const VulImage *>(desc.content);
             std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
             for (uint32_t j = 0; j < desc.count; j++){
@@ -205,7 +202,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
             imageInfosStorage.push_back(imageInfos);
             set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
         }
-        if (desc.type == DescriptorType::spCombinedTexSampler){
+        if (desc.type == DescriptorType::spCombinedImgSampler){
             const std::shared_ptr<VulImage> *image = static_cast<const std::shared_ptr<VulImage> *>(desc.content);
             std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
             for (uint32_t j = 0; j < desc.count; j++){
@@ -216,13 +213,13 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
             imageInfosStorage.push_back(imageInfos);
             set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
         }
-        if (desc.type == DescriptorType::upCombinedAttachmentSampler){
-            const std::unique_ptr<VulAttachmentImage> *image = static_cast<const std::unique_ptr<VulAttachmentImage> *>(desc.content);
+        if (desc.type == DescriptorType::upCombinedImgSampler){
+            const std::unique_ptr<VulImage> *image = static_cast<const std::unique_ptr<VulImage> *>(desc.content);
             std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
             for (uint32_t j = 0; j < desc.count; j++){
                 imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 imageInfos[j].imageView = image[j]->getImageView();
-                imageInfos[j].sampler = image[j]->getSampler();
+                imageInfos[j].sampler = image[j]->vulSampler->getSampler();
             }
             imageInfosStorage.push_back(imageInfos);
             set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);

@@ -1,4 +1,4 @@
-#include "vul_attachment_image.hpp"
+#include "vul_image.hpp"
 #include <vul_debug_tools.hpp>
 #include <cstddef>
 #include <cstdlib>
@@ -54,10 +54,9 @@ void VulRenderer::recreateSwapChain()
                                                             VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
     m_depthImages.resize(vulSwapChain->imageCount());
     for (size_t i = 0; i < vulSwapChain->imageCount(); i++) {
-        m_depthImages[i] = std::make_unique<VulAttachmentImage>(vulDevice);
-        if (m_depthImages[i]->createEmptyImage( VulAttachmentImage::ImageType::depthAttachment, m_depthFormat, vulSwapChain->getSwapChainExtent()) != VK_SUCCESS)
-            throw std::runtime_error("Failed to create depth image");
-        m_depthImages[i]->transitionLayout(cmdBuf, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, true);
+        m_depthImages[i] = std::make_unique<vul::VulImage>(vulDevice);
+        m_depthImages[i]->keepEmpty(vulSwapChain->getSwapChainExtent().width, vulSwapChain->getSwapChainExtent().height, 1, 1, 1, m_depthFormat, 0, 0);
+        m_depthImages[i]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, cmdBuf);
     }
     vulDevice.endSingleTimeCommands(cmdBuf);
 }
@@ -135,7 +134,7 @@ void VulRenderer::endFrame()
     currentFrameIndex = (currentFrameIndex + 1) % VulSwapChain::MAX_FRAMES_IN_FLIGHT;
 }
 
-void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulAttachmentImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, uint32_t renderWidth, uint32_t renderHeight)
+void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<vul::VulImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, uint32_t renderWidth, uint32_t renderHeight)
 {
     VUL_PROFILE_FUNC()
     assert(isFrameStarted && "Can't call beginRendering if the frame hasn't been started either");
@@ -145,14 +144,14 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vecto
     renderArea.width = renderWidth > 0 ? renderWidth : vulSwapChain->getSwapChainExtent().width;
     renderArea.height = renderHeight > 0 ? renderHeight : vulSwapChain->getSwapChainExtent().height;
 
-    if (swapChainImageMode == SwapChainImageMode::preservePreviousStoreCurrent) vulSwapChain->getImage(currentImageIndex)->preservePreviousContents = true;
-    else vulSwapChain->getImage(currentImageIndex)->preservePreviousContents = false;
+    if (swapChainImageMode == SwapChainImageMode::preservePreviousStoreCurrent) vulSwapChain->getImage(currentImageIndex)->attachmentPreservePreviousContents = true;
+    else vulSwapChain->getImage(currentImageIndex)->attachmentPreservePreviousContents = false;
     std::vector<VkRenderingAttachmentInfo> colorAttachmentInfos;
     if (swapChainImageMode != SwapChainImageMode::noSwapChainImage) colorAttachmentInfos.push_back(vulSwapChain->getImage(currentImageIndex)->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}}));
     for (size_t i = 0; i < attachmentImages.size(); i++) colorAttachmentInfos.push_back(attachmentImages[i]->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}}));
 
-    if (depthImageMode == DepthImageMode::clearPreviousStoreCurrent) m_depthImages[currentImageIndex]->storeCurrentContents = true;
-    else m_depthImages[currentImageIndex]->storeCurrentContents = false;
+    if (depthImageMode == DepthImageMode::clearPreviousStoreCurrent) m_depthImages[currentImageIndex]->attachmentStoreCurrentContents = true;
+    else m_depthImages[currentImageIndex]->attachmentStoreCurrentContents = false;
     VkRenderingAttachmentInfo depthAttachmentInfo = m_depthImages[currentImageIndex]->getAttachmentInfo({{{1.0f}}});
 
     VkRenderingInfo renderingInfo{};
@@ -164,7 +163,7 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vecto
     renderingInfo.pColorAttachments = colorAttachmentInfos.data();
     if (depthImageMode != DepthImageMode::noDepthImage) renderingInfo.pDepthAttachment = &depthAttachmentInfo;
 
-    vulSwapChain->getImage(currentImageIndex)->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, true);
+    vulSwapChain->getImage(currentImageIndex)->transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, commandBuffer);
     vkCmdBeginRendering(commandBuffer, &renderingInfo);
 
     VkViewport viewport{};
@@ -188,7 +187,7 @@ void VulRenderer::stopRendering(VkCommandBuffer commandBuffer)
     assert(commandBuffer == getCurrentCommandBuffer() && "Can't end a render pass on a command buffer from a different frame");
 
     vkCmdEndRendering(commandBuffer);
-    vulSwapChain->getImage(currentImageIndex)->transitionLayout(commandBuffer, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, false);
+    vulSwapChain->getImage(currentImageIndex)->transitionImageLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, commandBuffer);
 }
 
 }

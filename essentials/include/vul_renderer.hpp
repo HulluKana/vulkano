@@ -1,9 +1,9 @@
 #pragma once
 
-#include "vul_attachment_image.hpp"
 #include"vul_device.hpp"
 #include"vul_swap_chain.hpp"
 #include"vul_window.hpp"
+#include <vul_image.hpp>
 
 #include<cassert>
 #include<memory>
@@ -26,7 +26,7 @@ class VulRenderer{
         VkFormat getSwapChainColorFormat() const {return vulSwapChain->getSwapChainImageFormat();}
         bool wasSwapChainRecreated() const {return m_swapchainRecreated;}
         VkFormat getDepthFormat() const {return m_depthFormat;}
-        const std::vector<std::unique_ptr<VulAttachmentImage>> &getDepthImages() const {return m_depthImages;}
+        const std::vector<std::unique_ptr<vul::VulImage>> &getDepthImages() const {return m_depthImages;}
         bool isFrameInProgress() const {return isFrameStarted;}
 
         VkCommandBuffer getCurrentCommandBuffer() const {
@@ -53,7 +53,7 @@ class VulRenderer{
             clearPreviousDiscardCurrent,
             noDepthImage
         };
-        void beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulAttachmentImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, uint32_t renderWidth, uint32_t renderHeight);
+        void beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<vul::VulImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, uint32_t renderWidth, uint32_t renderHeight);
         void stopRendering(VkCommandBuffer commandBuffer);
         
     private:
@@ -65,7 +65,7 @@ class VulRenderer{
         std::unique_ptr<VulSwapChain> vulSwapChain;
         std::vector<VkCommandBuffer> commandBuffers;
 
-        std::vector<std::unique_ptr<VulAttachmentImage>> m_depthImages;
+        std::vector<std::unique_ptr<vul::VulImage>> m_depthImages;
         VkFormat m_depthFormat;
 
         uint32_t currentImageIndex;

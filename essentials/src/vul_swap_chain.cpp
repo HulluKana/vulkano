@@ -1,4 +1,4 @@
-#include "vul_attachment_image.hpp"
+#include "vul_image.hpp"
 #include <vul_debug_tools.hpp>
 #include <memory>
 #include<vul_swap_chain.hpp>
@@ -186,9 +186,8 @@ void VulSwapChain::createSwapChain() {
     swapChainExtent = extent;
     swapChainImages.resize(imageCount);
     for (uint32_t i = 0; i < imageCount; i++) {
-        swapChainImages[i] = std::make_shared<VulAttachmentImage>(device);
-        if (swapChainImages[i]->createFromVkImage(rawSwapChainImages[i], swapChainImageFormat, swapChainExtent) != VK_SUCCESS)
-            throw std::runtime_error("Failed to create swap chain image");
+        swapChainImages[i] = std::make_shared<vul::VulImage>(device);
+        swapChainImages[i]->createFromVkImage(rawSwapChainImages[i], VK_IMAGE_VIEW_TYPE_2D, swapChainImageFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1, 1);
     }
 
     VUL_NAME_VK(swapChain)

@@ -65,7 +65,9 @@ class VulImage {
             storage1d,
             storage2d,
             storage3d,
-            storageCube
+            storageCube,
+            colorAttachment,
+            depthAttachment
         };
         enum class InputDataType {
             compressedKtxFile,
@@ -140,9 +142,12 @@ class VulImage {
         void createDefaultImageSingleTime(ImageType type);
         void createDefaultImage(ImageType type, VkCommandBuffer cmdBuf);
         void createCustomImageSingleTime(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
-                VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling);
+                VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect);
         void createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
-                VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkCommandBuffer cmdBuf);
+                VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf);
+
+        void createFromVkImage(VkImage image, VkImageViewType type, VkFormat format, VkImageAspectFlags aspect,
+                uint32_t mipLevelCount, uint32_t arrayLayerCount);
 
         void modifyImageSingleTime(const std::vector<DataSection> &modificationSections);
         void modifyImage(const std::vector<DataSection> &modificationSections, VkCommandBuffer cmdBuf);
@@ -150,15 +155,19 @@ class VulImage {
         void readImageSingleTime(std::vector<DataSection> &readSections);
         void readImage(std::vector<DataSection> &readSections, VkCommandBuffer cmdBuf);
 
+        void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf);
+
         void deleteStagingResources() {m_stagingBuffers.clear();}
         void deleteCpuData() {delete m_data.release(); m_dataSize = 0;}
+
+        VkRenderingAttachmentInfo getAttachmentInfo(VkClearValue clearValue) const;
 
         uint32_t getBaseWidth() const {return m_baseWidth;}
         uint32_t getBaseHeight() const {return m_baseHeight;}
         uint32_t getBaseDepth() const {return m_baseDepth;}
-        uint32_t getMipCount() const {return static_cast<uint32_t>(m_mipLevels.size());}
-        VkExtent3D getMipSize(uint32_t mipLevel) const;
-        uint32_t getArrayCount() const {return m_arrayLayers;}
+        uint32_t getMipCount() const {return m_mipLevelsCount;}
+        VkExtent3D getMipSize(uint32_t mip)const{return{m_mipLevels[mip].width,m_mipLevels[mip].height,m_mipLevels[mip].depth};}
+        uint32_t getArrayCount() const {return m_arrayLayersCount;}
         uint32_t getBitsPerTexel() const {return m_bitsPerTexel;}
         size_t getDataSize() const {return m_dataSize;}
 
@@ -167,6 +176,7 @@ class VulImage {
         VkImageUsageFlags getImageUsages() const {return m_usage;}
         VkImageLayout getLayout() const {return m_layout;}
         VkImageTiling getTiling() const {return m_tiling;}
+        VkImageAspectFlags getAspect() const {return m_aspect;}
         VkImageType getImageType() const {return m_imageType;}
         VkImageViewType getImageViewType() const {return m_imageViewType;}
 
@@ -175,6 +185,8 @@ class VulImage {
         VkDeviceMemory getMemory() const {return m_imageMemory;}
         
         std::shared_ptr<VulSampler> vulSampler = nullptr;
+        bool attachmentPreservePreviousContents = false;
+        bool attachmentStoreCurrentContents = true;
     private:
         struct KtxCompressionFormatProperties {
             ktx_transcode_fmt_e transcodeFormat;
@@ -193,19 +205,25 @@ class VulImage {
             size_t layerSize;
         };
 
-        uint32_t alignUp(uint32_t alignee, uint32_t aligner);
-        void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf);
+        void createVkImage();
+        void createImageView();
         void copyBufferToImage(VkBuffer buffer, uint32_t mipLevel, VkCommandBuffer cmdBuf);
+
+        uint32_t alignUp(uint32_t alignee, uint32_t aligner);
+
         KtxCompressionFormatProperties getKtxCompressionFormatProperties(KtxCompressionFormat compressionFormat);
         VkFormatProperties getVkFormatProperties(VkFormat format);
 
+        bool m_ownsImage = false;
         VkFormat m_format = VK_FORMAT_UNDEFINED;
         uint32_t m_bitsPerTexel = 0;
-        uint32_t m_arrayLayers = 0;
+        uint32_t m_arrayLayersCount = 0;
+        uint32_t m_mipLevelsCount = 0;
         VkMemoryPropertyFlags m_memoryProperties = 0;
         VkImageUsageFlags m_usage = 0;
         VkImageLayout m_layout = VK_IMAGE_LAYOUT_UNDEFINED;
         VkImageTiling m_tiling = VK_IMAGE_TILING_OPTIMAL;
+        VkImageAspectFlags m_aspect = 0;
         VkImageType m_imageType = VK_IMAGE_TYPE_1D;
         VkImageViewType m_imageViewType = VK_IMAGE_VIEW_TYPE_1D;
 

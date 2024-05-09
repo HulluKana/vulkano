@@ -1,6 +1,5 @@
 #pragma once
 
-#include "vul_attachment_image.hpp"
 #include "vul_renderer.hpp"
 #include<vul_buffer.hpp>
 #include<vul_device.hpp>
@@ -19,7 +18,6 @@
 
 #include<memory>
 #include<array>
-#include<variant>
 #include <vulkan/vulkan_core.h>
 
 namespace vul{
@@ -67,9 +65,9 @@ class Vulkano{
         enum class DescriptorType{
             ubo,
             ssbo,
-            combinedTexSampler,
-            spCombinedTexSampler,
-            upCombinedAttachmentSampler,
+            combinedImgSampler,
+            spCombinedImgSampler,
+            upCombinedImgSampler,
             storageImage,
             accelerationStructure 
         };
@@ -101,7 +99,7 @@ class Vulkano{
             std::shared_ptr<vulB::VulPipeline> pipeline;
             std::vector<vulB::VulPipeline::DrawData> drawDatas;
             std::array<std::vector<std::shared_ptr<vulB::VulDescriptorSet>>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descriptorSets;
-            std::array<std::vector<std::shared_ptr<vulB::VulAttachmentImage>>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> attachmentImages;
+            std::array<std::vector<std::shared_ptr<VulImage>>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> attachmentImages;
             vulB::VulRenderer::SwapChainImageMode swapChainImageMode;
             vulB::VulRenderer::DepthImageMode depthImageMode;
             bool sampleFromDepth;
