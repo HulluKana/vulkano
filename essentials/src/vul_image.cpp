@@ -1,4 +1,4 @@
-#include "json.hpp"
+#include <OpenEXR/ImfRgba.h>
 #include <cassert>
 #include <cmath>
 #include <cstdlib>
@@ -6,11 +6,13 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <array>
 #include <vul_image.hpp>
 #include <vul_device.hpp>
 #include <vul_buffer.hpp>
 #include <vul_debug_tools.hpp>
 
+#include <OpenEXR/ImfRgbaFile.h>
 #include <ktx.h>
 #include <vulkan/vulkan_core.h>
 #define STB_IMAGE_IMPLEMENTATION
@@ -157,6 +159,29 @@ void VulImage::loadCompressedKtxFromFile(const std::string &fileName, KtxCompres
     free(ktxTexture);
 }
 
+void VulImage::loadCubemapFromEXR(const std::string &filename)
+{
+    Imf::RgbaInputFile file(filename.c_str());
+    Imath::Box2i dataWindow = file.dataWindow();
+    uint32_t width = dataWindow.max.x - dataWindow.min.x + 1;
+    uint32_t height = dataWindow.max.y - dataWindow.min.y + 1;
+    assert(height % 6 == 0);
+    height /= 6;
+
+    std::unique_ptr<Imf::Rgba> pixels(new Imf::Rgba[width * height * 6]());
+    file.setFrameBuffer(pixels.get(), 1, width);
+    file.readPixels(dataWindow.min.y, dataWindow.max.y);
+
+    std::vector<void *> mipLevel(6);
+        mipLevel[0] = pixels.get() + height * width * 0;
+        mipLevel[1] = pixels.get() + height * width * 1;
+        mipLevel[2] = pixels.get() + height * width * 2;
+        mipLevel[3] = pixels.get() + height * width * 3;
+        mipLevel[4] = pixels.get() + height * width * 5;
+        mipLevel[5] = pixels.get() + height * width * 4;
+    loadRawFromMemory(width, height, 1, {mipLevel}, VK_FORMAT_R16G16B16A16_SFLOAT, 0, 0);
+}
+
 void VulImage::loadRawFromMemory(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth,
         const std::vector<std::vector<void *>> &data, VkFormat format, uint32_t baseOutputMipLevel, uint32_t baseOutputArrayLayer)
 {
@@ -284,10 +309,10 @@ void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkI
         VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf)
 {
     assert(m_mipLevels.size() > 0);
-    if (type == VK_IMAGE_VIEW_TYPE_1D) m_imageType = VK_IMAGE_TYPE_1D;
-    else if (type == VK_IMAGE_VIEW_TYPE_2D || type == VK_IMAGE_VIEW_TYPE_1D_ARRAY) m_imageType = VK_IMAGE_TYPE_2D;
-    else if (type == VK_IMAGE_VIEW_TYPE_3D || type == VK_IMAGE_VIEW_TYPE_2D_ARRAY || type == VK_IMAGE_VIEW_TYPE_CUBE
-            || type == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY) m_imageType = VK_IMAGE_TYPE_3D;
+    if (type == VK_IMAGE_VIEW_TYPE_1D || type == VK_IMAGE_VIEW_TYPE_1D_ARRAY) m_imageType = VK_IMAGE_TYPE_1D;
+    else if (type == VK_IMAGE_VIEW_TYPE_2D || type == VK_IMAGE_VIEW_TYPE_2D_ARRAY || type == VK_IMAGE_VIEW_TYPE_CUBE
+            || type == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY) m_imageType = VK_IMAGE_TYPE_2D;
+    else if (type == VK_IMAGE_VIEW_TYPE_3D) m_imageType = VK_IMAGE_TYPE_3D;
     m_ownsImage = true;
     m_imageViewType = type;
     m_usage = usage;
@@ -456,6 +481,16 @@ void VulImage::keepRegularRaw2d8bitRgbaEmpty(uint32_t width, uint32_t height)
 void VulImage::keepRegularRaw2d32bitRgbaEmpty(uint32_t width, uint32_t height)
 {
     keepEmpty(width, height, 1, 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT, 0, 0);
+}
+
+void VulImage::createCustomImageSingleTime(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
+        VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect)
+{
+    VkCommandBuffer cmdBuf = m_vulDevice.beginSingleTimeCommands();
+    createCustomImage(type, layout, usage, memoryProperties, tiling, aspect, cmdBuf);
+    m_vulDevice.endSingleTimeCommands(cmdBuf);
+    deleteStagingResources();
+    deleteCpuData();
 }
 
 void VulImage::createDefaultImageSingleTime(ImageType type)
@@ -753,6 +788,10 @@ VulImage::VkFormatProperties VulImage::getVkFormatProperties(VkFormat format)
             break;
         case VK_FORMAT_R32G32B32A32_SFLOAT:
             properties.bitsPerTexel = 128;
+            properties.sideLengthAlignment = 1;
+            break;
+        case VK_FORMAT_R16G16B16A16_SFLOAT:
+            properties.bitsPerTexel = 64;
             properties.sideLengthAlignment = 1;
             break;
         case VK_FORMAT_D32_SFLOAT:

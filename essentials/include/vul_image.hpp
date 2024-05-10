@@ -124,6 +124,8 @@ class VulImage {
         void loadUncompressedFromFile(const std::string &fileName, uint32_t baseInputMipLevel, uint32_t baseOutputMipLevel,
                 uint32_t mipLevelCount, uint32_t baseInputArrayLayer, uint32_t baseOutputArrayLayer, uint32_t arrayLayerCount);
 
+        void loadCubemapFromEXR(const std::string &filename);
+
         void loadRegularRaw2d8bitRgbaFromMemoryWhole(const void *data, uint32_t width, uint32_t height);
         void loadRegularRaw2d32bitRgbaFromMemoryWhole(const void *data, uint32_t width, uint32_t height);
         void loadRawFromMemoryWhole(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth,

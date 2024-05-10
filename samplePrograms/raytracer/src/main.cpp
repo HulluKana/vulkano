@@ -1,4 +1,5 @@
 #include "vul_buffer.hpp"
+#include "vul_descriptors.hpp"
 #include "vul_image.hpp"
 #include "vul_pipeline.hpp"
 #include "vul_renderer.hpp"
@@ -6,6 +7,7 @@
 #include "vul_settings.hpp"
 #include "vul_swap_chain.hpp"
 #include <cmath>
+#include <cstdlib>
 #include <glm/detail/qualifier.hpp>
 #include <glm/matrix.hpp>
 #include <memory>
@@ -33,6 +35,11 @@ int main() {
     vulkano.loadScene("../Models/sponza.gltf");
     vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
     vul::settings::maxFps = 60.0f;
+
+    std::shared_ptr<vul::VulImage> enviromentMap = std::make_shared<vul::VulImage>(vulkano.getVulDevice());
+    enviromentMap->loadCubemapFromEXR("../enviromentMaps/sunsetCube.exr");
+    enviromentMap->createCustomImageSingleTime(VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+    enviromentMap->vulSampler = vul::VulSampler::createDefaultTexSampler(vulkano.getVulDevice(), 1);
 
     vul::VulAs as(vulkano.getVulDevice(), vulkano.scene);
     std::array<std::unique_ptr<vul::VulImage>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> rtImgs;
@@ -89,6 +96,12 @@ int main() {
         desc.type = vul::Vulkano::DescriptorType::spCombinedImgSampler;
         desc.content = vulkano.scene.images.data();
         desc.count = vulkano.scene.images.size();
+        descriptors.push_back(desc);
+
+        desc.type = vul::Vulkano::DescriptorType::combinedImgSampler;
+        desc.stages = {vul::Vulkano::ShaderStage::rmiss};
+        desc.content = enviromentMap.get();
+        desc.count = 1;
         descriptors.push_back(desc);
 
         desc.type = vul::Vulkano::DescriptorType::accelerationStructure;

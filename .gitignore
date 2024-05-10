@@ -11,6 +11,7 @@
 /samplePrograms/rasterizer/.cache/
 /samplePrograms/rasterizer/bin/
 /samplePrograms/rasterizer/Models/
+/samplePrograms/rasterizer/enviromentMaps/
 /samplePrograms/rasterizer/build/.cache/
 /samplePrograms/rasterizer/build/CMakeFiles
 /samplePrograms/rasterizer/build/cmake_install.cmake
@@ -27,6 +28,7 @@
 /samplePrograms/raytracer/.cache/
 /samplePrograms/raytracer/bin/
 /samplePrograms/raytracer/Models
+/samplePrograms/raytracer/enviromentMaps
 /samplePrograms/raytracer/build/.cache/
 /samplePrograms/raytracer/build/CMakeFiles
 /samplePrograms/raytracer/build/cmake_install.cmake

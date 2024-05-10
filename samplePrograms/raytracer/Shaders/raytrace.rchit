@@ -18,7 +18,7 @@ layout(binding = 6, set = 0) readonly buffer Uvs                {vec2 uvs[];};
 layout(binding = 7, set = 0) readonly buffer Materials          {PackedMaterial materials[];};
 layout(binding = 8, set = 0) readonly buffer PrimInfos          {PrimInfo primInfos[];};
 layout(binding = 9, set = 0) uniform sampler2D texSampler[];
-layout(binding = 10, set = 0) uniform accelerationStructureEXT tlas;
+layout(binding = 11, set = 0) uniform accelerationStructureEXT tlas;
 
 layout(location = 0) rayPayloadInEXT payload prd;
 layout(location = 1) rayPayloadEXT float visibility;

@@ -45,6 +45,9 @@ target_link_libraries(debugVulkanoRaytracer glfw)
 target_link_libraries(vulkanoRaytracer ktx)
 target_link_libraries(debugVulkanoRaytracer ktx)
 
+target_link_libraries(vulkanoRaytracer OpenEXR-3_2)
+target_link_libraries(debugVulkanoRaytracer OpenEXR-3_2)
+
 set(IMGUI_PATH "../../../3rdParty/imgui")
 file(GLOB IMGUI_SOURCES ${IMGUI_PATH}/*.cpp) 
 add_library("ImGui" STATIC ${IMGUI_SOURCES})
