@@ -25,7 +25,7 @@ struct GlobalUbo {
 
     vec4 ambientLightColor;
 
-    vec4 lightPositions[MAX_LIGHTS]; // 4th component is ignored
+    vec4 lightPositions[MAX_LIGHTS]; // 4th component is light range
     vec4 lightColors[MAX_LIGHTS];
     int numLights;
 };

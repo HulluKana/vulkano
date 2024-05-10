@@ -1,3 +1,6 @@
+#include "vul_image.hpp"
+#include "vul_swap_chain.hpp"
+#include <vulkan/vulkan_core.h>
 #include<vulkano_program.hpp>
 #include<host_device.hpp>
 #include<vul_debug_tools.hpp>
@@ -115,20 +118,23 @@ Resources createReources(vul::Vulkano &vulkano)
 
     Resources output{};
     output.multipleBounce2dImage = std::make_shared<vul::VulImage>(vulkano.getVulDevice());
-    output.multipleBounce2dImage->loadData(&results[0][0], LIGHT_DIR_COUNT, ROUGHNESS_COUNT, 1, 1);
-    output.multipleBounce2dImage->createImageSingleTime(true, true, vul::VulImage::ImageType::texture, 2);
+    output.multipleBounce2dImage->loadRawFromMemoryWhole(LIGHT_DIR_COUNT, ROUGHNESS_COUNT, 1, {{&results[0][0]}}, VK_FORMAT_R8_UNORM);
+    output.multipleBounce2dImage->createDefaultImageSingleTime(vul::VulImage::ImageType::texture2d);
+    output.multipleBounce2dImage->vulSampler = vul::VulSampler::createCustomSampler(vulkano.getVulDevice(), VK_FILTER_LINEAR,
+            VK_SAMPLER_ADDRESS_MODE_REPEAT, 0.0f, VK_BORDER_COLOR_INT_OPAQUE_BLACK, VK_SAMPLER_MIPMAP_MODE_NEAREST, 0.0f, 0.0f, 1.0f);
 
     output.multipleBounce1dImage = std::make_shared<vul::VulImage>(vulkano.getVulDevice());
-    output.multipleBounce1dImage->loadData(&otherResults[0], ROUGHNESS_COUNT, 1, 1, 1);
-    output.multipleBounce1dImage->createImageSingleTime(true, true, vul::VulImage::ImageType::texture, 1);
+    output.multipleBounce1dImage->loadRawFromMemoryWhole(ROUGHNESS_COUNT, 1 , 1, {{&otherResults[0]}}, VK_FORMAT_R8_UNORM);
+    output.multipleBounce1dImage->createDefaultImageSingleTime(vul::VulImage::ImageType::texture1d);
+    output.multipleBounce1dImage->vulSampler = output.multipleBounce2dImage->vulSampler;
 
     output.aBuffer = std::make_shared<vulB::VulBuffer>(vulkano.getVulDevice());
     output.aBuffer->keepEmpty(sizeof(ABuffer), 10'000'000 / sizeof(ABuffer));
     output.aBuffer->createBuffer(true, vulB::VulBuffer::usage_ssbo);
 
     output.aBufferHeads = std::make_shared<vul::VulImage>(vulkano.getVulDevice());
-    output.aBufferHeads->keepEmpty(2560, 1440, 1, 4);
-    output.aBufferHeads->createImageSingleTime(false, true, vul::VulImage::ImageType::storageUint, 2);
+    output.aBufferHeads->keepEmpty(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, 1, 1, 1, VK_FORMAT_R32_UINT, 0, 0);
+    output.aBufferHeads->createDefaultImageSingleTime(vul::VulImage::ImageType::storage2d);
     
     output.aBufferCounter = std::make_shared<vulB::VulBuffer>(vulkano.getVulDevice());
     output.aBufferCounter->keepEmpty(sizeof(uint32_t), 1);
@@ -144,7 +150,7 @@ Resources createReources(vul::Vulkano &vulkano)
     return output;
 }
 
-RenderDataIndices createDescriptors(vul::Vulkano &vulkano, Resources inputData)
+RenderDataIndices createDescriptors(vul::Vulkano &vulkano, Resources inputData, const std::vector<std::shared_ptr<vul::VulImage>> &modelImages)
 {
     for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++){
         std::unique_ptr<vulB::VulBuffer> globalBuffer = std::make_unique<vulB::VulBuffer>(vulkano.getVulDevice());
@@ -176,9 +182,9 @@ RenderDataIndices createDescriptors(vul::Vulkano &vulkano, Resources inputData)
         descs.push_back(ubo);
 
         vul::Vulkano::Descriptor image{};
-        image.type = vul::Vulkano::DescriptorType::spCombinedTexSampler;
-        image.content = &vulkano.images[0];
-        image.count = static_cast<uint32_t>(vulkano.images.size());
+        image.type = vul::Vulkano::DescriptorType::spCombinedImgSampler;
+        image.content = modelImages.data();
+        image.count = static_cast<uint32_t>(modelImages.size());
         image.stages = {vul::Vulkano::ShaderStage::frag};
         descs.push_back(image);
 
@@ -191,14 +197,14 @@ RenderDataIndices createDescriptors(vul::Vulkano &vulkano, Resources inputData)
         }
         if (inputData.multipleBounce2dImage != nullptr){
             vul::Vulkano::Descriptor mb2dImg{};
-            mb2dImg.type = vul::Vulkano::DescriptorType::combinedTexSampler;
+            mb2dImg.type = vul::Vulkano::DescriptorType::combinedImgSampler;
             mb2dImg.content = inputData.multipleBounce2dImage.get();
             mb2dImg.stages = {vul::Vulkano::ShaderStage::frag};
             descs.push_back(mb2dImg);
         }
         if (inputData.multipleBounce1dImage != nullptr){
             vul::Vulkano::Descriptor mb1dImg{};
-            mb1dImg.type = vul::Vulkano::DescriptorType::combinedTexSampler;
+            mb1dImg.type = vul::Vulkano::DescriptorType::combinedImgSampler;
             mb1dImg.content = inputData.multipleBounce1dImage.get();
             mb1dImg.stages = {vul::Vulkano::ShaderStage::frag};
             descs.push_back(mb1dImg);
@@ -238,7 +244,7 @@ RenderDataIndices createDescriptors(vul::Vulkano &vulkano, Resources inputData)
         descs.push_back(aBufferCounter);
 
         vul::Vulkano::Descriptor depthImages{};
-        depthImages.type = vul::Vulkano::DescriptorType::upCombinedAttachmentSampler;
+        depthImages.type = vul::Vulkano::DescriptorType::upCombinedImgSampler;
         depthImages.content = vulkano.vulRenderer.getDepthImages().data();
         depthImages.count = vulkano.vulRenderer.getDepthImages().size();
         depthImages.stages = {vul::Vulkano::ShaderStage::frag};
@@ -368,7 +374,7 @@ size_t updateShaderInputs(vul::Vulkano &vulkano, RenderDataIndices inputDataRend
     ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.6f);
     ubo.numLights = scene.lights.size();
     for (int i = 0; i < std::min(static_cast<int>(scene.lights.size()), MAX_LIGHTS); i++){
-        ubo.lightPositions[i] = glm::vec4(scene.lights[i].position, 69.0f);
+        ubo.lightPositions[i] = glm::vec4(scene.lights[i].position, scene.lights[i].range);
         ubo.lightColors[i] = glm::vec4(scene.lights[i].color, scene.lights[i].intensity);
     }
     vulkano.buffers[vulkano.getFrameIdx()]->writeData(&ubo, sizeof(ubo), 0);
@@ -420,7 +426,7 @@ void updateOitResources(vul::Vulkano &vulkano, RenderDataIndices inputDataRender
             for (size_t j = 0; j < vulkano.vulRenderer.getDepthImages().size(); j++) {
                 oitDescSet->descriptorInfos[3].imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 oitDescSet->descriptorInfos[3].imageInfos[j].imageView = vulkano.vulRenderer.getDepthImages()[j]->getImageView();
-                oitDescSet->descriptorInfos[3].imageInfos[j].sampler = vulkano.vulRenderer.getDepthImages()[j]->getSampler();
+                oitDescSet->descriptorInfos[3].imageInfos[j].sampler = vulkano.vulRenderer.getDepthImages()[j]->vulSampler->getSampler();
             }
             oitDescSet->update();
         }
@@ -454,11 +460,9 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 int main() {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
     vulkano.loadScene("../Models/sponza.gltf");
-    for (const std::shared_ptr<vul::VulImage> &image : vulkano.scene.images) vulkano.images.push_back(image);
     Resources resources = createReources(vulkano);
-    RenderDataIndices renderDataIndices = createDescriptors(vulkano, resources);
+    RenderDataIndices renderDataIndices = createDescriptors(vulkano, resources, vulkano.scene.images);
     createPipelines(vulkano, renderDataIndices);
-    vulkano.initVulkano();
     vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
     vul::settings::maxFps = 60.0f;
 

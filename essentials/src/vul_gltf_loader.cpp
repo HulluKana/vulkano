@@ -74,11 +74,13 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
 
 void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
 {
-    std::set<int> colorTextures;
+    std::set<int> transparentColorTextures;
+    std::set<int> opaqueColorTextures;
     std::set<int> normalMaps;
     std::set<int> roughnessMetallicTextures;
     for (const tinygltf::Material &mat : model.materials) {
-        colorTextures.insert(model.textures[mat.pbrMetallicRoughness.baseColorTexture.index].source);
+        if (mat.alphaMode == "OPAQUE") opaqueColorTextures.insert(model.textures[mat.pbrMetallicRoughness.baseColorTexture.index].source);
+        else transparentColorTextures.insert(model.textures[mat.pbrMetallicRoughness.baseColorTexture.index].source);
         normalMaps.insert(model.textures[mat.normalTexture.index].source);
         roughnessMetallicTextures.insert(model.textures[mat.pbrMetallicRoughness.metallicRoughnessTexture.index].source);
     }
@@ -119,7 +121,8 @@ void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
             if (imgIdx >= imgSources.size()) break;
 
             VulImage::KtxCompressionFormat fromat{};
-            if (colorTextures.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaNonLinear;
+            if (transparentColorTextures.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaNonLinear;
+            else if (opaqueColorTextures.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc1rgbNonLinear;
             else if (normalMaps.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaLinear;
             else if (roughnessMetallicTextures.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaLinear;
 

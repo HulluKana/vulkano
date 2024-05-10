@@ -1,4 +1,5 @@
 #include "vul_buffer.hpp"
+#include "vul_settings.hpp"
 #include <cstdlib>
 #include<vul_debug_tools.hpp>
 #include<vul_gltf_loader.hpp>
@@ -79,10 +80,14 @@ void Scene::loadScene(std::string fileName)
     materialBuffer->loadVector(packedMaterials);
     primInfoBuffer->loadVector(primInfos);
 
-    indexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_indexBuffer | VulBuffer::usage_transferDst
-                | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead | VulBuffer::usage_ssbo));
-    vertexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst
-                | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead | VulBuffer::usage_ssbo));
+    VulBuffer::Usage rtFlags = VulBuffer::usage_none;
+    if (settings::deviceInitConfig.enableRaytracingSupport)
+        rtFlags = static_cast<VulBuffer::Usage>(VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead);
+
+    indexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_indexBuffer |
+                VulBuffer::usage_transferDst | VulBuffer::usage_ssbo | rtFlags));
+    vertexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
+                VulBuffer::usage_transferDst | VulBuffer::usage_ssbo | rtFlags));
     normalBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst | VulBuffer::usage_ssbo));
     tangentBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst | VulBuffer::usage_ssbo));
     uvBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst | VulBuffer::usage_ssbo));

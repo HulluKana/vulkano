@@ -107,18 +107,22 @@ void main()
     const vec3 specularColor = mix(vec3(0.03), rawColor, metalliness);
     const vec3 diffuseColor = mix(rawColor, vec3(0.0), metalliness);
     for (int i = 0; i < ubo.numLights; i++){
-        vec3 lightPos = ubo.lightPositions[i].xyz;
-        vec4 lightColor = ubo.lightColors[i];
+        const vec3 lightPos = ubo.lightPositions[i].xyz;
+        const vec4 lightColor = ubo.lightColors[i];
 
-        vec3 directionToLight = lightPos - fragPosWorld;
-        float attenuation = 1.0 / dot(directionToLight, directionToLight);
-        directionToLight = normalize(directionToLight);
+        vec3 lightDir = lightPos - fragPosWorld;
+        const float lightDstSquared = dot(lightDir, lightDir);
+        const float lightDst = sqrt(lightDstSquared);
+        if (lightDst > ubo.lightPositions[i].w) continue;
+
+        lightDir = normalize(lightDir);
+        if (dot(surfaceNormal, lightDir) <= 0.0) continue;
 
         vec3 colorFromThisLight = vec3(0.0);
-        colorFromThisLight += BRDF(surfaceNormal, viewDirection, directionToLight, specularColor, roughness);
-        colorFromThisLight += multipleBounceBRDF(surfaceNormal, viewDirection, directionToLight, specularColor, roughness);
-        colorFromThisLight += diffBRDF(surfaceNormal, viewDirection, directionToLight, specularColor, diffuseColor);
-        colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation;
+        colorFromThisLight += BRDF(surfaceNormal, viewDirection, lightDir, specularColor, roughness);
+        colorFromThisLight += multipleBounceBRDF(surfaceNormal, viewDirection, lightDir, specularColor, roughness);
+        colorFromThisLight += diffBRDF(surfaceNormal, viewDirection, lightDir, specularColor, diffuseColor);
+        colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w) / lightDstSquared;
         color += colorFromThisLight;
     }
 
