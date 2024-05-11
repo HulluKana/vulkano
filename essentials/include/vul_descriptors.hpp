@@ -14,7 +14,7 @@ class VulDescriptorSetLayout {
     public:
         class Builder {
             public:
-                Builder(VulDevice &vulDevice) : vulDevice{vulDevice} {}
+                Builder(const VulDevice &vulDevice) : vulDevice{vulDevice} {}
 
                 Builder &addBinding(
                         uint32_t binding,
@@ -24,12 +24,12 @@ class VulDescriptorSetLayout {
                 std::unique_ptr<VulDescriptorSetLayout> build() const;
 
             private:
-                VulDevice &vulDevice;
+                const VulDevice &vulDevice;
                 std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings{};
         };
 
         VulDescriptorSetLayout(
-                VulDevice &vulDevice, std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings);
+                const VulDevice &vulDevice, std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings);
         ~VulDescriptorSetLayout();
         VulDescriptorSetLayout(const VulDescriptorSetLayout &) = delete;
         VulDescriptorSetLayout &operator=(const VulDescriptorSetLayout &) = delete;
@@ -37,7 +37,7 @@ class VulDescriptorSetLayout {
         VkDescriptorSetLayout getDescriptorSetLayout() const { return descriptorSetLayout; }
 
     private:
-        VulDevice &vulDevice;
+        const VulDevice &vulDevice;
         VkDescriptorSetLayout descriptorSetLayout;
         std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings;
 

@@ -33,7 +33,7 @@ std::unique_ptr<VulDescriptorSetLayout> VulDescriptorSetLayout::Builder::build()
 // *************** Descriptor Set Layout *********************
 
 VulDescriptorSetLayout::VulDescriptorSetLayout(
-        VulDevice &vulDevice, std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings)
+        const VulDevice &vulDevice, std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> bindings)
     : vulDevice{vulDevice}, bindings{bindings} {
         std::vector<VkDescriptorSetLayoutBinding> setLayoutBindings{};
         for (auto kv : bindings) {

@@ -22,7 +22,7 @@ class VulPipeline{
             VkBlendFactor blendDstFactor = VK_BLEND_FACTOR_ZERO;
         };
 
-        VulPipeline(VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo);
+        VulPipeline(const VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo);
         ~VulPipeline();
 
         /* These 2 lines remove the copy constructor and operator from VulPipeline class.
@@ -41,12 +41,12 @@ class VulPipeline{
         void draw(  VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSet> &descriptorSets, const std::vector<VkBuffer> &vertexBuffers,
                     VkBuffer indexBuffer, const std::vector<DrawData> &drawDatas);
 
-        static void createShaderModule(VulDevice &vulDevice, const std::string &filePath, VkShaderModule* shaderModule);
+        static void createShaderModule(const VulDevice &vulDevice, const std::string &filePath, VkShaderModule* shaderModule);
 
         VkPipeline getPipeline() const {return m_pipeline;}
         VkPipelineLayout getPipelineLayout() const {return m_layout;}
     private:
-        VulDevice& m_vulDevice;
+        const VulDevice& m_vulDevice;
         VkPipeline m_pipeline;
         VkPipelineLayout m_layout;
         VkShaderModule vertShaderModule;

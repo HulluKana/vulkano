@@ -8,7 +8,7 @@
 
 namespace vulB{
 
-VulPipeline::VulPipeline(VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo) : m_vulDevice(device)
+VulPipeline::VulPipeline(const VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo) : m_vulDevice(device)
 {
     createShaderModule(m_vulDevice, vertFile, &vertShaderModule);
     createShaderModule(m_vulDevice, fragFile, &fragShaderModule);
@@ -197,7 +197,7 @@ void VulPipeline::draw( VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSe
     }
 }
 
-void VulPipeline::createShaderModule(VulDevice &m_vulDevice, const std::string &filePath, VkShaderModule* shaderModule)
+void VulPipeline::createShaderModule(const VulDevice &m_vulDevice, const std::string &filePath, VkShaderModule* shaderModule)
 {
     std::ifstream file{filePath, std::ios::ate | std::ios::binary};
     if (!file.is_open()) throw std::runtime_error("Failed to open file in vul_pipeline readFile function. Filepath: " + filePath);

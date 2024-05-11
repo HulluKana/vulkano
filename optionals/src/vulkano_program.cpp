@@ -158,7 +158,7 @@ void Vulkano::createTriangle(glm::vec2 corner1, glm::vec2 corner2, glm::vec2 cor
     object2Ds.push_back(std::move(object));
 }
 
-Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descriptor> &descriptors)
+std::unique_ptr<VulDescriptorSet> Vulkano::createDescriptorSet(const std::vector<Descriptor> &descriptors) const
 {
     VulDescriptorSetLayout::Builder layoutBuilder = VulDescriptorSetLayout::Builder(m_vulDevice);
     for (size_t i = 0; i < descriptors.size(); i++){
@@ -248,8 +248,7 @@ Vulkano::descSetReturnVal Vulkano::createDescriptorSet(const std::vector<Descrip
     }
     set->build();
 
-    bool succeeded = set->hasSet();
-    return {std::move(set), succeeded};
+    return set;
 }
         
 VulCompPipeline Vulkano::createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight)

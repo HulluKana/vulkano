@@ -462,9 +462,53 @@ void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newL
     m_layout = newLayout;
 }
 
+std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOneSingleTime(vulB::VulDevice &vulDevice,
+        std::variant<std::string, RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format,
+        bool addSampler, InputDataType dataType, ImageType imageType)
+{
+    VkCommandBuffer cmdBuf = vulDevice.beginSingleTimeCommands();
+    std::unique_ptr<VulImage> img = createDefaultWholeImageAllInOne(vulDevice, data, format, addSampler, dataType, imageType, cmdBuf);
+    vulDevice.endSingleTimeCommands(cmdBuf);
+
+    img->deleteStagingResources();
+    img->deleteCpuData();
+    return img;
+}
+
+std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOne(vulB::VulDevice &vulDevice, std::variant<std::string,
+        RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format, bool addSampler,
+        InputDataType dataType, ImageType imageType, VkCommandBuffer cmdBuf)
+{
+    std::unique_ptr<VulImage> img = std::make_unique<VulImage>(vulDevice);
+    switch (dataType) {
+        case InputDataType::compressedKtxFile:
+            img->loadCompressedKtxFromFileWhole(std::get<std::string>(data), std::get<KtxCompressionFormat>(format));
+            break;
+        case InputDataType::exrFile:
+            img->loadCubemapFromEXR(std::get<std::string>(data));
+            break;
+        case InputDataType::normieFile:
+            img->loadUncompressedFromFileWhole(std::get<std::string>(data));
+            break;
+        case InputDataType::rawData:
+            RawImageData rawData = std::get<RawImageData>(data);
+            img->loadRawFromMemoryWhole(rawData.baseWidth, rawData.baseHeight, rawData.baseDepth,
+                    rawData.data, std::get<VkFormat>(format));
+            break;
+    }
+    img->createDefaultImage(imageType, cmdBuf);
+    if (addSampler) img->vulSampler = VulSampler::createDefaultTexSampler(vulDevice, img->getMipCount());
+    return img;
+}
+
 void VulImage::loadCompressedKtxFromFileWhole(const std::string &fileName, KtxCompressionFormat compressionFormat)
 {
     loadCompressedKtxFromFile(fileName, compressionFormat, 0, 0, 69, 0, 0, 69);
+}
+
+void VulImage::loadUncompressedFromFileWhole(const std::string &filename)
+{
+    assert(0 && "Not implemented");
 }
 
 void VulImage::loadRawFromMemoryWhole(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth,
@@ -550,6 +594,12 @@ void VulImage::createDefaultImage(ImageType type, VkCommandBuffer cmdBuf)
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
             else createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
+            break;
+        case ImageType::hdrCube:
+            if (arrayLayers > 6) createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT 
+                    | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
+            else createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
+                    | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
             break;
         case ImageType::colorAttachment:
             createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,

@@ -86,12 +86,8 @@ class Vulkano{
             const void *content;
             uint32_t count = 1;
         };
-        struct descSetReturnVal{
-            std::unique_ptr<vulB::VulDescriptorSet> set;
-            bool succeeded;
-        };
 
-        descSetReturnVal createDescriptorSet(const std::vector<Descriptor> &descriptors);
+        std::unique_ptr<vulB::VulDescriptorSet> createDescriptorSet(const std::vector<Descriptor> &descriptors) const;
         VulCompPipeline createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight);        
 
         struct RenderData {

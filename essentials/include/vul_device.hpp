@@ -41,15 +41,15 @@ class VulDevice {
   VulDevice(VulDevice &&) = delete;
   VulDevice &operator=(VulDevice &&) = delete;
 
-  VkCommandPool getCommandPool() { return commandPool; }
-  VkCommandPool getComputeCommandPool() { return m_computeCommandPool; }
-  VkDevice device() { return device_; }
-  VkPhysicalDevice getPhysicalDevice() {return physicalDevice;}
-  VkSurfaceKHR surface() { return surface_; }
-  VkQueue graphicsQueue() { return graphicsQueue_; }
-  VkQueue presentQueue() { return presentQueue_; }
-  VkQueue computeQueue() { return m_computeQueue; }
-  VkInstance getInstace() {return instance;}
+  VkCommandPool getCommandPool() const { return commandPool; }
+  VkCommandPool getComputeCommandPool() const { return m_computeCommandPool; }
+  VkDevice device() const { return device_; }
+  VkPhysicalDevice getPhysicalDevice() const {return physicalDevice;}
+  VkSurfaceKHR surface() const { return surface_; }
+  VkQueue graphicsQueue() const { return graphicsQueue_; }
+  VkQueue presentQueue() const { return presentQueue_; }
+  VkQueue computeQueue() const { return m_computeQueue; }
+  VkInstance getInstace() const {return instance;}
 
   SwapChainSupportDetails getSwapChainSupport() { return querySwapChainSupport(physicalDevice); }
   uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
