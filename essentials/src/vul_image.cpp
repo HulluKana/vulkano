@@ -104,11 +104,11 @@ void VulImage::loadCompressedKtxFromFile(const std::string &fileName, KtxCompres
 
     ktxTexture2 *ktxTexture;
     KTX_error_code result = ktxTexture2_CreateFromNamedFile(fileName.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture); 
-    if (result != KTX_SUCCESS) throw std::runtime_error("Failed to create ktxTexture: " + std::to_string(result));
+    if (result != KTX_SUCCESS) throw std::runtime_error("Failed to create ktxTexture. File: " + fileName + " Error code: " + std::to_string(result));
 
     result = ktxTexture2_TranscodeBasis(ktxTexture, ktxFormatProperties.transcodeFormat, 0);
     if (result != KTX_SUCCESS) throw std::runtime_error("Failed to transcode ktxTexture to format " +
-            std::to_string(ktxFormatProperties.transcodeFormat) + ": " + std::to_string(result));
+            std::to_string(ktxFormatProperties.transcodeFormat) + " File: " + fileName + " Error code: " + std::to_string(result));
 
     uint32_t width = ktxTexture->baseWidth;
     uint32_t height = ktxTexture->baseHeight;

@@ -17,7 +17,7 @@ class Scene
 
         Scene(vulB::VulDevice &vulDevice);
 
-        void loadScene(std::string fileName);
+        void loadScene(const std::string &fileName, std::string textureDirectory);
 
         std::vector<vulB::GltfLoader::GltfLight> lights;
         std::vector<vulB::GltfLoader::GltfNode> nodes;

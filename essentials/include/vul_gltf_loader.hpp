@@ -105,7 +105,7 @@ class GltfLoader
         std::vector<std::shared_ptr<vul::VulImage>> images;
 
         void importMaterials(const tinygltf::Model &model);
-        void importTextures(const tinygltf::Model &model, VulDevice &device);
+        void importTextures(const tinygltf::Model &model, const std::string &textureDirectory, VulDevice &device);
         void importDrawableNodes(const tinygltf::Model &model, GltfAttributes requestedAttributes);
 
     private:

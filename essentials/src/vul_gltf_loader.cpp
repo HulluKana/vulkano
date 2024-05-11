@@ -72,7 +72,7 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
     }
 }
 
-void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
+void GltfLoader::importTextures(const tinygltf::Model &model, const std::string &textureDirectory, VulDevice &device)
 {
     std::set<int> transparentColorTextures;
     std::set<int> opaqueColorTextures;
@@ -128,7 +128,7 @@ void GltfLoader::importTextures(const tinygltf::Model &model, VulDevice &device)
 
             const tinygltf::Image &image = model.images[imgIdx];
             imgSources[imgIdx] = std::make_shared<VulImage>(device);
-            imgSources[imgIdx]->loadCompressedKtxFromFileWhole("../Models/" + image.uri, fromat);
+            imgSources[imgIdx]->loadCompressedKtxFromFileWhole(textureDirectory + image.uri, fromat);
             imgSources[imgIdx]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                     VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBufs[threadIdx]);

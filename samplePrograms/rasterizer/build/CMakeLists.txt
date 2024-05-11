@@ -45,6 +45,9 @@ target_link_libraries(debugVulkanoRasteriser glfw)
 target_link_libraries(vulkanoRasteriser ktx)
 target_link_libraries(debugVulkanoRasteriser ktx)
 
+target_link_libraries(vulkanoRasteriser OpenEXR-3_2)
+target_link_libraries(debugVulkanoRasteriser OpenEXR-3_2)
+
 set(IMGUI_PATH "../../../3rdParty/imgui")
 file(GLOB IMGUI_SOURCES ${IMGUI_PATH}/*.cpp) 
 add_library("ImGui" STATIC ${IMGUI_SOURCES})

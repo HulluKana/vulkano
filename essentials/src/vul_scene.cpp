@@ -19,7 +19,7 @@ Scene::Scene(vulB::VulDevice &vulDevice) : m_vulDevice{vulDevice}
 
 }
 
-void Scene::loadScene(std::string fileName)
+void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
 {
     tinygltf::Model model;
     tinygltf::TinyGLTF context;
@@ -28,9 +28,11 @@ void Scene::loadScene(std::string fileName)
     if (!context.LoadASCIIFromFile(&model, &err, &warn, fileName)) 
         throw std::runtime_error("Failed to load scene from file: " + err);
 
+    if (textureDirectory[textureDirectory.length() - 1] != '/') textureDirectory += '/';
+
     GltfLoader gltfLoader;
     gltfLoader.importMaterials(model);
-    gltfLoader.importTextures(model, m_vulDevice);
+    gltfLoader.importTextures(model, textureDirectory, m_vulDevice);
     gltfLoader.importDrawableNodes(model, GltfLoader::gltfAttribOr(GltfLoader::gltfAttribOr(GltfLoader::GltfAttributes::Normal,
                     GltfLoader::GltfAttributes::Tangent), GltfLoader::GltfAttributes::TexCoord));
 

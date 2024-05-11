@@ -1,3 +1,4 @@
+#include "vul_descriptors.hpp"
 #include "vul_image.hpp"
 #include "vul_swap_chain.hpp"
 #include <vulkan/vulkan_core.h>
@@ -117,15 +118,13 @@ Resources createReources(vul::Vulkano &vulkano)
     }
 
     Resources output{};
-    output.multipleBounce2dImage = std::make_shared<vul::VulImage>(vulkano.getVulDevice());
-    output.multipleBounce2dImage->loadRawFromMemoryWhole(LIGHT_DIR_COUNT, ROUGHNESS_COUNT, 1, {{&results[0][0]}}, VK_FORMAT_R8_UNORM);
-    output.multipleBounce2dImage->createDefaultImageSingleTime(vul::VulImage::ImageType::texture2d);
+    output.multipleBounce2dImage = vul::VulImage::createDefaultWholeImageAllInOneSingleTime(vulkano.getVulDevice(), vul::VulImage::RawImageData{LIGHT_DIR_COUNT,
+            ROUGHNESS_COUNT, 1, {{&results[0][0]}}}, VK_FORMAT_R8_UNORM, false, vul::VulImage::InputDataType::rawData, vul::VulImage::ImageType::texture2d);
     output.multipleBounce2dImage->vulSampler = vul::VulSampler::createCustomSampler(vulkano.getVulDevice(), VK_FILTER_LINEAR,
             VK_SAMPLER_ADDRESS_MODE_REPEAT, 0.0f, VK_BORDER_COLOR_INT_OPAQUE_BLACK, VK_SAMPLER_MIPMAP_MODE_NEAREST, 0.0f, 0.0f, 1.0f);
 
-    output.multipleBounce1dImage = std::make_shared<vul::VulImage>(vulkano.getVulDevice());
-    output.multipleBounce1dImage->loadRawFromMemoryWhole(ROUGHNESS_COUNT, 1 , 1, {{&otherResults[0]}}, VK_FORMAT_R8_UNORM);
-    output.multipleBounce1dImage->createDefaultImageSingleTime(vul::VulImage::ImageType::texture1d);
+    output.multipleBounce1dImage = vul::VulImage::createDefaultWholeImageAllInOneSingleTime(vulkano.getVulDevice(), vul::VulImage::RawImageData{
+            ROUGHNESS_COUNT, 1, 1, {{&otherResults[0]}}}, VK_FORMAT_R8_UNORM, false, vul::VulImage::InputDataType::rawData, vul::VulImage::ImageType::texture1d);
     output.multipleBounce1dImage->vulSampler = output.multipleBounce2dImage->vulSampler;
 
     output.aBuffer = std::make_shared<vulB::VulBuffer>(vulkano.getVulDevice());
@@ -210,10 +209,9 @@ RenderDataIndices createDescriptors(vul::Vulkano &vulkano, Resources inputData, 
             descs.push_back(mb1dImg);
         }
 
-        vul::Vulkano::descSetReturnVal retVal = vulkano.createDescriptorSet(descs);
+        std::unique_ptr<vulB::VulDescriptorSet> mainDescSet = vulkano.createDescriptorSet(descs);
 
-        if (!retVal.succeeded) throw std::runtime_error("Failed to create default main descriptor sets");
-        vulkano.renderDatas[returnValue.mainRenderDataIdx].descriptorSets[i].push_back(std::move(retVal.set));
+        vulkano.renderDatas[returnValue.mainRenderDataIdx].descriptorSets[i].push_back(std::move(mainDescSet));
         vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i] = vulkano.renderDatas[returnValue.mainRenderDataIdx].descriptorSets[i];
 
         VUL_NAME_VK(vulkano.renderDatas[returnValue.mainRenderDataIdx].descriptorSets[i][0]->getSet())
@@ -250,9 +248,8 @@ RenderDataIndices createDescriptors(vul::Vulkano &vulkano, Resources inputData, 
         depthImages.stages = {vul::Vulkano::ShaderStage::frag};
         descs.push_back(depthImages);
 
-        vul::Vulkano::descSetReturnVal retVal = vulkano.createDescriptorSet(descs);
-        if (!retVal.succeeded) throw std::runtime_error("Failed to create default OIT descriptor sets");
-        vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i].push_back(std::move(retVal.set));
+        std::unique_ptr<vulB::VulDescriptorSet> oitDescSet = vulkano.createDescriptorSet(descs);
+        vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i].push_back(std::move(oitDescSet));
         vulkano.renderDatas[returnValue.oitCompositingRenderDataIdx].descriptorSets[i].push_back(vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i][1]);
         // vulkano.renderDatas[returnValue.oitReflectionRenderDataIdx].descriptorSets[i].push_back(vulkano.renderDatas[returnValue.oitColoringRenderDataIdx].descriptorSets[i][1]);
     }
@@ -459,7 +456,7 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 
 int main() {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
-    vulkano.loadScene("../Models/sponza.gltf");
+    vulkano.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza");
     Resources resources = createReources(vulkano);
     RenderDataIndices renderDataIndices = createDescriptors(vulkano, resources, vulkano.scene.images);
     createPipelines(vulkano, renderDataIndices);

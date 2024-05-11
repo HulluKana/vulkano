@@ -140,7 +140,7 @@ void updateUbo(const vul::Vulkano &vulkano, std::unique_ptr<vulB::VulBuffer> &ub
 int main() {
     vul::settings::deviceInitConfig.enableRaytracingSupport = true;
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
-    vulkano.loadScene("../Models/sponza.gltf");
+    vulkano.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza/");
     vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
     vul::settings::maxFps = 60.0f;
 
