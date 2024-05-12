@@ -7,7 +7,7 @@
 #include "common.glsl"
 
 layout(binding = 1, set = 0) uniform Ubo {GlobalUbo ubo;};
-layout(binding = 10, set = 0) uniform samplerCube enviromentMap;
+layout(binding = 11, set = 0) uniform samplerCube enviromentMap;
 
 layout(location = 0) rayPayloadInEXT payload prd;
 
@@ -15,4 +15,5 @@ void main()
 {
     const vec3 dir = vec3(-gl_WorldRayDirectionEXT.x, gl_WorldRayDirectionEXT.y, gl_WorldRayDirectionEXT.z);
     prd.hitValue = texture(enviromentMap, dir);
+    prd.emission = vec3(0.0);
 }

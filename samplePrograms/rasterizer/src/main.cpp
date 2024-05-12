@@ -193,6 +193,12 @@ RenderDataIndices createDescriptors(vul::Vulkano &vulkano, Resources inputData, 
             matBuf.content = vulkano.scene.materialBuffer.get();
             matBuf.stages = {vul::Vulkano::ShaderStage::frag};
             descs.push_back(matBuf);
+
+            vul::Vulkano::Descriptor lightsBuf{};
+            lightsBuf.type = vul::Vulkano::DescriptorType::ssbo;
+            lightsBuf.content = vulkano.scene.lightsBuffer.get();
+            lightsBuf.stages = {vul::Vulkano::ShaderStage::frag};
+            descs.push_back(lightsBuf);
         }
         if (inputData.multipleBounce2dImage != nullptr){
             vul::Vulkano::Descriptor mb2dImg{};
@@ -370,10 +376,6 @@ size_t updateShaderInputs(vul::Vulkano &vulkano, RenderDataIndices inputDataRend
 
     ubo.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.6f);
     ubo.numLights = scene.lights.size();
-    for (int i = 0; i < std::min(static_cast<int>(scene.lights.size()), MAX_LIGHTS); i++){
-        ubo.lightPositions[i] = glm::vec4(scene.lights[i].position, scene.lights[i].range);
-        ubo.lightColors[i] = glm::vec4(scene.lights[i].color, scene.lights[i].intensity);
-    }
     vulkano.buffers[vulkano.getFrameIdx()]->writeData(&ubo, sizeof(ubo), 0);
 
     size_t mainIdx = 0;
@@ -456,7 +458,7 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 
 int main() {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
-    vulkano.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza");
+    vulkano.loadScene("../Models/sponzaCandles/sponzaCandles.gltf", "../Models/sponzaCandles");
     Resources resources = createReources(vulkano);
     RenderDataIndices renderDataIndices = createDescriptors(vulkano, resources, vulkano.scene.images);
     createPipelines(vulkano, renderDataIndices);

@@ -1,7 +1,10 @@
+#include <cstdio>
+#include <stdexcept>
 #include <vul_debug_tools.hpp>
 #include <vul_transform.hpp>
 #include <vul_acceleration_structure.hpp>
 #include <iostream>
+#include <vulkan/vulkan_core.h>
 
 using namespace vulB;
 namespace vul {
@@ -285,7 +288,16 @@ VulAs::As VulAs::createAs(VkAccelerationStructureCreateInfoKHR &createInfo)
     As as{};
     as.buffer = std::make_unique<VulBuffer>(m_vulDevice);
     as.buffer->keepEmpty(1, createInfo.size);
-    as.buffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_accelerationStructureBuffer | VulBuffer::usage_getAddress));
+    VkResult result = as.buffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_accelerationStructureBuffer | VulBuffer::usage_getAddress));
+    if (result != VK_SUCCESS) {
+        if (result == VK_ERROR_OUT_OF_DEVICE_MEMORY) {
+            fprintf(stderr, "Failed to create acceleration structure buffer due to running out of device memory. Tried to allocate %lu bytes. Trying to allocate buffer to host memory", createInfo.size);
+            as.buffer = std::make_unique<VulBuffer>(m_vulDevice);
+            as.buffer->keepEmpty(1, createInfo.size);
+            result = as.buffer->createBuffer(false, static_cast<VulBuffer::Usage>(VulBuffer::usage_accelerationStructureBuffer | VulBuffer::usage_getAddress));
+        }
+        if (result != VK_SUCCESS) throw std::runtime_error("Failed to create acceleration structure buffer: " + std::to_string(result));
+    } 
 
     createInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
     createInfo.buffer = as.buffer->getBuffer();

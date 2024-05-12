@@ -1,5 +1,5 @@
-#include "vul_image.hpp"
 #include <array>
+#include <iostream>
 #include <vul_rt_pipeline.hpp>
 #include<vulkano_program.hpp>
 #include<host_device.hpp>
@@ -54,6 +54,8 @@ std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulk
     desc.content = vulkano.scene.materialBuffer.get();
     descriptors.push_back(desc);
     desc.content = vulkano.scene.primInfoBuffer.get();
+    descriptors.push_back(desc);
+    desc.content = vulkano.scene.lightsBuffer.get();
     descriptors.push_back(desc);
 
     desc.type = vul::Vulkano::DescriptorType::spCombinedImgSampler;
@@ -121,11 +123,7 @@ void updateUbo(const vul::Vulkano &vulkano, std::unique_ptr<vulB::VulBuffer> &ub
     uboData.inverseProjectionMatrix = glm::inverse(vulkano.camera.getProjection());
     uboData.cameraPosition = glm::vec4(vulkano.cameraTransform.pos, 0.0f);
 
-    uboData.numLights = std::min(static_cast<int>(vulkano.scene.lights.size()), MAX_LIGHTS);
-    for (int i = 0; i < uboData.numLights; i++){
-        uboData.lightPositions[i] = glm::vec4(vulkano.scene.lights[i].position, vulkano.scene.lights[i].range);
-        uboData.lightColors[i] = glm::vec4(vulkano.scene.lights[i].color, vulkano.scene.lights[i].intensity);
-    }
+    uboData.numLights = vulkano.scene.lights.size();
     uboData.ambientLightColor = glm::vec4(1.0f, 1.0f, 1.0f, 0.3f);
 
     // Pixel spread angle is from equation 30 from
@@ -140,7 +138,7 @@ void updateUbo(const vul::Vulkano &vulkano, std::unique_ptr<vulB::VulBuffer> &ub
 int main() {
     vul::settings::deviceInitConfig.enableRaytracingSupport = true;
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
-    vulkano.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza/");
+    vulkano.loadScene("../Models/sponzaCandles/sponzaCandles.gltf", "../Models/sponzaCandles/");
     vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
     vul::settings::maxFps = 60.0f;
 

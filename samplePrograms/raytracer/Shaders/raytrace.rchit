@@ -17,8 +17,9 @@ layout(binding = 5, set = 0) readonly buffer Tangents           {vec4 tangents[]
 layout(binding = 6, set = 0) readonly buffer Uvs                {vec2 uvs[];};
 layout(binding = 7, set = 0) readonly buffer Materials          {PackedMaterial materials[];};
 layout(binding = 8, set = 0) readonly buffer PrimInfos          {PrimInfo primInfos[];};
-layout(binding = 9, set = 0) uniform sampler2D texSampler[];
-layout(binding = 11, set = 0) uniform accelerationStructureEXT tlas;
+layout(binding = 9, set = 0) readonly buffer LightInfos         {LightInfo lightInfos[];};
+layout(binding = 10, set = 0) uniform sampler2D texSampler[];
+layout(binding = 12, set = 0) uniform accelerationStructureEXT tlas;
 
 layout(location = 0) rayPayloadInEXT payload prd;
 layout(location = 1) rayPayloadEXT float visibility;
@@ -217,6 +218,7 @@ void main()
         if (mat.emissiveStrength > 0.01) color += sRGBToAlbedo(mat.emissiveColor * mat.emissiveStrength);
 
         prd.hitValue = vec4(albedoToSRGB(color), alpha);
+        prd.emission = vec3(0.0);
         prd.pos = pos;
         return;
     }
@@ -225,15 +227,14 @@ void main()
     const vec3 specularColor = mix(vec3(0.03), rawColor, metalliness);
     const vec3 diffuseColor = mix(rawColor, vec3(0.0), metalliness);
     for (int i = 0; i < ubo.numLights; i++){
-        const vec3 lightPos = ubo.lightPositions[i].xyz;
-        const vec4 lightColor = ubo.lightColors[i];
+        const vec4 lightPos = lightInfos[i].lightPosition;
+        const vec4 lightColor = lightInfos[i].lightColor;
 
-        vec3 lightDir = lightPos - pos;
+        vec3 lightDir = lightPos.xyz - pos;
         const float lightDstSquared = dot(lightDir, lightDir);
         const float lightDst = sqrt(lightDstSquared);
         const float attenuation = 1.0 / lightDstSquared;
-        const vec3 lightContribution = sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation;
-        if (length(lightContribution) <= 0.05 || lightDst > ubo.lightPositions[i].w) continue;
+        if (lightDst > lightPos.w) continue;
 
         lightDir = normalize(lightDir);
         if (dot(normal, lightDir) <= 0.0) continue;
@@ -257,13 +258,13 @@ void main()
         vec3 colorFromThisLight = vec3(0.0);
         colorFromThisLight += BRDF(normal, viewDirection, lightDir, specularColor, roughness);
         colorFromThisLight += diffBRDF(normal, viewDirection, lightDir, specularColor, diffuseColor);
-        colorFromThisLight *= lightContribution * (visibility - 10.0);
+        colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation * (visibility - 10.0);
         color += colorFromThisLight;
     }
 
     color += sRGBToAlbedo(ubo.ambientLightColor.xyz * ubo.ambientLightColor.w) * rawColor;
-    if (mat.emissiveStrength > 0.01) color += sRGBToAlbedo(mat.emissiveColor * mat.emissiveStrength);
 
     prd.hitValue = vec4(albedoToSRGB(color), alpha);
+    prd.emission = mat.emissiveColor * mat.emissiveStrength;
     prd.pos = pos;
 }

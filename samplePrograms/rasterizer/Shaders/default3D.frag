@@ -17,9 +17,10 @@ layout (location = 0) out vec4 FragColor;
 layout(set = 0, binding = 0) uniform Ubo {GlobalUbo ubo;};
 
 layout (set = 0, binding = 1) uniform sampler2D texSampler[];
-layout(set = 0, binding = 2) readonly buffer MaterialBuffer{PackedMaterial m[];} matBuf;
-layout(set = 0, binding = 3) uniform sampler2D multipleBounce2dImg;
-layout(set = 0, binding = 4) uniform sampler1D multipleBounce1dImg;
+layout(set = 0, binding = 2) readonly buffer MaterialBuffer{PackedMaterial matBuf[];};
+layout(set = 0, binding = 3) readonly buffer LightBuffer{LightInfo lightBuf[];};
+layout(set = 0, binding = 4) uniform sampler2D multipleBounce2dImg;
+layout(set = 0, binding = 5) uniform sampler1D multipleBounce1dImg;
 
 layout (push_constant) uniform Push{DefaultPushConstant push;};
 
@@ -60,7 +61,7 @@ void main()
         int roughnessMetallicTextureIndex;
     } mat;
     if (push.matIdx > -1){
-        PackedMaterial packedMat = matBuf.m[push.matIdx];
+        PackedMaterial packedMat = matBuf[push.matIdx];
         mat.color = packedMat.colorFactor.xyz;
         mat.alpha = packedMat.colorFactor.w;
         mat.emissiveColor = packedMat.emissiveFactor.xyz;
@@ -107,13 +108,13 @@ void main()
     const vec3 specularColor = mix(vec3(0.03), rawColor, metalliness);
     const vec3 diffuseColor = mix(rawColor, vec3(0.0), metalliness);
     for (int i = 0; i < ubo.numLights; i++){
-        const vec3 lightPos = ubo.lightPositions[i].xyz;
-        const vec4 lightColor = ubo.lightColors[i];
+        const vec4 lightPos = lightBuf[i].lightPosition;
+        const vec4 lightColor = lightBuf[i].lightColor;
 
-        vec3 lightDir = lightPos - fragPosWorld;
+        vec3 lightDir = lightPos.xyz - fragPosWorld;
         const float lightDstSquared = dot(lightDir, lightDir);
         const float lightDst = sqrt(lightDstSquared);
-        if (lightDst > ubo.lightPositions[i].w) continue;
+        if (lightDst > lightPos.w) continue;
 
         lightDir = normalize(lightDir);
         if (dot(surfaceNormal, lightDir) <= 0.0) continue;

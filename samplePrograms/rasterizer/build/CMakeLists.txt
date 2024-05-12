@@ -55,5 +55,5 @@ target_include_directories("ImGui" PUBLIC ${IMGUI_PATH})
 target_link_libraries(vulkanoRasteriser ImGui)
 target_link_libraries(debugVulkanoRasteriser ImGui)
 
-target_include_directories(vulkanoRasteriser PUBLIC "../include" "../../../3rdParty/" "../../../essentials/include/" "../../../optionals/include/")
-target_include_directories(debugVulkanoRasteriser PUBLIC "../include" "../../../3rdParty/"  "../../../essentials/include/" "../../../optionals/include/")
+target_include_directories(vulkanoRasteriser PUBLIC "../include" "../../../3rdParty/" "../../../essentials/include/" "../../../optionals/include/" "/usr/include/Imath")
+target_include_directories(debugVulkanoRasteriser PUBLIC "../include" "../../../3rdParty/"  "../../../essentials/include/" "../../../optionals/include/" "/usr/include/Imath")

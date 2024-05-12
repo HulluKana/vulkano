@@ -1,27 +1,12 @@
-#include "vul_device.hpp"
-#include <GLFW/glfw3.h>
 #include <atomic>
-#include <cstddef>
-#include <cstdlib>
-#include <glm/ext/matrix_transform.hpp>
-#include <glm/ext/quaternion_float.hpp>
-#include <glm/ext/quaternion_transform.hpp>
 #include <glm/gtc/quaternion.hpp>
-#include <limits>
-#include <map>
-#include <memory>
 #include <set>
-#include <functional>
-#include <sstream>
-#include <stdexcept>
-#include <string>
 #include <iostream>
-#include <future>
-
+#include <unistd.h>
 #include <thread>
+
 #include<vul_gltf_loader.hpp>
 #include<vul_transform.hpp>
-#include <vulkan/vulkan_core.h>
 
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #define TINYGLTF_IMPLEMENTATION
@@ -39,9 +24,9 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
     for (const tinygltf::Material &tmat : model.materials){
         Material omat{};
         omat.name = tmat.name;
-        if (tmat.alphaMode == "OPAQUE" || tmat.alphaMode.length() == 0) omat.alphaMode = GltfAlphaMode::opaque;
+        if (tmat.alphaMode == "BLEND" || tmat.pbrMetallicRoughness.baseColorFactor[3] < 0.99) omat.alphaMode = GltfAlphaMode::blend;
         else if (tmat.alphaMode == "MASK") omat.alphaMode = GltfAlphaMode::mask;
-        else if (tmat.alphaMode == "BLEND") omat.alphaMode = GltfAlphaMode::blend;
+        else if (tmat.alphaMode == "OPAQUE" || tmat.alphaMode.length() == 0) omat.alphaMode = GltfAlphaMode::opaque;
         else throw std::runtime_error("Unsupported alpha mode while importing materials. Alpha mode: " + tmat.alphaMode);
         
         omat.emissiveFactor = (tmat.emissiveFactor.size() == 3) ? glm::vec3(tmat.emissiveFactor[0], tmat.emissiveFactor[1], tmat.emissiveFactor[2]) : glm::vec3(0.0f);
@@ -61,7 +46,7 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
         if (tmat.extensions.find("KHR_materials_emissive_strength") != tmat.extensions.end()){
             const auto &ext = tmat.extensions.find("KHR_materials_emissive_strength")->second;
             omat.emissionStrength = getFloat(ext, "emissiveStrength");
-        }
+        } else (omat.emissiveFactor.x > 0.001f || omat.emissiveFactor.y > 0.001f || omat.emissiveFactor.z > 0.001f) ? omat.emissionStrength = 1.0f : omat.emissionStrength = 0.0f;
         
         materials.emplace_back(omat);
     }
@@ -347,10 +332,18 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
         localQuat.w = node.rotation[3];
         rotationQuaternion *= localQuat;
     }
-    transform.rot = -glm::eulerAngles(rotationQuaternion); // Don't even ask about the minus sign
     if (!node.scale.empty())
         transform.scale *= glm::vec3(node.scale[0], node.scale[1], node.scale[2]); 
     if (!node.matrix.empty()) throw std::runtime_error("The node has some sort of matrix. Handle it");
+
+    // Don't ask what the fuck is going on with this block of code.
+    // Definitely don't ask why is there a minus sign in the transform.rot, but not in parentTransform.rot
+    transform3D parentTransform{};
+    parentTransform.pos = parentPos;
+    parentTransform.rot = glm::eulerAngles(parentRot);
+    parentTransform.scale = parentScale;
+    transform.pos = glm::vec4(transform.pos - parentPos, 1.0f) * parentTransform.transformMat();
+    transform.rot = -glm::eulerAngles(rotationQuaternion);
 
     if (node.mesh > -1){
         const std::vector<uint32_t> &meshes = m_meshToPrimMesh[node.mesh];
@@ -373,7 +366,7 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
         gltfLight.color = {light.color[0], light.color[1], light.color[2]};
         gltfLight.intensity = light.intensity;
         gltfLight.range = light.range;
-        if (gltfLight.range < 0.01f) gltfLight.range = 10'000.0f;
+        if (gltfLight.range < 0.001f) gltfLight.range = 10'000.0f;
         lights.push_back(gltfLight);
     }
 

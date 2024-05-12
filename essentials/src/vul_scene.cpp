@@ -66,6 +66,14 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
         primInfos.push_back(primInfo);
     } 
 
+    std::vector<LightInfo> lightInfos;
+    for (const GltfLoader::GltfLight &light : gltfLoader.lights) {
+        LightInfo lightInfo;
+        lightInfo.lightPosition = glm::vec4(light.position, light.range);
+        lightInfo.lightColor = glm::vec4(light.color, light.intensity);
+        lightInfos.push_back(lightInfo);
+    }
+
     indexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
     vertexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
     normalBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
@@ -73,6 +81,7 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
     uvBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
     materialBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
     primInfoBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+    lightsBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
 
     indexBuffer->loadVector(gltfLoader.indices);
     vertexBuffer->loadVector(gltfLoader.positions);
@@ -81,6 +90,7 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
     uvBuffer->loadVector(gltfLoader.uvCoords);
     materialBuffer->loadVector(packedMaterials);
     primInfoBuffer->loadVector(primInfos);
+    lightsBuffer->loadVector(lightInfos);
 
     VulBuffer::Usage rtFlags = VulBuffer::usage_none;
     if (settings::deviceInitConfig.enableRaytracingSupport)
@@ -95,6 +105,7 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
     uvBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst | VulBuffer::usage_ssbo));
     materialBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_transferDst));
     primInfoBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_transferDst));
+    lightsBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_transferDst));
 
     lights = gltfLoader.lights;
     nodes = gltfLoader.nodes;
@@ -108,6 +119,7 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
     VUL_NAME_VK(uvBuffer->getBuffer())
     VUL_NAME_VK(materialBuffer->getBuffer())
     VUL_NAME_VK(primInfoBuffer->getBuffer())
+    VUL_NAME_VK(lightsBuffer->getBuffer())
 }
 
 }

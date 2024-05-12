@@ -8,7 +8,7 @@
 
 layout(binding = 0, set = 0, rgba32f) uniform image2D image;
 layout(binding = 1, set = 0) uniform Ubo {GlobalUbo ubo;};
-layout(binding = 11, set = 0) uniform accelerationStructureEXT tlas;
+layout(binding = 12, set = 0) uniform accelerationStructureEXT tlas;
 
 layout(location = 0) rayPayloadEXT payload prd;
 
@@ -26,6 +26,7 @@ void main()
 
     vec3 pos = origin; 
     vec3 color = vec3(0.0);
+    vec3 emission = vec3(0.0);
     float alpha = 0.0;
     while (true) {
         traceRayEXT(tlas,               // acceleration structure
@@ -44,9 +45,10 @@ void main()
         pos = prd.pos;
 
         color = alpha * color + (1.0 - alpha) * prd.hitValue.w * prd.hitValue.xyz;
+        emission = emission + prd.emission * (1.0 - alpha);
         alpha = prd.hitValue.w - prd.hitValue.w * alpha + alpha;
         if (alpha >= 0.97) break;
     }
 
-    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(color, 1.0));
+    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(color + emission, 1.0));
 }

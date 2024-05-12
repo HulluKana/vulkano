@@ -15,7 +15,6 @@ using mat4 = glm::mat4;
 using uint = uint32_t;
 #endif
 
-#define MAX_LIGHTS 25
 #define OIT_LAYERS 8
 
 struct GlobalUbo {
@@ -25,8 +24,6 @@ struct GlobalUbo {
 
     vec4 ambientLightColor;
 
-    vec4 lightPositions[MAX_LIGHTS]; // 4th component is light range
-    vec4 lightColors[MAX_LIGHTS];
     int numLights;
 };
 
