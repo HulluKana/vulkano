@@ -15,7 +15,7 @@ using mat4 = glm::mat4;
 using uint = uint32_t;
 #endif
 
-#define MAX_LIGHTS 25
+#define RESERVOIRS_PER_CELL 64
 
 struct GlobalUbo {
     mat4 inverseProjectionMatrix;
@@ -24,13 +24,14 @@ struct GlobalUbo {
 
     vec4 ambientLightColor;
 
-    vec4 lightPositions[MAX_LIGHTS]; // 4th component is the lights max range
-    vec4 lightColors[MAX_LIGHTS];
-    int numLights;
-
     float pixelSpreadAngle;
     int padding1;
-    int padding2;
+};
+
+struct Reservoir {
+    uint lightIdx;
+    float totalWeight;
+    float targetPdf;
 };
 
 #endif

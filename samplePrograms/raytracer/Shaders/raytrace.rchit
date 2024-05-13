@@ -18,8 +18,9 @@ layout(binding = 6, set = 0) readonly buffer Uvs                {vec2 uvs[];};
 layout(binding = 7, set = 0) readonly buffer Materials          {PackedMaterial materials[];};
 layout(binding = 8, set = 0) readonly buffer PrimInfos          {PrimInfo primInfos[];};
 layout(binding = 9, set = 0) readonly buffer LightInfos         {LightInfo lightInfos[];};
-layout(binding = 10, set = 0) uniform sampler2D texSampler[];
-layout(binding = 12, set = 0) uniform accelerationStructureEXT tlas;
+layout(binding = 10, set = 0, scalar) readonly buffer Reservoirs{ivec4 minPos; uvec4 dims; Reservoir reservoirs[];};
+layout(binding = 11, set = 0) uniform sampler2D texSampler[];
+layout(binding = 13, set = 0) uniform accelerationStructureEXT tlas;
 
 layout(location = 0) rayPayloadInEXT payload prd;
 layout(location = 1) rayPayloadEXT float visibility;
@@ -223,18 +224,23 @@ void main()
         return;
     }
 
+    uint gridX = uint(pos.x) - minPos.x;
+    uint gridY = uint(pos.y) - minPos.y;
+    uint gridZ = uint(pos.z) - minPos.z;
+    uint idx = gridZ * dims.y * dims.x * RESERVOIRS_PER_CELL + gridY * dims.x * RESERVOIRS_PER_CELL + gridX * RESERVOIRS_PER_CELL;
+
     vec3 color = vec3(0.0);
     const vec3 specularColor = mix(vec3(0.03), rawColor, metalliness);
     const vec3 diffuseColor = mix(rawColor, vec3(0.0), metalliness);
-    for (int i = 0; i < ubo.numLights; i++){
-        const vec4 lightPos = lightInfos[i].lightPosition;
-        const vec4 lightColor = lightInfos[i].lightColor;
+    for (uint i = idx; i < idx + RESERVOIRS_PER_CELL; i++){
+        const Reservoir reservoir = reservoirs[i];
+        const vec4 lightPos = lightInfos[reservoir.lightIdx].lightPosition;
+        const vec4 lightColor = lightInfos[reservoir.lightIdx].lightColor;
 
         vec3 lightDir = lightPos.xyz - pos;
         const float lightDstSquared = dot(lightDir, lightDir);
         const float lightDst = sqrt(lightDstSquared);
         const float attenuation = 1.0 / lightDstSquared;
-        if (lightDst > lightPos.w) continue;
 
         lightDir = normalize(lightDir);
         if (dot(normal, lightDir) <= 0.0) continue;

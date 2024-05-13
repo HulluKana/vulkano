@@ -8,7 +8,7 @@
 
 namespace vulB {
 
-VulBuffer::VulBuffer(VulDevice &vulDevice) : m_vulDevice{vulDevice}
+VulBuffer::VulBuffer(const VulDevice &vulDevice) : m_vulDevice{vulDevice}
 {
 
 }

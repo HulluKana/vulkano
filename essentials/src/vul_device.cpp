@@ -506,7 +506,7 @@ VkFormat VulDevice::findSupportedFormat(const std::vector<VkFormat> &candidates,
 }
 
 uint32_t VulDevice::findMemoryType(uint32_t typeFilter,
-                                   VkMemoryPropertyFlags properties) {
+                                   VkMemoryPropertyFlags properties) const {
   VkPhysicalDeviceMemoryProperties memProperties;
   vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memProperties);
   for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
@@ -519,7 +519,7 @@ uint32_t VulDevice::findMemoryType(uint32_t typeFilter,
   throw std::runtime_error("failed to find suitable memory type!");
 }
 
-VkCommandBuffer VulDevice::beginSingleTimeCommands() {
+VkCommandBuffer VulDevice::beginSingleTimeCommands() const{
   VkCommandBufferAllocateInfo allocInfo{};
   allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
   allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -537,7 +537,7 @@ VkCommandBuffer VulDevice::beginSingleTimeCommands() {
   return commandBuffer;
 }
 
-void VulDevice::endSingleTimeCommands(VkCommandBuffer commandBuffer) {
+void VulDevice::endSingleTimeCommands(VkCommandBuffer commandBuffer) const{
   vkEndCommandBuffer(commandBuffer);
 
   VkSubmitInfo submitInfo{};

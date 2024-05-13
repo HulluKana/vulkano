@@ -32,7 +32,7 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
 
     GltfLoader gltfLoader;
     gltfLoader.importMaterials(model);
-    gltfLoader.importTextures(model, textureDirectory, m_vulDevice);
+    // gltfLoader.importTextures(model, textureDirectory, m_vulDevice);
     gltfLoader.importDrawableNodes(model, GltfLoader::gltfAttribOr(GltfLoader::gltfAttribOr(GltfLoader::GltfAttributes::Normal,
                     GltfLoader::GltfAttributes::Tangent), GltfLoader::GltfAttributes::TexCoord));
 
@@ -43,9 +43,12 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
         packedMat.emissiveFactor = glm::vec4(mat.emissiveFactor, mat.emissionStrength);
         packedMat.roughness = mat.roughness;
         packedMat.metalliness = mat.metalliness;
-        packedMat.colorTextureIndex = mat.colorTextureIndex;
-        packedMat.normalTextureIndex = mat.normalTextureIndex;
-        packedMat.roughnessMetallicTextureIndex = mat.roughnessMetallinessTextureIndex;
+        // packedMat.colorTextureIndex = mat.colorTextureIndex;
+        // packedMat.normalTextureIndex = mat.normalTextureIndex;
+        // packedMat.roughnessMetallicTextureIndex = mat.roughnessMetallinessTextureIndex;
+        packedMat.colorTextureIndex = -1;
+        packedMat.normalTextureIndex = -1;
+        packedMat.roughnessMetallicTextureIndex = -1;
         packedMat.padding1 = 14;
         packedMat.padding2 = 69;
         packedMat.padding3 = 420;
@@ -64,6 +67,9 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
         primInfo.materialIndex = mesh.materialIndex;
         primInfo.padding = 69;
         primInfos.push_back(primInfo);
+
+        minPos = glm::min(minPos, mesh.posMin);
+        maxPos = glm::max(maxPos, mesh.posMax);
     } 
 
     std::vector<LightInfo> lightInfos;
