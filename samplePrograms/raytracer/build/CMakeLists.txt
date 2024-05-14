@@ -33,7 +33,7 @@ add_dependencies(debugVulkanoRaytracer shaders)
 target_compile_options(vulkanoRaytracer PRIVATE "-Wall" "-O3")
 target_compile_options(debugVulkanoRaytracer PRIVATE "-Wall" "-g")
 
-add_compile_definitions(VUL_ENABLE_PROFILER)
+#add_compile_definitions(VUL_ENABLE_PROFILER)
 add_compile_definitions(VUL_ENABLE_DEBUG_NAMER)
 
 target_link_libraries(vulkanoRaytracer vulkan)

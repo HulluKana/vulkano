@@ -22,10 +22,7 @@ int main() {
     vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
     vul::settings::maxFps = 60.0f;
 
-    vul::ProfAnalyzer::resetMeasurements();
     ReservoirGrid reservoirGrid = createReservoirGrid(vulkano.scene, vulkano.getVulDevice());
-    vul::ProfAnalyzer::dumpMeasurementSummary("summary.txt");
-    exit(0);
 
     std::unique_ptr<vul::VulImage> enviromentMap = vul::VulImage::createDefaultWholeImageAllInOneSingleTime(vulkano.getVulDevice(),
             "../enviromentMaps/sunsetCube.exr", {}, true, vul::VulImage::InputDataType::exrFile, vul::VulImage::ImageType::hdrCube);

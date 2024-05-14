@@ -88,6 +88,20 @@ vec3 diffBRDF(vec3 normal, vec3 viewDirection, vec3 lightDirection, vec3 specula
     return 21.0 / (20.0 * pi) * (vec3(1.0) - specularColor) * diffuseColor * (1.0 - pow(1.0 - nl, 5.0)) * (1.0 - pow(1.0 - nv, 5.0)); 
 }
 
+float partialBRDF(uint lightIdx, vec3 pos)
+{
+    const LightInfo lightInfo = lightInfos[lightIdx];
+    const float lightStrength = length(lightInfo.lightColor.xyz) / /*sqrt(1.0 + 1.0 + 1.0)*/ 1.73205 * lightInfo.lightColor.w;
+    return 0.258908 * lightStrength / dot(lightInfo.lightPosition.xyz - pos, lightInfo.lightPosition.xyz - pos);
+}
+
+float randomFloat(inout uint state) {
+    state = state * 747796405 + 2891336453;
+    uint result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
+    result = (result >> 22) ^ result;
+    return result / 4294967295.0;
+}
+
 void getVertexInputs(out vec3 worldPos, out vec3 worldNormal, out vec4 worldTangent, out vec2 uv, out Material material, out vec4 uvGradients)
 {
     const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
@@ -188,6 +202,7 @@ void main()
     Material mat;
     vec4 uvGrads;
     getVertexInputs(pos, normal, tangent, uv, mat, uvGrads);
+    uint state = gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x;
 
     float epsilon = 0.0001;
     vec3 rawColor;
@@ -224,18 +239,26 @@ void main()
         return;
     }
 
-    uint gridX = uint(pos.x) - minPos.x;
-    uint gridY = uint(pos.y) - minPos.y;
-    uint gridZ = uint(pos.z) - minPos.z;
+    uint gridX = int(floor(pos.x)) - minPos.x;
+    uint gridY = int(floor(pos.y)) - minPos.y;
+    uint gridZ = int(floor(pos.z)) - minPos.z;
     uint idx = gridZ * dims.y * dims.x * RESERVOIRS_PER_CELL + gridY * dims.x * RESERVOIRS_PER_CELL + gridX * RESERVOIRS_PER_CELL;
+    Reservoir chosenOne;
+    for (uint i = idx; i < idx + RESERVOIRS_PER_CELL; i++) {
+        const Reservoir reservoir = reservoirs[i];
+        const float sourcePdf = reservoir.targetPdf / reservoir.averageWeight;
+        const float targetPdf = partialBRDF(reservoir.lightIdx, pos);
+        const float risWeight = targetPdf / sourcePdf;
+        chosenOne.averageWeight += risWeight;
+        if (randomFloat(state) < risWeight / chosenOne.averageWeight) chosenOne.lightIdx = reservoir.lightIdx;
+    }
 
     vec3 color = vec3(0.0);
     const vec3 specularColor = mix(vec3(0.03), rawColor, metalliness);
     const vec3 diffuseColor = mix(rawColor, vec3(0.0), metalliness);
-    for (uint i = idx; i < idx + RESERVOIRS_PER_CELL; i++){
-        const Reservoir reservoir = reservoirs[i];
-        const vec4 lightPos = lightInfos[reservoir.lightIdx].lightPosition;
-        const vec4 lightColor = lightInfos[reservoir.lightIdx].lightColor;
+    for (int i = 0; i < 1; i++) {
+        const vec4 lightPos = lightInfos[chosenOne.lightIdx].lightPosition;
+        const vec4 lightColor = lightInfos[chosenOne.lightIdx].lightColor;
 
         vec3 lightDir = lightPos.xyz - pos;
         const float lightDstSquared = dot(lightDir, lightDir);
@@ -258,7 +281,7 @@ void main()
                 lightDir,               // ray direction
                 lightDst,               // ray max range
                 1                       // payload (location = 1)
-        );
+            );
         if (visibility < 10.01) continue;
 
         vec3 colorFromThisLight = vec3(0.0);

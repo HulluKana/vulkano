@@ -15,7 +15,7 @@ using mat4 = glm::mat4;
 using uint = uint32_t;
 #endif
 
-#define RESERVOIRS_PER_CELL 64
+#define RESERVOIRS_PER_CELL 128
 
 struct GlobalUbo {
     mat4 inverseProjectionMatrix;
@@ -30,7 +30,7 @@ struct GlobalUbo {
 
 struct Reservoir {
     uint lightIdx;
-    float totalWeight;
+    float averageWeight;
     float targetPdf;
 };
 
