@@ -98,7 +98,7 @@ void VulCompPipeline::begin(const std::vector<VkDescriptorSet> &sets)
 
 void VulCompPipeline::dispatch(uint32_t x, uint32_t y, uint32_t z)
 {
-    vkCmdPushConstants(m_cmdBufs[m_frame], m_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, pushSize, pPushData);
+    if (pushSize > 0) vkCmdPushConstants(m_cmdBufs[m_frame], m_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, pushSize, pPushData);
     vkCmdDispatch(m_cmdBufs[m_frame], x, y, z);
 }
 

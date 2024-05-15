@@ -19,8 +19,11 @@ layout(binding = 7, set = 0) readonly buffer Materials          {PackedMaterial 
 layout(binding = 8, set = 0) readonly buffer PrimInfos          {PrimInfo primInfos[];};
 layout(binding = 9, set = 0) readonly buffer LightInfos         {LightInfo lightInfos[];};
 layout(binding = 10, set = 0, scalar) readonly buffer Reservoirs{ivec4 minPos; uvec4 dims; Reservoir reservoirs[];};
-layout(binding = 11, set = 0) uniform sampler2D texSampler[];
-layout(binding = 13, set = 0) uniform accelerationStructureEXT tlas;
+layout(binding = 11, set = 0, r32ui) writeonly uniform uimage3D hitCache;
+layout(binding = 12, set = 0) uniform sampler2D texSampler[];
+layout(binding = 14, set = 0) uniform accelerationStructureEXT tlas;
+
+layout(push_constant) uniform Push{uint frameNumber;};
 
 layout(location = 0) rayPayloadInEXT payload prd;
 layout(location = 1) rayPayloadEXT float visibility;
@@ -86,13 +89,6 @@ vec3 diffBRDF(vec3 normal, vec3 viewDirection, vec3 lightDirection, vec3 specula
     const float nv = dot(normal, viewDirection);
     // if (nl <= 0.0 || nv <= 0.0) return vec3(0.0);
     return 21.0 / (20.0 * pi) * (vec3(1.0) - specularColor) * diffuseColor * (1.0 - pow(1.0 - nl, 5.0)) * (1.0 - pow(1.0 - nv, 5.0)); 
-}
-
-float partialBRDF(uint lightIdx, vec3 pos)
-{
-    const LightInfo lightInfo = lightInfos[lightIdx];
-    const float lightStrength = length(lightInfo.lightColor.xyz) / /*sqrt(1.0 + 1.0 + 1.0)*/ 1.73205 * lightInfo.lightColor.w;
-    return 0.258908 * lightStrength / dot(lightInfo.lightPosition.xyz - pos, lightInfo.lightPosition.xyz - pos);
 }
 
 float randomFloat(inout uint state) {
@@ -239,15 +235,18 @@ void main()
         return;
     }
 
-    uint gridX = int(floor(pos.x)) - minPos.x;
-    uint gridY = int(floor(pos.y)) - minPos.y;
-    uint gridZ = int(floor(pos.z)) - minPos.z;
-    uint idx = gridZ * dims.y * dims.x * RESERVOIRS_PER_CELL + gridY * dims.x * RESERVOIRS_PER_CELL + gridX * RESERVOIRS_PER_CELL;
+    const uint gridX = int(floor(pos.x)) - minPos.x;
+    const uint gridY = int(floor(pos.y)) - minPos.y;
+    const uint gridZ = int(floor(pos.z)) - minPos.z;
+    const uint idx = (gridZ * dims.y * dims.x + gridY * dims.x + gridX) * RESERVOIRS_PER_CELL;
+    imageStore(hitCache, ivec3(gridX, gridY, gridZ), uvec4(frameNumber, 0, 0, 0));
     Reservoir chosenOne;
     for (uint i = idx; i < idx + RESERVOIRS_PER_CELL; i++) {
         const Reservoir reservoir = reservoirs[i];
+        const LightInfo lightInfo = lightInfos[reservoir.lightIdx];
+        const float lightStrength = (lightInfo.color.x + lightInfo.color.y + lightInfo.color.z) * lightInfo.color.w;
+        const float targetPdf = lightStrength / dot(lightInfo.position.xyz - pos, lightInfo.position.xyz - pos);
         const float sourcePdf = reservoir.targetPdf / reservoir.averageWeight;
-        const float targetPdf = partialBRDF(reservoir.lightIdx, pos);
         const float risWeight = targetPdf / sourcePdf;
         chosenOne.averageWeight += risWeight;
         if (randomFloat(state) < risWeight / chosenOne.averageWeight) chosenOne.lightIdx = reservoir.lightIdx;
@@ -257,8 +256,8 @@ void main()
     const vec3 specularColor = mix(vec3(0.03), rawColor, metalliness);
     const vec3 diffuseColor = mix(rawColor, vec3(0.0), metalliness);
     for (int i = 0; i < 1; i++) {
-        const vec4 lightPos = lightInfos[chosenOne.lightIdx].lightPosition;
-        const vec4 lightColor = lightInfos[chosenOne.lightIdx].lightColor;
+        const vec4 lightPos = lightInfos[chosenOne.lightIdx].position;
+        const vec4 lightColor = lightInfos[chosenOne.lightIdx].color;
 
         vec3 lightDir = lightPos.xyz - pos;
         const float lightDstSquared = dot(lightDir, lightDir);

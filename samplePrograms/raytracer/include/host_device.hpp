@@ -16,6 +16,8 @@ using uint = uint32_t;
 #endif
 
 #define RESERVOIRS_PER_CELL 128
+#define BAD_SAMPLES 16
+#define CELL_SIZE 1.0
 
 struct GlobalUbo {
     mat4 inverseProjectionMatrix;

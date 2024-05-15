@@ -75,8 +75,8 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
     std::vector<LightInfo> lightInfos;
     for (const GltfLoader::GltfLight &light : gltfLoader.lights) {
         LightInfo lightInfo;
-        lightInfo.lightPosition = glm::vec4(light.position, light.range);
-        lightInfo.lightColor = glm::vec4(light.color, light.intensity);
+        lightInfo.position = glm::vec4(light.position, light.range);
+        lightInfo.color = glm::vec4(light.color, light.intensity);
         lightInfos.push_back(lightInfo);
     }
 

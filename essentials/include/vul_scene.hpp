@@ -67,8 +67,8 @@ class Scene
         };
 
         struct LightInfo {
-            vec4 lightPosition; // 4th component is light range
-            vec4 lightColor; // 4th component is intensity
+            vec4 position; // 4th component is light range
+            vec4 color; // 4th component is intensity
         };
 
         #ifdef __cplusplus

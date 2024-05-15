@@ -1,0 +1,62 @@
+#version 460
+
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+
+#include "common.glsl"
+#include "../include/host_device.hpp"
+#include"../../../essentials/include/vul_scene.hpp"
+
+layout(binding = 9, set = 0) readonly buffer LightInfos         {LightInfo lightInfos[];};
+layout(binding = 10, set = 0, scalar) buffer Reservoirs         {ivec4 minPos; uvec4 dims; Reservoir reservoirs[];};
+layout(binding = 11, set = 0, r32ui) uniform uimage3D hitCache;
+
+layout(push_constant) uniform Push{uint frameNumber;};
+
+layout(local_size_x = RESERVOIRS_PER_CELL, local_size_y = 1, local_size_z = 1) in;
+
+uint randomUint(inout uint state)
+{
+    state = state * 747796405 + 2891336453;
+    uint result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
+    result = (result >> 22) ^ result;
+    return result;
+};
+
+float randomFloat(inout uint state)
+{
+    return float(randomUint(state)) / 4294967295.0;
+};
+
+void main()
+{
+    const uvec3 cellCoord = gl_GlobalInvocationID;
+    const int x = int(cellCoord.x) + minPos.x;
+    const int y = int(cellCoord.y) + minPos.y;
+    const int z = int(cellCoord.z) + minPos.z;
+    const uint reservoirIdx = (cellCoord.z * dims.y * dims.x + cellCoord.y * dims.x + cellCoord.x) * RESERVOIRS_PER_CELL + gl_LocalInvocationID.x;
+    if (imageLoad(hitCache, ivec3(cellCoord)).x < frameNumber - 8) return;
+    uint state = reservoirIdx;
+    const uint lightCount = lightInfos.length();
+    Reservoir reservoir;
+    for (uint i = 0; i < BAD_SAMPLES; i++) {
+        const uint idx = randomUint(state) % lightCount;
+        const LightInfo light = lightInfos[idx]; 
+        const float sourcePdf = 1.0 / float(lightCount);
+
+        const float lightXDiff = max(light.position.x - x, CELL_SIZE * 0.5);
+        const float lightYDiff = max(light.position.y - y, CELL_SIZE * 0.5);
+        const float lightZDiff = max(light.position.z - z, CELL_SIZE * 0.5);
+        const float lightStrength = (light.color.x + light.color.y + light.color.z) * light.color.w;
+        const float targetPdf = lightStrength / (lightXDiff * lightXDiff + lightYDiff * lightYDiff + lightZDiff * lightZDiff);
+
+        const float risWeight = targetPdf / sourcePdf;
+        reservoir.averageWeight += risWeight;
+        if (randomFloat(state) < risWeight / reservoir.averageWeight) {
+            reservoir.lightIdx = idx;
+            reservoir.targetPdf = targetPdf;
+        }
+    }
+    reservoir.averageWeight /= float(BAD_SAMPLES);
+    reservoirs[reservoirIdx] = reservoir;
+}

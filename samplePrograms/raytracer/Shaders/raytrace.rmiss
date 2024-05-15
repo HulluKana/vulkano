@@ -7,7 +7,7 @@
 #include "common.glsl"
 
 layout(binding = 1, set = 0) uniform Ubo {GlobalUbo ubo;};
-layout(binding = 12, set = 0) uniform samplerCube enviromentMap;
+layout(binding = 13, set = 0) uniform samplerCube enviromentMap;
 
 layout(location = 0) rayPayloadInEXT payload prd;
 
