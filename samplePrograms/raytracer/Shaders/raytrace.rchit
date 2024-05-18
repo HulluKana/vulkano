@@ -42,24 +42,6 @@ struct Material{
     int roughnessMetallicTextureIndex;
 } mat;
 
-vec3 sRGBToAlbedo(vec3 sRGB)
-{
-    const vec3 prePow = (sRGB + vec3(0.055)) / 1.055;
-    return vec3(pow(prePow.x, 2.4), pow(prePow.y, 2.4), pow(prePow.z, 2.4));
-}
-
-vec3 albedoToSRGB(vec3 albedo)
-{
-    const vec3 prePow = albedo * 1.055;
-    return vec3(pow(prePow.x, 0.41667), pow(prePow.y, 0.41667), pow(prePow.z, 0.41167)) - vec3(0.055);
-}
-
-float albedoToSRGB(float albedo)
-{
-    const float prePow = albedo * 1.055;
-    return pow(prePow, 0.41667) - 0.055;
-}
-
 float lambda(vec3 someVector, vec3 surfaceNormal, float roughness)
 {
     const float dotP = dot(surfaceNormal, someVector);
@@ -198,7 +180,7 @@ void main()
     Material mat;
     vec4 uvGrads;
     getVertexInputs(pos, normal, tangent, uv, mat, uvGrads);
-    uint state = gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x;
+    uint state = (gl_LaunchIDEXT.y * gl_LaunchSizeEXT.x + gl_LaunchIDEXT.x) * frameNumber;
 
     float epsilon = 0.0001;
     vec3 rawColor;
@@ -238,13 +220,13 @@ void main()
     const uint gridX = int(floor(pos.x)) - minPos.x;
     const uint gridY = int(floor(pos.y)) - minPos.y;
     const uint gridZ = int(floor(pos.z)) - minPos.z;
+    imageStore(hitCache, ivec3(gridX, gridY, gridZ), uvec4(frameNumber));
     const uint idx = (gridZ * dims.y * dims.x + gridY * dims.x + gridX) * RESERVOIRS_PER_CELL;
-    imageStore(hitCache, ivec3(gridX, gridY, gridZ), uvec4(frameNumber, 0, 0, 0));
     Reservoir chosenOne;
     for (uint i = idx; i < idx + RESERVOIRS_PER_CELL; i++) {
         const Reservoir reservoir = reservoirs[i];
         const LightInfo lightInfo = lightInfos[reservoir.lightIdx];
-        const float lightStrength = (lightInfo.color.x + lightInfo.color.y + lightInfo.color.z) * lightInfo.color.w;
+        const float lightStrength = sRGBToAlbedo((lightInfo.color.x + lightInfo.color.y + lightInfo.color.z) * lightInfo.color.w);
         const float targetPdf = lightStrength / dot(lightInfo.position.xyz - pos, lightInfo.position.xyz - pos);
         const float sourcePdf = reservoir.targetPdf / reservoir.averageWeight;
         const float risWeight = targetPdf / sourcePdf;

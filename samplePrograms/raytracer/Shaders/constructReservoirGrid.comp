@@ -30,13 +30,13 @@ float randomFloat(inout uint state)
 
 void main()
 {
-    const uvec3 cellCoord = gl_GlobalInvocationID;
+    const uvec3 cellCoord = gl_WorkGroupID;
     const int x = int(cellCoord.x) + minPos.x;
     const int y = int(cellCoord.y) + minPos.y;
     const int z = int(cellCoord.z) + minPos.z;
     const uint reservoirIdx = (cellCoord.z * dims.y * dims.x + cellCoord.y * dims.x + cellCoord.x) * RESERVOIRS_PER_CELL + gl_LocalInvocationID.x;
     if (imageLoad(hitCache, ivec3(cellCoord)).x < frameNumber - 8) return;
-    uint state = reservoirIdx;
+    uint state = reservoirIdx * frameNumber;
     const uint lightCount = lightInfos.length();
     Reservoir reservoir;
     for (uint i = 0; i < BAD_SAMPLES; i++) {
@@ -47,7 +47,7 @@ void main()
         const float lightXDiff = max(light.position.x - x, CELL_SIZE * 0.5);
         const float lightYDiff = max(light.position.y - y, CELL_SIZE * 0.5);
         const float lightZDiff = max(light.position.z - z, CELL_SIZE * 0.5);
-        const float lightStrength = (light.color.x + light.color.y + light.color.z) * light.color.w;
+        const float lightStrength = sRGBToAlbedo((light.color.x + light.color.y + light.color.z) * light.color.w);
         const float targetPdf = lightStrength / (lightXDiff * lightXDiff + lightYDiff * lightYDiff + lightZDiff * lightZDiff);
 
         const float risWeight = targetPdf / sourcePdf;

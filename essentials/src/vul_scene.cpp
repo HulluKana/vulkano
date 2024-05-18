@@ -1,4 +1,5 @@
 #include "vul_buffer.hpp"
+#include "vul_image.hpp"
 #include "vul_settings.hpp"
 #include <cstdlib>
 #include<vul_debug_tools.hpp>
@@ -33,6 +34,10 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
     GltfLoader gltfLoader;
     gltfLoader.importMaterials(model);
     // gltfLoader.importTextures(model, textureDirectory, m_vulDevice);
+    images.push_back(std::make_shared<VulImage>(m_vulDevice));
+    images[0]->keepRegularRaw2d8bitRgbaEmpty(1, 1);
+    images[0]->createDefaultImageSingleTime(VulImage::ImageType::texture2d);
+    images[0]->vulSampler = VulSampler::createDefaultTexSampler(m_vulDevice, 1);
     gltfLoader.importDrawableNodes(model, GltfLoader::gltfAttribOr(GltfLoader::gltfAttribOr(GltfLoader::GltfAttributes::Normal,
                     GltfLoader::GltfAttributes::Tangent), GltfLoader::GltfAttributes::TexCoord));
 
@@ -70,7 +75,7 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
 
         minPos = glm::min(minPos, mesh.posMin);
         maxPos = glm::max(maxPos, mesh.posMax);
-    } 
+    }
 
     std::vector<LightInfo> lightInfos;
     for (const GltfLoader::GltfLight &light : gltfLoader.lights) {
@@ -117,7 +122,7 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
     nodes = gltfLoader.nodes;
     meshes = gltfLoader.primMeshes;
     materials = gltfLoader.materials;
-    images = gltfLoader.images;
+    // images = gltfLoader.images;
 
     VUL_NAME_VK(indexBuffer->getBuffer())
     VUL_NAME_VK(vertexBuffer->getBuffer())

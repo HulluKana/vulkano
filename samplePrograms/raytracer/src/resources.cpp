@@ -1,3 +1,4 @@
+#include "vul_image.hpp"
 #include <resources.hpp>
 #include <vul_debug_tools.hpp>
 #include <iostream>
@@ -85,12 +86,10 @@ std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulk
     desc.content = hitCacheBuffer.get();
     descriptors.push_back(desc);
 
-    // desc.type = vul::Vulkano::DescriptorType::spCombinedImgSampler;
-    // desc.content = vulkano.scene.images.data();
-    // desc.count = vulkano.scene.images.size();
-    desc.type = vul::Vulkano::DescriptorType::combinedImgSampler; 
+    desc.type = vul::Vulkano::DescriptorType::spCombinedImgSampler;
     desc.stages = {vul::Vulkano::ShaderStage::rchit, vul::Vulkano::ShaderStage::rahit};
-    desc.content = enviromentMap.get();
+    desc.content = vulkano.scene.images.data();
+    desc.count = vulkano.scene.images.size();
     descriptors.push_back(desc);
 
     desc.type = vul::Vulkano::DescriptorType::combinedImgSampler;
