@@ -64,6 +64,7 @@ class Vulkano{
 
         enum class DescriptorType{
             ubo,
+            upSsbo,
             ssbo,
             combinedImgSampler,
             spCombinedImgSampler,

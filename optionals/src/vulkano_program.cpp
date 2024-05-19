@@ -167,7 +167,7 @@ std::unique_ptr<VulDescriptorSet> Vulkano::createDescriptorSet(const std::vector
             stageFlags |= static_cast<int>(descriptors[i].stages[j]);
         VkDescriptorType type{};
         if (descriptors[i].type == DescriptorType::ubo) type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-        else if (descriptors[i].type == DescriptorType::ssbo) type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        else if (descriptors[i].type == DescriptorType::ssbo || descriptors[i].type == DescriptorType::upSsbo) type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         else if (descriptors[i].type == DescriptorType::combinedImgSampler ||
             descriptors[i].type == DescriptorType::spCombinedImgSampler || descriptors[i].type == DescriptorType::upCombinedImgSampler)
             type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
@@ -188,6 +188,14 @@ std::unique_ptr<VulDescriptorSet> Vulkano::createDescriptorSet(const std::vector
             std::vector<VkDescriptorBufferInfo> bufferInfos(desc.count);
             for (uint32_t j = 0; j < desc.count; j++)
                 bufferInfos[j] = buffer[j].getDescriptorInfo();
+            bufferInfosStorage.push_back(bufferInfos);
+            set->writeBuffer(i, bufferInfosStorage[bufferInfosStorage.size() - 1].data(), desc.count);
+        }
+        if (desc.type == DescriptorType::upSsbo){
+            const std::unique_ptr<VulBuffer> *buffer = static_cast<const std::unique_ptr<VulBuffer> *>(desc.content);
+            std::vector<VkDescriptorBufferInfo> bufferInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++)
+                bufferInfos[j] = buffer[j]->getDescriptorInfo();
             bufferInfosStorage.push_back(bufferInfos);
             set->writeBuffer(i, bufferInfosStorage[bufferInfosStorage.size() - 1].data(), desc.count);
         }

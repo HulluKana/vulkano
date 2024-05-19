@@ -1,6 +1,7 @@
 #include<vul_window.hpp>
 #include <GLFW/glfw3.h>
-#include<stdexcept>
+#include <cassert>
+#include <stdexcept>
 
 namespace vulB{
 
@@ -15,8 +16,14 @@ VulWindow::~VulWindow()
     glfwTerminate();
 }
 
+void errorCallBack(int code, const char* description)
+{
+    throw std::runtime_error("GLFW error. Code: " + std::to_string(code) + " Desc: " + description);
+}
+
 void VulWindow::InitWindow()
 {
+    glfwSetErrorCallback(&errorCallBack);
     glfwInit();
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
     glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
@@ -28,9 +35,7 @@ void VulWindow::InitWindow()
 
 void VulWindow::createWindowSurface(VkInstance instance, VkSurfaceKHR *surface)
 {
-    if (glfwCreateWindowSurface(instance, window, nullptr, surface) != VK_SUCCESS){
-        throw std::runtime_error("Failed to create window surface in vul_window file");
-    }
+    assert(glfwCreateWindowSurface(instance, window, nullptr, surface) == VK_SUCCESS);
 }
 
 void VulWindow::frameBufferResizeCallback(GLFWwindow *window, int windowWidth, int windowHeight)

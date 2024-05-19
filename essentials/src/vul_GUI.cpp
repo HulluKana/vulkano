@@ -26,8 +26,8 @@ void VulGUI::initImGui(GLFWwindow *window, VkDescriptorPool &descriptorPool, Vul
     info.DescriptorPool = descriptorPool;
     info.Device = vulDevice.device();
     info.PhysicalDevice = vulDevice.getPhysicalDevice();
-    info.ImageCount = VulSwapChain::MAX_FRAMES_IN_FLIGHT;
-    info.MinImageCount = VulSwapChain::MAX_FRAMES_IN_FLIGHT;
+    info.MinImageCount = std::max(VulSwapChain::MAX_FRAMES_IN_FLIGHT, 2);
+    info.ImageCount = info.MinImageCount;
     info.Instance = vulDevice.getInstace();
     info.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
     info.Subpass = 0;

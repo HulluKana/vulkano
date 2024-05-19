@@ -17,7 +17,7 @@ struct ReservoirGrid {
 ReservoirGrid createReservoirGrid(const vul::Scene &scene, const vulB::VulDevice &device);
 std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulkano, const vul::VulAs &as,
         const std::unique_ptr<vul::VulImage> &rtImg, const std::unique_ptr<vulB::VulBuffer> &ubo,
-        const std::unique_ptr<vul::VulImage> &enviromentMap, const std::unique_ptr<vulB::VulBuffer> &reservoirsBuffer,
+        const std::unique_ptr<vul::VulImage> &enviromentMap, const std::vector<std::unique_ptr<vulB::VulBuffer>> &reservoirsBuffers,
         const std::unique_ptr<vul::VulImage> &hitCacheBuffer);
 vul::Vulkano::RenderData createRenderData(const vul::Vulkano &vulkano, const vulB::VulDevice &device,
         const std::array<std::shared_ptr<vulB::VulDescriptorSet>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> &descSets);

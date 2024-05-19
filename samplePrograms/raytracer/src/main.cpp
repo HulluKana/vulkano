@@ -1,7 +1,10 @@
+#include "host_device.hpp"
 #include "vul_comp_pipeline.hpp"
+#include "vul_gltf_loader.hpp"
 #include "vul_image.hpp"
 #include "vul_swap_chain.hpp"
 #include <GLFW/glfw3.h>
+#include <cstdlib>
 #include <memory>
 #include <resources.hpp>
 
@@ -21,14 +24,39 @@ void GuiStuff(vul::Vulkano &vulkano) {
     ImGui::End();
 }
 
+float sRGBToAlbedo(float sRGB)
+{
+    const float prePow = (sRGB + 0.055) / 1.055;
+    return pow(prePow, 2.4);
+}
+
 int main() {
     vul::settings::deviceInitConfig.enableRaytracingSupport = true;
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
     vulkano.loadScene("../Models/sponzaCandles/sponzaCandles.gltf", "../Models/sponzaCandles/");
     vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
-    vul::settings::maxFps = 60.0f;
+    vul::settings::maxFps = 30.0f;
 
-    ReservoirGrid reservoirGrid = createReservoirGrid(vulkano.scene, vulkano.getVulDevice());
+    for (int i = 0; i < 200; i++) {
+        const vulB::GltfLoader::GltfLight light = vulkano.scene.lights[i];
+        const float sourcePdf = 1.0f / float(vulkano.scene.lights.size());
+
+        const float lightXDiff = std::max(light.position.x, 0.5f);
+        const float lightYDiff = std::max(light.position.y, 0.5f);
+        const float lightZDiff = std::max(light.position.z, 0.5f);
+        const float lightStrength = sRGBToAlbedo((light.color.x + light.color.y + light.color.z) * light.intensity / 3.0f);
+        const float targetPdf = lightStrength / (lightXDiff * lightXDiff + lightYDiff * lightYDiff + lightZDiff * lightZDiff) / float(vulkano.scene.lights.size());
+        const float risWeight = targetPdf / sourcePdf;
+        std::cout << light.name << " " << targetPdf << " " << risWeight << "\n";
+    }
+
+    std::vector<std::unique_ptr<vulB::VulBuffer>> reservoirGrids(RESERVOIR_HISTORY_LEN);
+    VkExtent3D resGridSize{};
+    for (int i = 0; i < RESERVOIR_HISTORY_LEN; i++) {
+        ReservoirGrid resGrid = createReservoirGrid(vulkano.scene, vulkano.getVulDevice());
+        resGridSize = {resGrid.width, resGrid.height, resGrid.depth};
+        reservoirGrids[i] = std::move(resGrid.buffer);
+    }
 
     std::unique_ptr<vul::VulImage> enviromentMap = vul::VulImage::createDefaultWholeImageAllInOneSingleTime(vulkano.getVulDevice(),
             "../enviromentMaps/sunsetCube.exr", {}, true, vul::VulImage::InputDataType::exrFile, vul::VulImage::ImageType::hdrCube);
@@ -36,7 +64,6 @@ int main() {
     vul::VulAs as(vulkano.getVulDevice(), vulkano.scene);
     std::array<std::unique_ptr<vul::VulImage>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> rtImgs;
     std::array<std::unique_ptr<vulB::VulBuffer>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> ubos;
-    std::array<std::unique_ptr<vulB::VulBuffer>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> reservoirGrids;
     std::array<std::unique_ptr<vul::VulImage>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> hitCaches;
     std::array<std::shared_ptr<vulB::VulDescriptorSet>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descSets;
     for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
@@ -49,17 +76,14 @@ int main() {
         ubos[i]->createBuffer(false, vulB::VulBuffer::usage_ubo);
 
         hitCaches[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());
-        hitCaches[i]->keepEmpty(reservoirGrid.width, reservoirGrid.height, reservoirGrid.depth, 1, 1, VK_FORMAT_R32_UINT, 0, 0);
+        hitCaches[i]->keepEmpty(resGridSize.width, resGridSize.height, resGridSize.depth, 1, 1, VK_FORMAT_R32_UINT, 0, 0);
         hitCaches[i]->createDefaultImageSingleTime(vul::VulImage::ImageType::storage3d);
 
-        if (i == 0) reservoirGrids[i] = std::move(reservoirGrid.buffer);
-        else reservoirGrids[i] = createReservoirGrid(vulkano.scene, vulkano.getVulDevice()).buffer;
-
-        descSets[i] = createRtDescSet(vulkano, as, rtImgs[i], ubos[i], enviromentMap, reservoirGrids[i], hitCaches[i]);
+        descSets[i] = createRtDescSet(vulkano, as, rtImgs[i], ubos[i], enviromentMap, reservoirGrids, hitCaches[i]);
     }
 
     uint32_t frameNumber = 0;
-    vul::VulCompPipeline reservoirGridGenerator("../bin/constructReservoirGrid.comp.spv", {descSets[0]->getLayout()->getDescriptorSetLayout()}, vulkano.getVulDevice(), vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT);
+    vul::VulCompPipeline reservoirGridGenerator("../bin/constructReservoirGrid.comp.spv", {descSets[0]->getLayout()->getDescriptorSetLayout()}, vulkano.getVulDevice(), 1);
     reservoirGridGenerator.pPushData = &frameNumber;
     reservoirGridGenerator.pushSize = sizeof(frameNumber);
 
@@ -79,11 +103,10 @@ int main() {
         updateUbo(vulkano, ubos[frameIdx]);
 
         std::vector<VkDescriptorSet> vkDescSets = {vulkano.renderDatas[0].descriptorSets[frameIdx][0]->getSet()};
-        std::vector<VkDescriptorSet> vkDescSetsNext = {vulkano.renderDatas[0].descriptorSets[(frameIdx + 1) % descSets.size()][0]->getSet()};
         
-        reservoirGridGenerator.begin({vkDescSetsNext});
-        reservoirGridGenerator.dispatch(reservoirGrid.width, reservoirGrid.height, reservoirGrid.depth);
-        reservoirGridGenerator.end(false);
+        reservoirGridGenerator.begin({vkDescSets});
+        reservoirGridGenerator.dispatch(resGridSize.width, resGridSize.height, resGridSize.depth);
+        reservoirGridGenerator.end(true);
 
         rtPipeline.traceRays(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, sizeof(frameNumber), &frameNumber, vkDescSets, commandBuffer);
         stop = vulkano.endFrame(commandBuffer);

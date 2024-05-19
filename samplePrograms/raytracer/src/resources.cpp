@@ -1,9 +1,4 @@
-#include "vul_image.hpp"
 #include <resources.hpp>
-#include <vul_debug_tools.hpp>
-#include <iostream>
-#include <cmath>
-#include <cstdlib>
 
 ReservoirGrid createReservoirGrid(const vul::Scene &scene, const vulB::VulDevice &device)
 {
@@ -18,9 +13,11 @@ ReservoirGrid createReservoirGrid(const vul::Scene &scene, const vulB::VulDevice
 
     glm::vec<4, int> minPos = {minX, minY, minZ, -69};
     glm::vec<4, uint32_t> dims = {width, height, depth, 420};
+    Reservoir defaultReservoir{0, 0.0f, 0.0f};
     uint8_t *data = static_cast<uint8_t *>(malloc(sizeof(minPos) + sizeof(dims) + sizeof(Reservoir) * reservoirCount));
     memcpy(data, &minPos, sizeof(minPos));
     memcpy(data + sizeof(minPos), &dims, sizeof(dims));
+    for (uint32_t i = 0; i < reservoirCount; i++) memcpy(data + sizeof(minPos) + sizeof(dims) + i * sizeof(Reservoir), &defaultReservoir, sizeof(Reservoir));
 
     ReservoirGrid reservoirGrid{};
     reservoirGrid.width = width;
@@ -37,7 +34,7 @@ ReservoirGrid createReservoirGrid(const vul::Scene &scene, const vulB::VulDevice
     return reservoirGrid;
 }
 
-std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulkano, const vul::VulAs &as, const std::unique_ptr<vul::VulImage> &rtImg, const std::unique_ptr<vulB::VulBuffer> &ubo, const std::unique_ptr<vul::VulImage> &enviromentMap, const std::unique_ptr<vulB::VulBuffer> &reservoirsBuffer, const std::unique_ptr<vul::VulImage> &hitCacheBuffer)
+std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulkano, const vul::VulAs &as, const std::unique_ptr<vul::VulImage> &rtImg, const std::unique_ptr<vulB::VulBuffer> &ubo, const std::unique_ptr<vul::VulImage> &enviromentMap, const std::vector<std::unique_ptr<vulB::VulBuffer>> &reservoirsBuffers, const std::unique_ptr<vul::VulImage> &hitCacheBuffer)
 {
     std::vector<vul::Vulkano::Descriptor> descriptors;
     vul::Vulkano::Descriptor desc{};
@@ -79,11 +76,15 @@ std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulk
     desc.stages = {vul::Vulkano::ShaderStage::rchit, vul::Vulkano::ShaderStage::comp};
     desc.content = vulkano.scene.lightsBuffer.get();
     descriptors.push_back(desc);
-    desc.content = reservoirsBuffer.get();
+
+    desc.type = vul::Vulkano::DescriptorType::upSsbo;
+    desc.content = reservoirsBuffers.data();
+    desc.count = reservoirsBuffers.size();
     descriptors.push_back(desc);
 
     desc.type = {vul::Vulkano::DescriptorType::storageImage};
     desc.content = hitCacheBuffer.get();
+    desc.count = 1;
     descriptors.push_back(desc);
 
     desc.type = vul::Vulkano::DescriptorType::spCombinedImgSampler;

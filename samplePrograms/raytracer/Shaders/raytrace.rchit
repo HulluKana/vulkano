@@ -9,16 +9,16 @@
 #include "../include/host_device.hpp"
 #include"../../../essentials/include/vul_scene.hpp"
 
-layout(binding = 1, set = 0) uniform Ubo {GlobalUbo ubo;};
-layout(binding = 2, set = 0) readonly buffer Indices            {uint indices[];};
-layout(binding = 3, set = 0, scalar) readonly buffer Vertices   {vec3 vertices[];};
-layout(binding = 4, set = 0, scalar) readonly buffer Normals    {vec3 normals[];};
-layout(binding = 5, set = 0) readonly buffer Tangents           {vec4 tangents[];};
-layout(binding = 6, set = 0) readonly buffer Uvs                {vec2 uvs[];};
-layout(binding = 7, set = 0) readonly buffer Materials          {PackedMaterial materials[];};
-layout(binding = 8, set = 0) readonly buffer PrimInfos          {PrimInfo primInfos[];};
-layout(binding = 9, set = 0) readonly buffer LightInfos         {LightInfo lightInfos[];};
-layout(binding = 10, set = 0, scalar) readonly buffer Reservoirs{ivec4 minPos; uvec4 dims; Reservoir reservoirs[];};
+layout(binding = 1, set = 0) readonly uniform Ubo                           {GlobalUbo ubo;};
+layout(binding = 2, set = 0) readonly buffer Indices                        {uint indices[];};
+layout(binding = 3, set = 0, scalar) readonly buffer Vertices               {vec3 vertices[];};
+layout(binding = 4, set = 0, scalar) readonly buffer Normals                {vec3 normals[];};
+layout(binding = 5, set = 0) readonly buffer Tangents                       {vec4 tangents[];};
+layout(binding = 6, set = 0) readonly buffer Uvs                            {vec2 uvs[];};
+layout(binding = 7, set = 0) readonly buffer Materials                      {PackedMaterial materials[];};
+layout(binding = 8, set = 0) readonly buffer PrimInfos                      {PrimInfo primInfos[];};
+layout(binding = 9, set = 0) readonly buffer LightInfos                     {LightInfo lightInfos[];};
+layout(binding = 10, set = 0, scalar) readonly buffer ReservoirsBuffers     {ivec4 minPos; uvec4 dims; Reservoir data[];} reservoirs[RESERVOIR_HISTORY_LEN];
 layout(binding = 11, set = 0, r32ui) writeonly uniform uimage3D hitCache;
 layout(binding = 12, set = 0) uniform sampler2D texSampler[];
 layout(binding = 14, set = 0) uniform accelerationStructureEXT tlas;
@@ -217,26 +217,49 @@ void main()
         return;
     }
 
+    const ivec3 minPos = reservoirs[0].minPos.xyz;
+    const uvec3 dims = reservoirs[0].dims.xyz;
     const uint gridX = int(floor(pos.x)) - minPos.x;
     const uint gridY = int(floor(pos.y)) - minPos.y;
     const uint gridZ = int(floor(pos.z)) - minPos.z;
     imageStore(hitCache, ivec3(gridX, gridY, gridZ), uvec4(frameNumber));
-    const uint idx = (gridZ * dims.y * dims.x + gridY * dims.x + gridX) * RESERVOIRS_PER_CELL;
-    Reservoir chosenOne;
-    for (uint i = idx; i < idx + RESERVOIRS_PER_CELL; i++) {
-        const Reservoir reservoir = reservoirs[i];
-        const LightInfo lightInfo = lightInfos[reservoir.lightIdx];
-        const float lightStrength = sRGBToAlbedo((lightInfo.color.x + lightInfo.color.y + lightInfo.color.z) * lightInfo.color.w);
-        const float targetPdf = lightStrength / dot(lightInfo.position.xyz - pos, lightInfo.position.xyz - pos);
-        const float sourcePdf = reservoir.targetPdf / reservoir.averageWeight;
-        const float risWeight = targetPdf / sourcePdf;
-        chosenOne.averageWeight += risWeight;
-        if (randomFloat(state) < risWeight / chosenOne.averageWeight) chosenOne.lightIdx = reservoir.lightIdx;
-    }
 
-    vec3 color = vec3(0.0);
+    const uint idx = (gridZ * dims.y * dims.x + gridY * dims.x + gridX) * RESERVOIRS_PER_CELL;
+    float avgOfAllReservoirs = 0.0;
+    for (uint i = idx; i < idx + RESERVOIRS_PER_CELL; i++) {
+        const Reservoir reservoir = reservoirs[0].data[i];
+        avgOfAllReservoirs += reservoir.averageWeight;
+    }
+    avgOfAllReservoirs /= float(RESERVOIRS_PER_CELL);
+
+    Reservoir chosenOne;
     const vec3 specularColor = mix(vec3(0.03), rawColor, metalliness);
     const vec3 diffuseColor = mix(rawColor, vec3(0.0), metalliness);
+    for (uint i = idx; i < idx + RESERVOIRS_PER_CELL; i++) {
+        const Reservoir reservoir = reservoirs[frameNumber % RESERVOIR_HISTORY_LEN].data[i];
+        const vec4 lightPos = lightInfos[reservoir.lightIdx].position;
+        const vec4 lightColor = lightInfos[reservoir.lightIdx].color;
+
+        vec3 lightDir = lightPos.xyz - pos;
+        const float lightDstSquared = dot(lightDir, lightDir);
+        lightDir = normalize(lightDir);
+        const float lightDst = sqrt(lightDstSquared);
+        const float attenuation = 1.0 / lightDstSquared;
+        const LightInfo lightInfo = lightInfos[reservoir.lightIdx];
+        const vec3 color = (BRDF(normal, viewDirection, lightDir, specularColor, roughness) + diffBRDF(normal, viewDirection, lightDir, specularColor, diffuseColor)) * sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation;
+        const float targetPdf = (color.x + color.y + color.z) / lightInfos.length();
+
+        const float sourcePdf = reservoir.targetPdf / avgOfAllReservoirs;
+        const float risWeight = targetPdf / sourcePdf;
+        chosenOne.averageWeight += risWeight;
+        if (randomFloat(state) < risWeight / chosenOne.averageWeight) {
+            chosenOne.lightIdx = reservoir.lightIdx;
+            chosenOne.targetPdf = targetPdf;
+        }
+    }
+    chosenOne.averageWeight /= float(RESERVOIRS_PER_CELL);
+
+    vec3 color = vec3(0.0);
     for (int i = 0; i < 1; i++) {
         const vec4 lightPos = lightInfos[chosenOne.lightIdx].position;
         const vec4 lightColor = lightInfos[chosenOne.lightIdx].color;
@@ -268,7 +291,7 @@ void main()
         vec3 colorFromThisLight = vec3(0.0);
         colorFromThisLight += BRDF(normal, viewDirection, lightDir, specularColor, roughness);
         colorFromThisLight += diffBRDF(normal, viewDirection, lightDir, specularColor, diffuseColor);
-        colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation * (visibility - 10.0);
+        colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation * (visibility - 10.0) * chosenOne.averageWeight / chosenOne.targetPdf;
         color += colorFromThisLight;
     }
 
