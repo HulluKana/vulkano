@@ -225,29 +225,36 @@ void main()
     imageStore(hitCache, ivec3(gridX, gridY, gridZ), uvec4(frameNumber));
 
     const uint idx = (gridZ * dims.y * dims.x + gridY * dims.x + gridX) * RESERVOIRS_PER_CELL;
+    const uint histIdx = frameNumber % RESERVOIR_HISTORY_LEN;
     float avgOfAllReservoirs = 0.0;
     for (uint i = idx; i < idx + RESERVOIRS_PER_CELL; i++) {
-        const Reservoir reservoir = reservoirs[0].data[i];
+        const Reservoir reservoir = reservoirs[histIdx].data[i];
         avgOfAllReservoirs += reservoir.averageWeight;
     }
     avgOfAllReservoirs /= float(RESERVOIRS_PER_CELL);
 
     Reservoir chosenOne;
+    chosenOne.lightIdx = 0;
+    chosenOne.averageWeight = 0.0;
+    chosenOne.targetPdf = 0.0;
     const vec3 specularColor = mix(vec3(0.03), rawColor, metalliness);
     const vec3 diffuseColor = mix(rawColor, vec3(0.0), metalliness);
     for (uint i = idx; i < idx + RESERVOIRS_PER_CELL; i++) {
-        const Reservoir reservoir = reservoirs[frameNumber % RESERVOIR_HISTORY_LEN].data[i];
+        const Reservoir reservoir = reservoirs[histIdx].data[i];
         const vec4 lightPos = lightInfos[reservoir.lightIdx].position;
         const vec4 lightColor = lightInfos[reservoir.lightIdx].color;
 
         vec3 lightDir = lightPos.xyz - pos;
         const float lightDstSquared = dot(lightDir, lightDir);
         lightDir = normalize(lightDir);
+        if (dot(normal, lightDir) <= 0.0) continue;
+
         const float lightDst = sqrt(lightDstSquared);
         const float attenuation = 1.0 / lightDstSquared;
         const LightInfo lightInfo = lightInfos[reservoir.lightIdx];
-        const vec3 color = (BRDF(normal, viewDirection, lightDir, specularColor, roughness) + diffBRDF(normal, viewDirection, lightDir, specularColor, diffuseColor)) * sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation;
-        const float targetPdf = (color.x + color.y + color.z) / lightInfos.length();
+
+        const vec3 color = (BRDF(normal, viewDirection, lightDir, specularColor, roughness) + diffBRDF(normal, viewDirection, lightDir, specularColor, diffuseColor)) * sRGBToAlbedo(lightColor.xyz * lightColor.w);
+        const float targetPdf = ((color.x + color.y + color.z) / 3.0) * attenuation / lightInfos.length();
 
         const float sourcePdf = reservoir.targetPdf / avgOfAllReservoirs;
         const float risWeight = targetPdf / sourcePdf;

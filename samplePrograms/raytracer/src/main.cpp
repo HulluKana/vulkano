@@ -35,20 +35,24 @@ int main() {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
     vulkano.loadScene("../Models/sponzaCandles/sponzaCandles.gltf", "../Models/sponzaCandles/");
     vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
-    vul::settings::maxFps = 30.0f;
+    vul::settings::maxFps = 60.0f;
 
-    for (int i = 0; i < 200; i++) {
+    /*
+    for (int i = 0; i < vulkano.scene.lights.size(); i++) {
         const vulB::GltfLoader::GltfLight light = vulkano.scene.lights[i];
         const float sourcePdf = 1.0f / float(vulkano.scene.lights.size());
 
-        const float lightXDiff = std::max(light.position.x, 0.5f);
-        const float lightYDiff = std::max(light.position.y, 0.5f);
-        const float lightZDiff = std::max(light.position.z, 0.5f);
+        const float lightXDiff = std::max(std::abs(light.position.x), 0.5f);
+        const float lightYDiff = std::max(std::abs(light.position.y), 0.5f);
+        const float lightZDiff = std::max(std::abs(light.position.z), 0.5f);
         const float lightStrength = sRGBToAlbedo((light.color.x + light.color.y + light.color.z) * light.intensity / 3.0f);
         const float targetPdf = lightStrength / (lightXDiff * lightXDiff + lightYDiff * lightYDiff + lightZDiff * lightZDiff) / float(vulkano.scene.lights.size());
         const float risWeight = targetPdf / sourcePdf;
-        std::cout << light.name << " " << targetPdf << " " << risWeight << "\n";
+        if (targetPdf < 0.0f || risWeight < 0.0f) {
+            std::cout << light.name << " " << i << " " << targetPdf << " " << risWeight << " " << lightXDiff << " " << lightYDiff << " " << lightZDiff << " " << lightStrength << "\n";
+        }
     }
+    */
 
     std::vector<std::unique_ptr<vulB::VulBuffer>> reservoirGrids(RESERVOIR_HISTORY_LEN);
     VkExtent3D resGridSize{};

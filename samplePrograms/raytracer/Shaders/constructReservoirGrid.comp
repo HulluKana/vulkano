@@ -30,13 +30,15 @@ float randomFloat(inout uint state)
 
 void main()
 {
+    const uint cullStartFrameNumber = 128;
+
     const uvec3 cellCoord = gl_WorkGroupID;
     const ivec3 minPos = reservoirs[0].minPos.xyz;
     const uvec3 dims = reservoirs[0].dims.xyz;
     const int x = int(cellCoord.x) + minPos.x;
     const int y = int(cellCoord.y) + minPos.y;
     const int z = int(cellCoord.z) + minPos.z;
-    if (imageLoad(hitCache, ivec3(cellCoord)).x < frameNumber - RESERVOIR_HISTORY_LEN) return;
+    if (frameNumber >= cullStartFrameNumber && imageLoad(hitCache, ivec3(cellCoord)).x < frameNumber - RESERVOIR_HISTORY_LEN) return;
 
     const uint BAD_SAMPLES = 32;
     const float CELL_SIZE = 1.0;
@@ -44,14 +46,17 @@ void main()
     uint state = reservoirIdx * frameNumber;
     const uint lightCount = lightInfos.length();
     Reservoir reservoir;
+    reservoir.lightIdx = 0;
+    reservoir.averageWeight = 0.0;
+    reservoir.targetPdf = 0.0;
     for (uint i = 0; i < BAD_SAMPLES; i++) {
         const uint idx = randomUint(state) % lightCount;
         const LightInfo light = lightInfos[idx]; 
         const float sourcePdf = 1.0 / float(lightCount);
 
-        const float lightXDiff = max(light.position.x - x, CELL_SIZE * 0.5);
-        const float lightYDiff = max(light.position.y - y, CELL_SIZE * 0.5);
-        const float lightZDiff = max(light.position.z - z, CELL_SIZE * 0.5);
+        const float lightXDiff = max(abs(light.position.x - x), CELL_SIZE * 0.5);
+        const float lightYDiff = max(abs(light.position.y - y), CELL_SIZE * 0.5);
+        const float lightZDiff = max(abs(light.position.z - z), CELL_SIZE * 0.5);
         const float lightStrength = sRGBToAlbedo((light.color.x + light.color.y + light.color.z) * light.color.w / 3.0);
         const float targetPdf = lightStrength / (lightXDiff * lightXDiff + lightYDiff * lightYDiff + lightZDiff * lightZDiff) / lightInfos.length();
 
@@ -65,7 +70,7 @@ void main()
 
     for (uint i = 1; i < RESERVOIR_HISTORY_LEN; i++) {
         Reservoir oldReservoir = reservoirs[(frameNumber + i) % RESERVOIR_HISTORY_LEN].data[reservoirIdx];
-        if (oldReservoir.averageWeight < 0.01) {
+        if (oldReservoir.averageWeight < 0.0001) {
             oldReservoir.averageWeight = reservoir.averageWeight / float(BAD_SAMPLES);
             oldReservoir.lightIdx = reservoir.lightIdx;
             oldReservoir.targetPdf = reservoir.targetPdf;
