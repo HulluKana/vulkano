@@ -6,7 +6,6 @@
 #extension GL_GOOGLE_include_directive : enable
 
 #include "common.glsl"
-#include "../include/host_device.hpp"
 #include"../../../essentials/include/vul_scene.hpp"
 
 layout(binding = 1, set = 0) readonly uniform Ubo                           {GlobalUbo ubo;};
@@ -19,9 +18,10 @@ layout(binding = 7, set = 0) readonly buffer Materials                      {Pac
 layout(binding = 8, set = 0) readonly buffer PrimInfos                      {PrimInfo primInfos[];};
 layout(binding = 9, set = 0) readonly buffer LightInfos                     {LightInfo lightInfos[];};
 layout(binding = 10, set = 0, scalar) readonly buffer ReservoirsBuffers     {ivec4 minPos; uvec4 dims; Reservoir data[];} reservoirs[RESERVOIR_HISTORY_LEN];
-layout(binding = 11, set = 0, r32ui) writeonly uniform uimage3D hitCache;
-layout(binding = 12, set = 0) uniform sampler2D texSampler[];
-layout(binding = 14, set = 0) uniform accelerationStructureEXT tlas;
+layout(binding = 11, set = 0, scalar) readonly buffer CellData              {Cell cells[];};
+layout(binding = 12, set = 0, r32ui) writeonly uniform uimage3D hitCache;
+layout(binding = 13, set = 0) uniform sampler2D texSampler[];
+layout(binding = 15, set = 0) uniform accelerationStructureEXT tlas;
 
 layout(push_constant) uniform Push{uint frameNumber;};
 
@@ -71,13 +71,6 @@ vec3 diffBRDF(vec3 normal, vec3 viewDirection, vec3 lightDirection, vec3 specula
     const float nv = dot(normal, viewDirection);
     // if (nl <= 0.0 || nv <= 0.0) return vec3(0.0);
     return 21.0 / (20.0 * pi) * (vec3(1.0) - specularColor) * diffuseColor * (1.0 - pow(1.0 - nl, 5.0)) * (1.0 - pow(1.0 - nv, 5.0)); 
-}
-
-float randomFloat(inout uint state) {
-    state = state * 747796405 + 2891336453;
-    uint result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
-    result = (result >> 22) ^ result;
-    return result / 4294967295.0;
 }
 
 void getVertexInputs(out vec3 worldPos, out vec3 worldNormal, out vec4 worldTangent, out vec2 uv, out Material material, out vec4 uvGradients)
@@ -224,23 +217,41 @@ void main()
     const uint gridZ = int(floor(pos.z)) - minPos.z;
     imageStore(hitCache, ivec3(gridX, gridY, gridZ), uvec4(frameNumber));
 
-    const uint idx = (gridZ * dims.y * dims.x + gridY * dims.x + gridX) * RESERVOIRS_PER_CELL;
+    const uint cellIdx = (gridZ * dims.y * dims.x + gridY * dims.x + gridX);
+    const uint resIdx = cellIdx * RESERVOIRS_PER_CELL;
     const uint histIdx = frameNumber % RESERVOIR_HISTORY_LEN;
-    float avgOfAllReservoirs = 0.0;
-    for (uint i = idx; i < idx + RESERVOIRS_PER_CELL; i++) {
-        const Reservoir reservoir = reservoirs[histIdx].data[i];
-        avgOfAllReservoirs += reservoir.averageWeight;
-    }
-    avgOfAllReservoirs /= float(RESERVOIRS_PER_CELL);
+    const float avgOfAllReservoirs = cells[cellIdx].avgReservoirWeight;
+    const float cdfTotal = cells[cellIdx].cdfTotal;
 
     Reservoir chosenOne;
     chosenOne.lightIdx = 0;
     chosenOne.averageWeight = 0.0;
     chosenOne.targetPdf = 0.0;
+    const uint lightCount = lightInfos.length();
+    const uint MERGED_SAMPLES = 8;
     const vec3 specularColor = mix(vec3(0.03), rawColor, metalliness);
     const vec3 diffuseColor = mix(rawColor, vec3(0.0), metalliness);
-    for (uint i = idx; i < idx + RESERVOIRS_PER_CELL; i++) {
-        const Reservoir reservoir = reservoirs[histIdx].data[i];
+    for (uint i = 0; i < MERGED_SAMPLES; i++) {
+        float goalWeight = randomFloat(state);
+        int idx = int(RESERVOIRS_PER_CELL * goalWeight);
+        int offset = min(idx / 2, (RESERVOIRS_PER_CELL - idx) / 2);
+        goalWeight *= cdfTotal;
+        while (true) {
+            const float lower = cells[cellIdx].cdf[idx];
+            const float upper = cells[cellIdx].cdf[idx + 1];
+            offset = max(offset / 2, 1);
+            if (goalWeight < lower) {
+                idx = max(idx - offset, 0);
+                continue;
+            }
+            if (goalWeight > upper) {
+                idx = min(idx + offset, RESERVOIRS_PER_CELL - 1);
+                continue;
+            }
+            break;
+        } 
+
+        const Reservoir reservoir = reservoirs[histIdx].data[resIdx + idx];
         const vec4 lightPos = lightInfos[reservoir.lightIdx].position;
         const vec4 lightColor = lightInfos[reservoir.lightIdx].color;
 
@@ -254,7 +265,7 @@ void main()
         const LightInfo lightInfo = lightInfos[reservoir.lightIdx];
 
         const vec3 color = (BRDF(normal, viewDirection, lightDir, specularColor, roughness) + diffBRDF(normal, viewDirection, lightDir, specularColor, diffuseColor)) * sRGBToAlbedo(lightColor.xyz * lightColor.w);
-        const float targetPdf = ((color.x + color.y + color.z) / 3.0) * attenuation / lightInfos.length();
+        const float targetPdf = ((color.x + color.y + color.z) / 3.0) * attenuation / lightCount;
 
         const float sourcePdf = reservoir.targetPdf / avgOfAllReservoirs;
         const float risWeight = targetPdf / sourcePdf;
@@ -264,7 +275,7 @@ void main()
             chosenOne.targetPdf = targetPdf;
         }
     }
-    chosenOne.averageWeight /= float(RESERVOIRS_PER_CELL);
+    chosenOne.averageWeight /= float(MERGED_SAMPLES);
 
     vec3 color = vec3(0.0);
     for (int i = 0; i < 1; i++) {

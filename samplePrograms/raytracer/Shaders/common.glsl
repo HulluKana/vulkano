@@ -1,7 +1,16 @@
+#extension GL_GOOGLE_include_directive : enable
+#include "../include/host_device.hpp"
+
 struct payload {
     vec4 hitValue;
     vec3 emission;
     vec3 pos;
+};
+
+struct Cell {
+    float cdf[RESERVOIRS_PER_CELL + 1];
+    float cdfTotal;
+    float avgReservoirWeight;
 };
 
 vec3 sRGBToAlbedo(vec3 sRGB)
@@ -26,4 +35,19 @@ float albedoToSRGB(float albedo)
 {
     const float prePow = albedo * 1.055;
     return pow(prePow, 0.41667) - 0.055;
+}
+
+uint randomUint(inout uint state)
+{
+    state = state * 747796405 + 2891336453;
+    uint result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
+    result = (result >> 22) ^ result;
+    return result;
+}
+
+float randomFloat(inout uint state) {
+    state = state * 747796405 + 2891336453;
+    uint result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
+    result = (result >> 22) ^ result;
+    return result / 4294967295.0;
 }

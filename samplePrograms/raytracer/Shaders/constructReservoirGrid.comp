@@ -9,24 +9,11 @@
 
 layout(binding = 9, set = 0) readonly buffer LightInfos         {LightInfo lightInfos[];};
 layout(binding = 10, set = 0, scalar) buffer ReservoirsBuffers  {ivec4 minPos; uvec4 dims; Reservoir data[];} reservoirs[RESERVOIR_HISTORY_LEN];
-layout(binding = 11, set = 0, r32ui) readonly uniform uimage3D hitCache;
+layout(binding = 12, set = 0, r32ui) readonly uniform uimage3D hitCache;
 
 layout(push_constant) uniform Push{uint frameNumber;};
 
 layout(local_size_x = RESERVOIRS_PER_CELL, local_size_y = 1, local_size_z = 1) in;
-
-uint randomUint(inout uint state)
-{
-    state = state * 747796405 + 2891336453;
-    uint result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
-    result = (result >> 22) ^ result;
-    return result;
-};
-
-float randomFloat(inout uint state)
-{
-    return float(randomUint(state)) / 4294967295.0;
-};
 
 void main()
 {
@@ -58,7 +45,7 @@ void main()
         const float lightYDiff = max(abs(light.position.y - y), CELL_SIZE * 0.5);
         const float lightZDiff = max(abs(light.position.z - z), CELL_SIZE * 0.5);
         const float lightStrength = sRGBToAlbedo((light.color.x + light.color.y + light.color.z) * light.color.w / 3.0);
-        const float targetPdf = lightStrength / (lightXDiff * lightXDiff + lightYDiff * lightYDiff + lightZDiff * lightZDiff) / lightInfos.length();
+        const float targetPdf = lightStrength / (lightXDiff * lightXDiff + lightYDiff * lightYDiff + lightZDiff * lightZDiff) / lightCount;
 
         const float risWeight = targetPdf / sourcePdf;
         reservoir.averageWeight += risWeight;

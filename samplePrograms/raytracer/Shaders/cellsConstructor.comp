@@ -1,0 +1,39 @@
+#version 460
+
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+
+#include "common.glsl"
+#include "../include/host_device.hpp"
+
+layout(binding = 10, set = 0, scalar) buffer ReservoirsBuffers  {ivec4 minPos; uvec4 dims; Reservoir data[];} reservoirs[RESERVOIR_HISTORY_LEN];
+layout(binding = 11, set = 0, scalar) buffer CellData  {Cell cells[];};
+layout(binding = 12, set = 0, r32ui) readonly uniform uimage3D hitCache;
+
+layout(push_constant) uniform Push{uint frameNumber;};
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+
+void main()
+{
+    const uvec3 cellCoord = gl_GlobalInvocationID;
+    if (imageLoad(hitCache, ivec3(cellCoord)).x < frameNumber - RESERVOIR_HISTORY_LEN) return;
+
+    const uvec2 dims = reservoirs[0].dims.xy;
+    const uint cellIdx = (cellCoord.z * dims.y * dims.x + cellCoord.y * dims.x + cellCoord.x);
+    const uint resIdx = cellIdx * RESERVOIRS_PER_CELL;
+    const uint histIdx = frameNumber % RESERVOIR_HISTORY_LEN;
+
+    float avgOfAllReservoirs = 0.0;
+    float cdfTotal = 0.0;
+    for (uint i = 0; i < RESERVOIRS_PER_CELL; i++) {
+        const Reservoir reservoir = reservoirs[histIdx].data[resIdx + i];
+        avgOfAllReservoirs += reservoir.averageWeight;
+        cells[cellIdx].cdf[i] = cdfTotal;
+        cdfTotal += reservoir.targetPdf;
+    }
+    cells[cellIdx].cdf[0] = -420.0;
+    cells[cellIdx].cdf[RESERVOIRS_PER_CELL] = cdfTotal + 69.0;
+    cells[cellIdx].avgReservoirWeight = avgOfAllReservoirs / float(RESERVOIRS_PER_CELL);
+    cells[cellIdx].cdfTotal = cdfTotal;
+}

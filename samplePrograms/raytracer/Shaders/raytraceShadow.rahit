@@ -6,7 +6,6 @@
 #extension GL_GOOGLE_include_directive : enable
 
 #include "common.glsl"
-#include "../include/host_device.hpp"
 #include"../../../essentials/include/vul_scene.hpp"
 
 layout(binding = 2, set = 0) readonly buffer Indices            {uint indices[];};
@@ -14,7 +13,7 @@ layout(binding = 3, set = 0, scalar) readonly buffer Vertices   {vec3 vertices[]
 layout(binding = 6, set = 0) readonly buffer Uvs                {vec2 uvs[];};
 layout(binding = 7, set = 0) readonly buffer Materials          {PackedMaterial materials[];};
 layout(binding = 8, set = 0) readonly buffer PrimInfos          {PrimInfo primInfos[];};
-layout(binding = 12, set = 0) uniform sampler2D texSampler[];
+layout(binding = 13, set = 0) uniform sampler2D texSampler[];
 
 layout(location = 0) rayPayloadInEXT float visibility;
 

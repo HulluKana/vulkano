@@ -34,7 +34,7 @@ ReservoirGrid createReservoirGrid(const vul::Scene &scene, const vulB::VulDevice
     return reservoirGrid;
 }
 
-std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulkano, const vul::VulAs &as, const std::unique_ptr<vul::VulImage> &rtImg, const std::unique_ptr<vulB::VulBuffer> &ubo, const std::unique_ptr<vul::VulImage> &enviromentMap, const std::vector<std::unique_ptr<vulB::VulBuffer>> &reservoirsBuffers, const std::unique_ptr<vul::VulImage> &hitCacheBuffer)
+std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulkano, const vul::VulAs &as, const std::unique_ptr<vul::VulImage> &rtImg, const std::unique_ptr<vulB::VulBuffer> &ubo, const std::unique_ptr<vul::VulImage> &enviromentMap, const std::vector<std::unique_ptr<vulB::VulBuffer>> &reservoirsBuffers, const std::unique_ptr<vul::VulImage> &hitCacheBuffer, const std::unique_ptr<vulB::VulBuffer> &cellsBuffer)
 {
     std::vector<vul::Vulkano::Descriptor> descriptors;
     vul::Vulkano::Descriptor desc{};
@@ -82,9 +82,13 @@ std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulk
     desc.count = reservoirsBuffers.size();
     descriptors.push_back(desc);
 
+    desc.type = {vul::Vulkano::DescriptorType::ssbo};
+    desc.content = cellsBuffer.get();
+    desc.count = 1;
+    descriptors.push_back(desc);
+
     desc.type = {vul::Vulkano::DescriptorType::storageImage};
     desc.content = hitCacheBuffer.get();
-    desc.count = 1;
     descriptors.push_back(desc);
 
     desc.type = vul::Vulkano::DescriptorType::spCombinedImgSampler;

@@ -1,4 +1,5 @@
 #include "host_device.hpp"
+#include "vul_buffer.hpp"
 #include "vul_comp_pipeline.hpp"
 #include "vul_gltf_loader.hpp"
 #include "vul_image.hpp"
@@ -61,6 +62,9 @@ int main() {
         resGridSize = {resGrid.width, resGrid.height, resGrid.depth};
         reservoirGrids[i] = std::move(resGrid.buffer);
     }
+    std::unique_ptr<vulB::VulBuffer> cellsBuffer = std::make_unique<vulB::VulBuffer>(vulkano.getVulDevice());
+    cellsBuffer->keepEmpty(sizeof(float) * (2 + RESERVOIRS_PER_CELL + 1), resGridSize.width * resGridSize.height * resGridSize.depth);
+    cellsBuffer->createBuffer(true, vulB::VulBuffer::usage_ssbo);
 
     std::unique_ptr<vul::VulImage> enviromentMap = vul::VulImage::createDefaultWholeImageAllInOneSingleTime(vulkano.getVulDevice(),
             "../enviromentMaps/sunsetCube.exr", {}, true, vul::VulImage::InputDataType::exrFile, vul::VulImage::ImageType::hdrCube);
@@ -83,13 +87,17 @@ int main() {
         hitCaches[i]->keepEmpty(resGridSize.width, resGridSize.height, resGridSize.depth, 1, 1, VK_FORMAT_R32_UINT, 0, 0);
         hitCaches[i]->createDefaultImageSingleTime(vul::VulImage::ImageType::storage3d);
 
-        descSets[i] = createRtDescSet(vulkano, as, rtImgs[i], ubos[i], enviromentMap, reservoirGrids, hitCaches[i]);
+        descSets[i] = createRtDescSet(vulkano, as, rtImgs[i], ubos[i], enviromentMap, reservoirGrids, hitCaches[i], cellsBuffer);
     }
 
     uint32_t frameNumber = 0;
     vul::VulCompPipeline reservoirGridGenerator("../bin/constructReservoirGrid.comp.spv", {descSets[0]->getLayout()->getDescriptorSetLayout()}, vulkano.getVulDevice(), 1);
     reservoirGridGenerator.pPushData = &frameNumber;
     reservoirGridGenerator.pushSize = sizeof(frameNumber);
+
+    vul::VulCompPipeline cellsGenerator("../bin/cellsConstructor.comp.spv", {descSets[0]->getLayout()->getDescriptorSetLayout()}, vulkano.getVulDevice(), 1);
+    cellsGenerator.pPushData = &frameNumber;
+    cellsGenerator.pushSize = sizeof(frameNumber);
 
     vulkano.renderDatas.push_back(createRenderData(vulkano, vulkano.getVulDevice(), descSets));
     vul::VulRtPipeline rtPipeline(vulkano.getVulDevice(), "../bin/raytrace.rgen.spv", {"../bin/raytrace.rmiss.spv", "../bin/raytraceShadow.rmiss.spv"},
@@ -111,6 +119,10 @@ int main() {
         reservoirGridGenerator.begin({vkDescSets});
         reservoirGridGenerator.dispatch(resGridSize.width, resGridSize.height, resGridSize.depth);
         reservoirGridGenerator.end(true);
+
+        cellsGenerator.begin({vkDescSets});
+        cellsGenerator.dispatch(resGridSize.width, resGridSize.height, resGridSize.depth);
+        cellsGenerator.end(true);
 
         rtPipeline.traceRays(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, sizeof(frameNumber), &frameNumber, vkDescSets, commandBuffer);
         stop = vulkano.endFrame(commandBuffer);
