@@ -35,4 +35,15 @@ struct Reservoir {
     float targetPdf;
 };
 
+struct Alias {
+    float threshold;
+    uint sample1;
+    uint sample2;
+};
+
+struct Cell {
+    Alias aliasTable[RESERVOIRS_PER_CELL];
+    float avgReservoirWeight;
+};
+
 #endif

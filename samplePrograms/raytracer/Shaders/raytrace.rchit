@@ -6,6 +6,7 @@
 #extension GL_GOOGLE_include_directive : enable
 
 #include "common.glsl"
+#include "../include/host_device.hpp"
 #include"../../../essentials/include/vul_scene.hpp"
 
 layout(binding = 1, set = 0) readonly uniform Ubo                           {GlobalUbo ubo;};
@@ -221,7 +222,6 @@ void main()
     const uint resIdx = cellIdx * RESERVOIRS_PER_CELL;
     const uint histIdx = frameNumber % RESERVOIR_HISTORY_LEN;
     const float avgOfAllReservoirs = cells[cellIdx].avgReservoirWeight;
-    const float cdfTotal = cells[cellIdx].cdfTotal;
 
     Reservoir chosenOne;
     chosenOne.lightIdx = 0;
@@ -232,24 +232,8 @@ void main()
     const vec3 specularColor = mix(vec3(0.03), rawColor, metalliness);
     const vec3 diffuseColor = mix(rawColor, vec3(0.0), metalliness);
     for (uint i = 0; i < MERGED_SAMPLES; i++) {
-        float goalWeight = randomFloat(state);
-        int idx = int(RESERVOIRS_PER_CELL * goalWeight);
-        int offset = min(idx / 2, (RESERVOIRS_PER_CELL - idx) / 2);
-        goalWeight *= cdfTotal;
-        while (true) {
-            const float lower = cells[cellIdx].cdf[idx];
-            const float upper = cells[cellIdx].cdf[idx + 1];
-            offset = max(offset / 2, 1);
-            if (goalWeight < lower) {
-                idx = max(idx - offset, 0);
-                continue;
-            }
-            if (goalWeight > upper) {
-                idx = min(idx + offset, RESERVOIRS_PER_CELL - 1);
-                continue;
-            }
-            break;
-        } 
+        Alias alias = cells[cellIdx].aliasTable[randomUint(state) % RESERVOIRS_PER_CELL];
+        const uint idx = (randomFloat(state) < alias.threshold) ? alias.sample1 : alias.sample2;
 
         const Reservoir reservoir = reservoirs[histIdx].data[resIdx + idx];
         const vec4 lightPos = lightInfos[reservoir.lightIdx].position;

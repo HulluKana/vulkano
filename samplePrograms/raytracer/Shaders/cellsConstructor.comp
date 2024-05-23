@@ -12,28 +12,100 @@ layout(binding = 12, set = 0, r32ui) readonly uniform uimage3D hitCache;
 
 layout(push_constant) uniform Push{uint frameNumber;};
 
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(local_size_x = 4, local_size_y = 4, local_size_z = 4) in;
 
 void main()
 {
+    const uvec3 dims = reservoirs[0].dims.xyz;
     const uvec3 cellCoord = gl_GlobalInvocationID;
+    if (cellCoord.x > dims.x || cellCoord.y > dims.y || cellCoord.z > dims.z) return;
     if (imageLoad(hitCache, ivec3(cellCoord)).x < frameNumber - RESERVOIR_HISTORY_LEN) return;
 
-    const uvec2 dims = reservoirs[0].dims.xy;
     const uint cellIdx = (cellCoord.z * dims.y * dims.x + cellCoord.y * dims.x + cellCoord.x);
     const uint resIdx = cellIdx * RESERVOIRS_PER_CELL;
     const uint histIdx = frameNumber % RESERVOIR_HISTORY_LEN;
 
+    struct Sample {
+        uint idx;
+        float weight;
+    };
+    Sample samples[RESERVOIRS_PER_CELL];
     float avgOfAllReservoirs = 0.0;
-    float cdfTotal = 0.0;
+    float avgPdf = 0.0;
     for (uint i = 0; i < RESERVOIRS_PER_CELL; i++) {
         const Reservoir reservoir = reservoirs[histIdx].data[resIdx + i];
         avgOfAllReservoirs += reservoir.averageWeight;
-        cells[cellIdx].cdf[i] = cdfTotal;
-        cdfTotal += reservoir.targetPdf;
+        avgPdf += reservoir.targetPdf;
+        samples[i].idx = i;
+        samples[i].weight = reservoir.targetPdf;
     }
-    cells[cellIdx].cdf[0] = -420.0;
-    cells[cellIdx].cdf[RESERVOIRS_PER_CELL] = cdfTotal + 69.0;
+    avgPdf /= float(RESERVOIRS_PER_CELL);
+
+    for (uint i = 0; i < RESERVOIRS_PER_CELL - 1; i++) {
+        /*
+        bool keepSorting = true;
+        while (keepSorting) {
+            keepSorting = false;
+            for (uint j = 0; j < RESERVOIRS_PER_CELL - 1 - i; j++) {
+                if (samples[j].weight < samples[j + 1].weight) {
+                    Sample temp = samples[j + 1];
+                    samples[j + 1] = samples[j];
+                    samples[j] = temp;
+                    keepSorting = true;
+                }
+            }
+        }
+        */
+
+        /*
+        const uint n = RESERVOIRS_PER_CELL - i;
+        for (uint width = 1; width < n; width *= 2) {
+            for (uint j = 0; j < n; j += width * 2) {
+                const uint cLeft = j;
+                const uint cRight = min(j + width, n);
+                const uint cEnd = min(j + 2 * width, n);
+                uint left = cLeft;
+                uint right = cRight;
+                for (uint k = cLeft; k < cEnd; k++) {
+                    if (left < cRight && (right >= cEnd || samples[samplesIdx][left].weight >= samples[samplesIdx][right].weight)) {
+                        samples[workSamplesIdx][k] = samples[samplesIdx][left]; 
+                        left++;
+                        continue;
+                    }
+                    samples[workSamplesIdx][k] = samples[samplesIdx][right];
+                    right++;
+                }
+            }
+
+            workSamplesIdx = samplesIdx;
+            samplesIdx = (samplesIdx + 1) % 2;
+        }
+        */
+
+        for (uint j = 1; j < RESERVOIRS_PER_CELL - i; j++) {
+            uint k = j;
+            const Sample sampl = samples[j];
+            while (k > 0 && samples[k - 1].weight < sampl.weight) {
+                samples[k] = samples[k - 1] ;
+                k--;
+            }
+            samples[k] = sampl;
+        }
+
+        Alias alias;
+        alias.sample1 = samples[RESERVOIRS_PER_CELL - i - 1].idx;
+        alias.sample2 = samples[0].idx;
+        alias.threshold = samples[RESERVOIRS_PER_CELL - i - 1].weight / avgPdf;
+        cells[cellIdx].aliasTable[i] = alias;
+
+        samples[0].weight -= avgPdf - samples[RESERVOIRS_PER_CELL - i - 1].weight;
+    }
+
+    Alias alias;
+    alias.sample1 = samples[0].idx;
+    alias.sample2 = samples[0].idx;
+    alias.threshold = 1.0;
+    cells[cellIdx].aliasTable[RESERVOIRS_PER_CELL - 1] = alias;
+
     cells[cellIdx].avgReservoirWeight = avgOfAllReservoirs / float(RESERVOIRS_PER_CELL);
-    cells[cellIdx].cdfTotal = cdfTotal;
 }

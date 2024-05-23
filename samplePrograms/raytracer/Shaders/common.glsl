@@ -1,16 +1,7 @@
-#extension GL_GOOGLE_include_directive : enable
-#include "../include/host_device.hpp"
-
 struct payload {
     vec4 hitValue;
     vec3 emission;
     vec3 pos;
-};
-
-struct Cell {
-    float cdf[RESERVOIRS_PER_CELL + 1];
-    float cdfTotal;
-    float avgReservoirWeight;
 };
 
 vec3 sRGBToAlbedo(vec3 sRGB)

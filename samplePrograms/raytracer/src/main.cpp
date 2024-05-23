@@ -1,11 +1,3 @@
-#include "host_device.hpp"
-#include "vul_buffer.hpp"
-#include "vul_comp_pipeline.hpp"
-#include "vul_gltf_loader.hpp"
-#include "vul_image.hpp"
-#include "vul_swap_chain.hpp"
-#include <GLFW/glfw3.h>
-#include <cstdlib>
 #include <memory>
 #include <resources.hpp>
 
@@ -14,14 +6,13 @@
 #include<vul_debug_tools.hpp>
 
 #include<imgui.h>
-#include <vulkan/vulkan_core.h>
 
-void GuiStuff(vul::Vulkano &vulkano) {
+void GuiStuff(vul::Vulkano &vulkano, float reservoirGridGenerationTime, float cellGridGenerationTime) {
     ImGui::Begin("Performance");
     ImGui::DragFloat("Max FPS", &vul::settings::maxFps, vul::settings::maxFps / 30.0f, 3.0f, 10'000.0f);
-    ImGui::Text("Fps: %f\nTotal frame time: %fms\nIdle time %fms",
-            1.0f / vulkano.getFrameTime(), vulkano.getFrameTime() * 1000.0f,
-            vulkano.getIdleTime() * 1000.0f);
+    ImGui::Text("Fps: %f\nTotal frame time: %fms\nReservoir time: %fms\nCell time: %fms\nIdle time: %fms",
+            1.0f / vulkano.getFrameTime(), vulkano.getFrameTime() * 1000.0f, reservoirGridGenerationTime * 1000.0f,
+            cellGridGenerationTime * 1000.0f, vulkano.getIdleTime() * 1000.0f);
     ImGui::End();
 }
 
@@ -63,7 +54,7 @@ int main() {
         reservoirGrids[i] = std::move(resGrid.buffer);
     }
     std::unique_ptr<vulB::VulBuffer> cellsBuffer = std::make_unique<vulB::VulBuffer>(vulkano.getVulDevice());
-    cellsBuffer->keepEmpty(sizeof(float) * (2 + RESERVOIRS_PER_CELL + 1), resGridSize.width * resGridSize.height * resGridSize.depth);
+    cellsBuffer->keepEmpty(sizeof(Cell), resGridSize.width * resGridSize.height * resGridSize.depth);
     cellsBuffer->createBuffer(true, vulB::VulBuffer::usage_ssbo);
 
     std::unique_ptr<vul::VulImage> enviromentMap = vul::VulImage::createDefaultWholeImageAllInOneSingleTime(vulkano.getVulDevice(),
@@ -111,20 +102,26 @@ int main() {
         if (commandBuffer == nullptr) continue;
         int frameIdx = vulkano.vulRenderer.getFrameIndex();
 
-        if (vulkano.shouldShowGUI()) GuiStuff(vulkano);
         updateUbo(vulkano, ubos[frameIdx]);
 
         std::vector<VkDescriptorSet> vkDescSets = {vulkano.renderDatas[0].descriptorSets[frameIdx][0]->getSet()};
         
+        double resStartTime = glfwGetTime();
         reservoirGridGenerator.begin({vkDescSets});
         reservoirGridGenerator.dispatch(resGridSize.width, resGridSize.height, resGridSize.depth);
         reservoirGridGenerator.end(true);
+        float resTime = glfwGetTime() - resStartTime;
 
+        double cellStartTime = glfwGetTime();
         cellsGenerator.begin({vkDescSets});
-        cellsGenerator.dispatch(resGridSize.width, resGridSize.height, resGridSize.depth);
+        cellsGenerator.dispatch(resGridSize.width / 4, resGridSize.height / 4, resGridSize.depth / 4);
         cellsGenerator.end(true);
+        float cellTime = glfwGetTime() - cellStartTime;
 
         rtPipeline.traceRays(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, sizeof(frameNumber), &frameNumber, vkDescSets, commandBuffer);
+
+        if (vulkano.shouldShowGUI()) GuiStuff(vulkano, resTime, cellTime);
+
         stop = vulkano.endFrame(commandBuffer);
 
         if (vulkano.vulRenderer.wasSwapChainRecreated()) resizeRtImgs(vulkano, rtImgs);
