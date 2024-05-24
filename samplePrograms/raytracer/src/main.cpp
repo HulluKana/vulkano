@@ -114,7 +114,7 @@ int main() {
 
         double cellStartTime = glfwGetTime();
         cellsGenerator.begin({vkDescSets});
-        cellsGenerator.dispatch(resGridSize.width / 4, resGridSize.height / 4, resGridSize.depth / 4);
+        cellsGenerator.dispatch(resGridSize.width / 4 + 1, resGridSize.height / 4 + 1, resGridSize.depth / 4 + 1);
         cellsGenerator.end(true);
         float cellTime = glfwGetTime() - cellStartTime;
 

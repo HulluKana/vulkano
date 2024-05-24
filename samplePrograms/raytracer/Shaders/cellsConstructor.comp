@@ -18,7 +18,7 @@ void main()
 {
     const uvec3 dims = reservoirs[0].dims.xyz;
     const uvec3 cellCoord = gl_GlobalInvocationID;
-    if (cellCoord.x > dims.x || cellCoord.y > dims.y || cellCoord.z > dims.z) return;
+    if (cellCoord.x >= dims.x || cellCoord.y >= dims.y || cellCoord.z >= dims.z) return;
     if (imageLoad(hitCache, ivec3(cellCoord)).x < frameNumber - RESERVOIR_HISTORY_LEN) return;
 
     const uint cellIdx = (cellCoord.z * dims.y * dims.x + cellCoord.y * dims.x + cellCoord.x);
@@ -29,81 +29,65 @@ void main()
         uint idx;
         float weight;
     };
-    Sample samples[RESERVOIRS_PER_CELL];
+    uint samplesIdx = 0;
+    uint workSamplesIdx = 1;
+    Sample samples[2][RESERVOIRS_PER_CELL];
     float avgOfAllReservoirs = 0.0;
     float avgPdf = 0.0;
     for (uint i = 0; i < RESERVOIRS_PER_CELL; i++) {
         const Reservoir reservoir = reservoirs[histIdx].data[resIdx + i];
         avgOfAllReservoirs += reservoir.averageWeight;
         avgPdf += reservoir.targetPdf;
-        samples[i].idx = i;
-        samples[i].weight = reservoir.targetPdf;
+        samples[samplesIdx][i].idx = i;
+        samples[samplesIdx][i].weight = reservoir.targetPdf;
     }
     avgPdf /= float(RESERVOIRS_PER_CELL);
 
+    for (uint width = 1; width < RESERVOIRS_PER_CELL; width *= 2) {
+        for (uint j = 0; j < RESERVOIRS_PER_CELL; j += width * 2) {
+            const uint cLeft = j;
+            const uint cRight = j + width;
+            const uint cEnd = j + 2 * width;
+            uint left = cLeft;
+            uint right = cRight;
+            for (uint k = cLeft; k < cEnd; k++) {
+                if (samples[samplesIdx][left].weight >= samples[samplesIdx][right].weight) {
+                    samples[workSamplesIdx][k] = samples[samplesIdx][left]; 
+                    left++;
+                    continue;
+                }
+                samples[workSamplesIdx][k] = samples[samplesIdx][right];
+                right++;
+            }
+        }
+
+        workSamplesIdx = samplesIdx;
+        samplesIdx = (samplesIdx + 1) % 2;
+    }
+
     for (uint i = 0; i < RESERVOIRS_PER_CELL - 1; i++) {
-        /*
-        bool keepSorting = true;
-        while (keepSorting) {
-            keepSorting = false;
-            for (uint j = 0; j < RESERVOIRS_PER_CELL - 1 - i; j++) {
-                if (samples[j].weight < samples[j + 1].weight) {
-                    Sample temp = samples[j + 1];
-                    samples[j + 1] = samples[j];
-                    samples[j] = temp;
-                    keepSorting = true;
-                }
-            }
-        }
-        */
-
-        /*
-        const uint n = RESERVOIRS_PER_CELL - i;
-        for (uint width = 1; width < n; width *= 2) {
-            for (uint j = 0; j < n; j += width * 2) {
-                const uint cLeft = j;
-                const uint cRight = min(j + width, n);
-                const uint cEnd = min(j + 2 * width, n);
-                uint left = cLeft;
-                uint right = cRight;
-                for (uint k = cLeft; k < cEnd; k++) {
-                    if (left < cRight && (right >= cEnd || samples[samplesIdx][left].weight >= samples[samplesIdx][right].weight)) {
-                        samples[workSamplesIdx][k] = samples[samplesIdx][left]; 
-                        left++;
-                        continue;
-                    }
-                    samples[workSamplesIdx][k] = samples[samplesIdx][right];
-                    right++;
-                }
-            }
-
-            workSamplesIdx = samplesIdx;
-            samplesIdx = (samplesIdx + 1) % 2;
-        }
-        */
-
-        for (uint j = 1; j < RESERVOIRS_PER_CELL - i; j++) {
-            uint k = j;
-            const Sample sampl = samples[j];
-            while (k > 0 && samples[k - 1].weight < sampl.weight) {
-                samples[k] = samples[k - 1] ;
-                k--;
-            }
-            samples[k] = sampl;
-        }
-
         Alias alias;
-        alias.sample1 = samples[RESERVOIRS_PER_CELL - i - 1].idx;
-        alias.sample2 = samples[0].idx;
-        alias.threshold = samples[RESERVOIRS_PER_CELL - i - 1].weight / avgPdf;
+        alias.sample1 = samples[samplesIdx][RESERVOIRS_PER_CELL - i - 1].idx;
+        alias.sample2 = samples[samplesIdx][0].idx;
+        alias.threshold = samples[samplesIdx][RESERVOIRS_PER_CELL - i - 1].weight / avgPdf;
         cells[cellIdx].aliasTable[i] = alias;
 
-        samples[0].weight -= avgPdf - samples[RESERVOIRS_PER_CELL - i - 1].weight;
+        samples[samplesIdx][0].weight -= avgPdf - samples[samplesIdx][RESERVOIRS_PER_CELL - i - 1].weight;
+
+        const Sample insertable = samples[samplesIdx][0];
+        for (uint j = 0; j < RESERVOIRS_PER_CELL - 2 - i; j++) {
+            const Sample sampl = samples[samplesIdx][j + 1];
+            if (sampl.weight <= insertable.weight) {
+                samples[samplesIdx][j] = insertable;
+                break;
+            }
+            samples[samplesIdx][j] = samples[samplesIdx][j + 1];
+        }
     }
 
     Alias alias;
-    alias.sample1 = samples[0].idx;
-    alias.sample2 = samples[0].idx;
+    alias.sample1 = samples[samplesIdx][0].idx;
+    alias.sample2 = samples[samplesIdx][0].idx;
     alias.threshold = 1.0;
     cells[cellIdx].aliasTable[RESERVOIRS_PER_CELL - 1] = alias;
 
