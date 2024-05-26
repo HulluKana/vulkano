@@ -1,0 +1,72 @@
+#version 460
+
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+
+#include "common.glsl"
+#include "../include/host_device.hpp"
+
+layout(binding = 1, set = 0, scalar) buffer ReservoirsBuffers  {ivec4 minPos; uvec4 dims; Reservoir data[];} reservoirs[RESERVOIR_HISTORY_LEN];
+layout(binding = 3, set = 0, r32ui) readonly uniform uimage3D hitCache;
+
+layout(push_constant) uniform Push{uint frameNumber;};
+
+layout(local_size_x = RESERVOIRS_PER_CELL / 2, local_size_y = 1, local_size_z = 1) in;
+
+shared Reservoir localReservoirs[RESERVOIRS_PER_CELL];
+
+void swap(uint idx1, uint idx2)
+{
+    if (localReservoirs[idx1].targetPdf < localReservoirs[idx2].targetPdf) {
+        const Reservoir temp = localReservoirs[idx1];
+        localReservoirs[idx1] = localReservoirs[idx2];
+        localReservoirs[idx2] = temp;
+    }
+}
+
+void flip(uint thread, uint height)
+{
+    const uint halfHeight = height / 2;
+    const uint tmhh = thread % halfHeight;
+    const uint offset = ((2 * thread) / height) * height;
+    const uint idx1 = offset + tmhh;
+    const uint idx2 = offset + height - tmhh - 1;
+    swap(idx1, idx2);
+}
+
+void dispese(uint thread, uint height)
+{
+    const uint halfHeight = height / 2;
+    const uint tmhh = thread % halfHeight;
+    const uint offset = ((2 * thread) / height) * height;
+    const uint idx1 = offset + tmhh;
+    const uint idx2 = offset + tmhh + halfHeight;
+    swap(idx1, idx2);
+}
+
+void main()
+{
+    const uvec3 cellCoord = gl_WorkGroupID;
+    if (imageLoad(hitCache, ivec3(cellCoord)).x < frameNumber - RESERVOIR_HISTORY_LEN) return;
+
+    const uvec2 dims = reservoirs[0].dims.xy;
+    const uint resIdx = (cellCoord.z * dims.y * dims.x + cellCoord.y * dims.x + cellCoord.x) * RESERVOIRS_PER_CELL;
+    const uint histIdx = frameNumber % RESERVOIR_HISTORY_LEN;
+    const uint thread = gl_LocalInvocationID.x;
+
+    localReservoirs[thread * 2] = reservoirs[histIdx].data[resIdx + thread * 2];
+    localReservoirs[thread * 2 + 1] = reservoirs[histIdx].data[resIdx + thread * 2 + 1];
+
+    for (uint flipHeight = 2; flipHeight <= RESERVOIRS_PER_CELL; flipHeight *= 2) {
+        barrier();
+        flip(thread, flipHeight);
+        for (uint disperseHeight = flipHeight / 2; disperseHeight > 1; disperseHeight /= 2) {
+            barrier();
+            dispese(thread, disperseHeight);
+        }
+    }
+
+    barrier();
+    reservoirs[histIdx].data[resIdx + thread * 2] = localReservoirs[thread * 2];
+    reservoirs[histIdx].data[resIdx + thread * 2 + 1] = localReservoirs[thread * 2 + 1];
+}

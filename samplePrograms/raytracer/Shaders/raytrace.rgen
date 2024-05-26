@@ -6,9 +6,9 @@
 #include "../include/host_device.hpp"
 #include "common.glsl"
 
-layout(binding = 0, set = 0, rgba32f) uniform image2D image;
-layout(binding = 1, set = 0) uniform Ubo {GlobalUbo ubo;};
-layout(binding = 15, set = 0) uniform accelerationStructureEXT tlas;
+layout(binding = 0, set = 0) uniform Ubo {GlobalUbo ubo;};
+layout(binding = 10, set = 0) uniform accelerationStructureEXT tlas;
+layout(binding = 0, set = 2, rgba32f) uniform image2D image;
 
 layout(location = 0) rayPayloadEXT payload prd;
 

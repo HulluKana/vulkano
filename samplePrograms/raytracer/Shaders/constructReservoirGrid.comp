@@ -7,9 +7,9 @@
 #include "../include/host_device.hpp"
 #include"../../../essentials/include/vul_scene.hpp"
 
-layout(binding = 9, set = 0) readonly buffer LightInfos         {LightInfo lightInfos[];};
-layout(binding = 10, set = 0, scalar) buffer ReservoirsBuffers  {ivec4 minPos; uvec4 dims; Reservoir data[];} reservoirs[RESERVOIR_HISTORY_LEN];
-layout(binding = 12, set = 0, r32ui) readonly uniform uimage3D hitCache;
+layout(binding = 0, set = 0) readonly buffer LightInfos         {LightInfo lightInfos[];};
+layout(binding = 1, set = 0, scalar) buffer ReservoirsBuffers  {ivec4 minPos; uvec4 dims; Reservoir data[];} reservoirs[RESERVOIR_HISTORY_LEN];
+layout(binding = 3, set = 0, r32ui) readonly uniform uimage3D hitCache;
 
 layout(push_constant) uniform Push{uint frameNumber;};
 

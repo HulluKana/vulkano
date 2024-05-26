@@ -34,16 +34,41 @@ ReservoirGrid createReservoirGrid(const vul::Scene &scene, const vulB::VulDevice
     return reservoirGrid;
 }
 
-std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulkano, const vul::VulAs &as, const std::unique_ptr<vul::VulImage> &rtImg, const std::unique_ptr<vulB::VulBuffer> &ubo, const std::unique_ptr<vul::VulImage> &enviromentMap, const std::vector<std::unique_ptr<vulB::VulBuffer>> &reservoirsBuffers, const std::unique_ptr<vul::VulImage> &hitCacheBuffer, const std::unique_ptr<vulB::VulBuffer> &cellsBuffer)
+std::unique_ptr<vulB::VulDescriptorSet> createResDescSet(const vul::Vulkano &vulkano, const std::vector<std::unique_ptr<vulB::VulBuffer>>
+        &reservoirsBuffers, const std::unique_ptr<vul::VulImage> &hitCacheBuffer, const std::unique_ptr<vulB::VulBuffer> &cellsBuffer)
 {
     std::vector<vul::Vulkano::Descriptor> descriptors;
     vul::Vulkano::Descriptor desc{};
     desc.count = 1;
 
-    desc.type = vul::Vulkano::DescriptorType::storageImage;
-    desc.stages = {vul::Vulkano::ShaderStage::rgen, vul::Vulkano::ShaderStage::frag};
-    desc.content = rtImg.get();
+    desc.type = vul::Vulkano::DescriptorType::ssbo;
+    desc.stages = {vul::Vulkano::ShaderStage::rchit, vul::Vulkano::ShaderStage::comp};
+    desc.content = vulkano.scene.lightsBuffer.get();
     descriptors.push_back(desc);
+
+    desc.type = vul::Vulkano::DescriptorType::upSsbo;
+    desc.content = reservoirsBuffers.data();
+    desc.count = reservoirsBuffers.size();
+    descriptors.push_back(desc);
+
+    desc.type = {vul::Vulkano::DescriptorType::ssbo};
+    desc.content = cellsBuffer.get();
+    desc.count = 1;
+    descriptors.push_back(desc);
+
+    desc.type = {vul::Vulkano::DescriptorType::storageImage};
+    desc.content = hitCacheBuffer.get();
+    descriptors.push_back(desc);
+
+    return vulkano.createDescriptorSet(descriptors);
+}
+
+std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulkano, const vul::VulAs &as,
+        const std::unique_ptr<vulB::VulBuffer> &ubo, const std::unique_ptr<vul::VulImage> &enviromentMap)
+{
+    std::vector<vul::Vulkano::Descriptor> descriptors;
+    vul::Vulkano::Descriptor desc{};
+    desc.count = 1;
 
     desc.type = vul::Vulkano::DescriptorType::ubo;
     desc.stages = {vul::Vulkano::ShaderStage::rgen, vul::Vulkano::ShaderStage::rmiss, vul::Vulkano::ShaderStage::rchit};
@@ -65,30 +90,11 @@ std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulk
     descriptors.push_back(desc);
 
     desc.stages = {vul::Vulkano::ShaderStage::rchit, vul::Vulkano::ShaderStage::rahit};
-    desc.content = vulkano.scene.indexBuffer.get();
     desc.content = vulkano.scene.uvBuffer.get();
     descriptors.push_back(desc);
     desc.content = vulkano.scene.materialBuffer.get();
     descriptors.push_back(desc);
     desc.content = vulkano.scene.primInfoBuffer.get();
-    descriptors.push_back(desc);
-
-    desc.stages = {vul::Vulkano::ShaderStage::rchit, vul::Vulkano::ShaderStage::comp};
-    desc.content = vulkano.scene.lightsBuffer.get();
-    descriptors.push_back(desc);
-
-    desc.type = vul::Vulkano::DescriptorType::upSsbo;
-    desc.content = reservoirsBuffers.data();
-    desc.count = reservoirsBuffers.size();
-    descriptors.push_back(desc);
-
-    desc.type = {vul::Vulkano::DescriptorType::ssbo};
-    desc.content = cellsBuffer.get();
-    desc.count = 1;
-    descriptors.push_back(desc);
-
-    desc.type = {vul::Vulkano::DescriptorType::storageImage};
-    desc.content = hitCacheBuffer.get();
     descriptors.push_back(desc);
 
     desc.type = vul::Vulkano::DescriptorType::spCombinedImgSampler;
@@ -107,6 +113,19 @@ std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulk
     desc.stages = {vul::Vulkano::ShaderStage::rgen, vul::Vulkano::ShaderStage::rchit};
     desc.count = 1;
     desc.content = &as;
+    descriptors.push_back(desc);
+
+    return vulkano.createDescriptorSet(descriptors);
+}
+
+std::unique_ptr<vulB::VulDescriptorSet> createDisplayDescSet(const vul::Vulkano &vulkano, const std::unique_ptr<vul::VulImage> &rtImg)
+{
+    std::vector<vul::Vulkano::Descriptor> descriptors;
+    vul::Vulkano::Descriptor desc{};
+    desc.count = 1;
+    desc.type = vul::Vulkano::DescriptorType::storageImage;
+    desc.stages = {vul::Vulkano::ShaderStage::rgen, vul::Vulkano::ShaderStage::frag};
+    desc.content = rtImg.get();
     descriptors.push_back(desc);
 
     return vulkano.createDescriptorSet(descriptors);

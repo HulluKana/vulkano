@@ -6,8 +6,8 @@
 #include "common.glsl"
 #include "../include/host_device.hpp"
 
-layout(binding = 1, set = 0) uniform Ubo {GlobalUbo ubo;};
-layout(binding = 14, set = 0) uniform samplerCube enviromentMap;
+layout(binding = 0, set = 0) uniform Ubo {GlobalUbo ubo;};
+layout(binding = 9, set = 0) uniform samplerCube enviromentMap;
 
 layout(location = 0) rayPayloadInEXT payload prd;
 

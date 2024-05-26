@@ -89,7 +89,6 @@ class Vulkano{
         };
 
         std::unique_ptr<vulB::VulDescriptorSet> createDescriptorSet(const std::vector<Descriptor> &descriptors) const;
-        VulCompPipeline createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight);        
 
         struct RenderData {
             bool is3d;

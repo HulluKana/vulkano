@@ -259,10 +259,4 @@ std::unique_ptr<VulDescriptorSet> Vulkano::createDescriptorSet(const std::vector
     return set;
 }
         
-VulCompPipeline Vulkano::createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight)
-{
-    VulCompPipeline compPipeline(compShaderName, setLayouts, m_vulDevice, maxSubmitsInFlight);
-    return compPipeline;
-}
-
 }

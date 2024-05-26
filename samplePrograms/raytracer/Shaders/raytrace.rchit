@@ -9,20 +9,20 @@
 #include "../include/host_device.hpp"
 #include"../../../essentials/include/vul_scene.hpp"
 
-layout(binding = 1, set = 0) readonly uniform Ubo                           {GlobalUbo ubo;};
-layout(binding = 2, set = 0) readonly buffer Indices                        {uint indices[];};
-layout(binding = 3, set = 0, scalar) readonly buffer Vertices               {vec3 vertices[];};
-layout(binding = 4, set = 0, scalar) readonly buffer Normals                {vec3 normals[];};
-layout(binding = 5, set = 0) readonly buffer Tangents                       {vec4 tangents[];};
-layout(binding = 6, set = 0) readonly buffer Uvs                            {vec2 uvs[];};
-layout(binding = 7, set = 0) readonly buffer Materials                      {PackedMaterial materials[];};
-layout(binding = 8, set = 0) readonly buffer PrimInfos                      {PrimInfo primInfos[];};
-layout(binding = 9, set = 0) readonly buffer LightInfos                     {LightInfo lightInfos[];};
-layout(binding = 10, set = 0, scalar) readonly buffer ReservoirsBuffers     {ivec4 minPos; uvec4 dims; Reservoir data[];} reservoirs[RESERVOIR_HISTORY_LEN];
-layout(binding = 11, set = 0, scalar) readonly buffer CellData              {Cell cells[];};
-layout(binding = 12, set = 0, r32ui) writeonly uniform uimage3D hitCache;
-layout(binding = 13, set = 0) uniform sampler2D texSampler[];
-layout(binding = 15, set = 0) uniform accelerationStructureEXT tlas;
+layout(binding = 0, set = 0) readonly uniform Ubo                           {GlobalUbo ubo;};
+layout(binding = 1, set = 0) readonly buffer Indices                        {uint indices[];};
+layout(binding = 2, set = 0, scalar) readonly buffer Vertices               {vec3 vertices[];};
+layout(binding = 3, set = 0, scalar) readonly buffer Normals                {vec3 normals[];};
+layout(binding = 4, set = 0) readonly buffer Tangents                       {vec4 tangents[];};
+layout(binding = 5, set = 0) readonly buffer Uvs                            {vec2 uvs[];};
+layout(binding = 6, set = 0) readonly buffer Materials                      {PackedMaterial materials[];};
+layout(binding = 7, set = 0) readonly buffer PrimInfos                      {PrimInfo primInfos[];};
+layout(binding = 8, set = 0) uniform sampler2D texSampler[];
+layout(binding = 10, set = 0) uniform accelerationStructureEXT tlas;
+layout(binding = 0, set = 1) readonly buffer LightInfos                     {LightInfo lightInfos[];};
+layout(binding = 1, set = 1, scalar) readonly buffer ReservoirsBuffers      {ivec4 minPos; uvec4 dims; Reservoir data[];} reservoirs[RESERVOIR_HISTORY_LEN];
+layout(binding = 2, set = 1, scalar) readonly buffer CellData               {Cell cells[];};
+layout(binding = 3, set = 1, r32ui) writeonly uniform uimage3D hitCache;
 
 layout(push_constant) uniform Push{uint frameNumber;};
 
