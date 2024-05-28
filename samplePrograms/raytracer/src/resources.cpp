@@ -35,7 +35,8 @@ ReservoirGrid createReservoirGrid(const vul::Scene &scene, const vulB::VulDevice
 }
 
 std::unique_ptr<vulB::VulDescriptorSet> createResDescSet(const vul::Vulkano &vulkano, const std::vector<std::unique_ptr<vulB::VulBuffer>>
-        &reservoirsBuffers, const std::unique_ptr<vul::VulImage> &hitCacheBuffer, const std::unique_ptr<vulB::VulBuffer> &cellsBuffer)
+        &reservoirsBuffers, const std::unique_ptr<vul::VulImage> &hitCacheBuffer, const std::unique_ptr<vulB::VulBuffer> &cellsBuffer,
+        const vul::VulAs &as)
 {
     std::vector<vul::Vulkano::Descriptor> descriptors;
     vul::Vulkano::Descriptor desc{};
@@ -60,10 +61,16 @@ std::unique_ptr<vulB::VulDescriptorSet> createResDescSet(const vul::Vulkano &vul
     desc.content = hitCacheBuffer.get();
     descriptors.push_back(desc);
 
+    desc.type = vul::Vulkano::DescriptorType::accelerationStructure;
+    desc.stages = {vul::Vulkano::ShaderStage::rgen, vul::Vulkano::ShaderStage::rchit, vul::Vulkano::ShaderStage::comp};
+    desc.count = 1;
+    desc.content = &as;
+    descriptors.push_back(desc);
+
     return vulkano.createDescriptorSet(descriptors);
 }
 
-std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulkano, const vul::VulAs &as,
+std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulkano,
         const std::unique_ptr<vulB::VulBuffer> &ubo, const std::unique_ptr<vul::VulImage> &enviromentMap)
 {
     std::vector<vul::Vulkano::Descriptor> descriptors;
@@ -83,7 +90,6 @@ std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulk
     descriptors.push_back(desc);
 
     desc.stages = {vul::Vulkano::ShaderStage::rchit};
-    desc.content = vulkano.scene.indexBuffer.get();
     desc.content = vulkano.scene.normalBuffer.get();
     descriptors.push_back(desc);
     desc.content = vulkano.scene.tangentBuffer.get();
@@ -107,12 +113,6 @@ std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulk
     desc.stages = {vul::Vulkano::ShaderStage::rmiss};
     desc.content = enviromentMap.get();
     desc.count = 1;
-    descriptors.push_back(desc);
-
-    desc.type = vul::Vulkano::DescriptorType::accelerationStructure;
-    desc.stages = {vul::Vulkano::ShaderStage::rgen, vul::Vulkano::ShaderStage::rchit};
-    desc.count = 1;
-    desc.content = &as;
     descriptors.push_back(desc);
 
     return vulkano.createDescriptorSet(descriptors);

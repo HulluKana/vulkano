@@ -7,7 +7,7 @@
 #include "common.glsl"
 
 layout(binding = 0, set = 0) uniform Ubo {GlobalUbo ubo;};
-layout(binding = 10, set = 0) uniform accelerationStructureEXT tlas;
+layout(binding = 4, set = 1) uniform accelerationStructureEXT tlas;
 layout(binding = 0, set = 2, rgba32f) uniform image2D image;
 
 layout(location = 0) rayPayloadEXT payload prd;

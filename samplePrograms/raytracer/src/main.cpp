@@ -79,8 +79,8 @@ int main() {
         hitCaches[i]->keepEmpty(resGridSize.width, resGridSize.height, resGridSize.depth, 1, 1, VK_FORMAT_R32_UINT, 0, 0);
         hitCaches[i]->createDefaultImageSingleTime(vul::VulImage::ImageType::storage3d);
 
-        resDescSets[i] = createResDescSet(vulkano, reservoirGrids, hitCaches[i], cellsBuffer);
-        rtDescSets[i] = createRtDescSet(vulkano, as, ubos[i], enviromentMap);
+        resDescSets[i] = createResDescSet(vulkano, reservoirGrids, hitCaches[i], cellsBuffer, as);
+        rtDescSets[i] = createRtDescSet(vulkano, ubos[i], enviromentMap);
         displayDescSets[i] = createDisplayDescSet(vulkano, rtImgs[i]);
     }
 

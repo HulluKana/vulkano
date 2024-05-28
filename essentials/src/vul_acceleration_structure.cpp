@@ -19,7 +19,7 @@ VulAs::VulAs(VulDevice &vulDevice, const Scene &scene) : m_vulDevice{vulDevice}
     buildBlases(blasInputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 
     std::vector<VkAccelerationStructureInstanceKHR> asInsts;
-    for (size_t i = 0; i < m_blases.size(); i++) asInsts.emplace_back(blasToAsInstance(0, m_blases[i]));
+    for (size_t i = 0; i < m_blases.size(); i++) asInsts.emplace_back(blasToAsInstance(i, m_blases[i], 0xff));
 
     buildTlas(asInsts, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
@@ -211,7 +211,7 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
     if (queryPool) vkDestroyQueryPool(m_vulDevice.device(), queryPool, nullptr);
 }
 
-VkAccelerationStructureInstanceKHR VulAs::blasToAsInstance(uint32_t index, const As &blas)
+VkAccelerationStructureInstanceKHR VulAs::blasToAsInstance(uint32_t index, const As &blas, uint32_t mask)
 {
     transform3D defaultTransform{};
     defaultTransform.pos = glm::vec3(0.0f);
@@ -228,7 +228,7 @@ VkAccelerationStructureInstanceKHR VulAs::blasToAsInstance(uint32_t index, const
     asInst.instanceCustomIndex = index;
     asInst.accelerationStructureReference = vkGetAccelerationStructureDeviceAddressKHR(m_vulDevice.device(), &blasAddrInfo);
     asInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-    asInst.mask = 0xFF;
+    asInst.mask = mask;
     asInst.instanceShaderBindingTableRecordOffset = 0;
     
     return asInst;
@@ -254,6 +254,7 @@ VulAs::BlasInput VulAs::gltfNodesToBlasInput(const Scene &scene, uint32_t firstN
         asGeom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
         asGeom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
         if (scene.materials[mesh.materialIndex].alphaMode == GltfLoader::GltfAlphaMode::opaque) asGeom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+        else asGeom.flags = VK_GEOMETRY_NO_DUPLICATE_ANY_HIT_INVOCATION_BIT_KHR;
         asGeom.geometry.triangles = triangles;
 
         VkAccelerationStructureBuildRangeInfoKHR offsetInfo{};

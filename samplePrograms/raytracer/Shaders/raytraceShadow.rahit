@@ -23,7 +23,7 @@ void main()
 {
     const vec3 barycentrics = vec3(1.0 - attribs.x - attribs.y, attribs.x, attribs.y);
 
-    PrimInfo primInfo = primInfos[gl_GeometryIndexEXT];
+    PrimInfo primInfo = primInfos[gl_InstanceCustomIndexEXT + gl_GeometryIndexEXT];
     const uint indexOffset = primInfo.firstIndex + gl_PrimitiveID * 3;
     const uvec3 index = uvec3(indices[indexOffset], indices[indexOffset + 1], indices[indexOffset + 2]) + uvec3(primInfo.vertexOffset);
     const vec3 pos = vertices[index.x] * barycentrics.x + vertices[index.y] * barycentrics.y + vertices[index.z] * barycentrics.z;

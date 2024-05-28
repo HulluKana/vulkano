@@ -18,11 +18,11 @@ layout(binding = 5, set = 0) readonly buffer Uvs                            {vec
 layout(binding = 6, set = 0) readonly buffer Materials                      {PackedMaterial materials[];};
 layout(binding = 7, set = 0) readonly buffer PrimInfos                      {PrimInfo primInfos[];};
 layout(binding = 8, set = 0) uniform sampler2D texSampler[];
-layout(binding = 10, set = 0) uniform accelerationStructureEXT tlas;
 layout(binding = 0, set = 1) readonly buffer LightInfos                     {LightInfo lightInfos[];};
 layout(binding = 1, set = 1, scalar) readonly buffer ReservoirsBuffers      {ivec4 minPos; uvec4 dims; Reservoir data[];} reservoirs[RESERVOIR_HISTORY_LEN];
 layout(binding = 2, set = 1, scalar) readonly buffer CellData               {Cell cells[];};
 layout(binding = 3, set = 1, r32ui) writeonly uniform uimage3D hitCache;
+layout(binding = 4, set = 1) uniform accelerationStructureEXT tlas;
 
 layout(push_constant) uniform Push{uint frameNumber;};
 
@@ -293,7 +293,7 @@ void main()
         vec3 colorFromThisLight = vec3(0.0);
         colorFromThisLight += BRDF(normal, viewDirection, lightDir, specularColor, roughness);
         colorFromThisLight += diffBRDF(normal, viewDirection, lightDir, specularColor, diffuseColor);
-        colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation * (visibility - 10.0) * chosenOne.averageWeight / chosenOne.targetPdf;
+        colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w) * attenuation * (visibility - 10.0) / (chosenOne.targetPdf * lightCount);
         color += colorFromThisLight;
     }
 

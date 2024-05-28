@@ -34,7 +34,7 @@ void main()
     float avgPdf = 0.0;
     for (uint i = 0; i < RESERVOIRS_PER_CELL; i++) {
         const Reservoir reservoir = reservoirs[histIdx].data[resIdx + i];
-        avgOfAllReservoirs += reservoir.averageWeight;
+        avgOfAllReservoirs += reservoir.targetPdf;
         avgPdf += reservoir.targetPdf;
         samples[i].idx = i;
         samples[i].weight = reservoir.targetPdf;

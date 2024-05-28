@@ -173,8 +173,12 @@ void VulDevice::createLogicalDevice() {
     queueCreateInfos.push_back(queueCreateInfo);
   }
 
+  VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures{};
+  rayQueryFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR;
+
   VkPhysicalDeviceAccelerationStructureFeaturesKHR accelStructFeatures{};
   accelStructFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR;
+  accelStructFeatures.pNext = &rayQueryFeatures;
 
   VkPhysicalDeviceRayTracingPipelineFeaturesKHR rtPipelineFeatures{};
   rtPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
@@ -192,6 +196,7 @@ void VulDevice::createLogicalDevice() {
       deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
       deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
       deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+      deviceExtensions.push_back(VK_KHR_RAY_QUERY_EXTENSION_NAME);
       scalarBlockFeatures.pNext = &reset;
   }
 
