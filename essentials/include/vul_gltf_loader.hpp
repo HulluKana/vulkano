@@ -56,7 +56,7 @@ class GltfLoader
             int normalTextureIndex = -1;
 
             std::string name;
-            GltfAlphaMode alphaMode;
+            GltfAlphaMode alphaMode = GltfAlphaMode::opaque;
 
             // Stuff added by extensions
             float emissionStrength = 0.0f;

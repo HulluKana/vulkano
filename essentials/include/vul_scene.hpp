@@ -17,6 +17,17 @@ class Scene
 
         Scene(vulB::VulDevice &vulDevice);
 
+        struct Cube {
+            glm::vec3 centerPos;
+            glm::vec3 dimensions;
+        };
+        struct Sphere {
+            glm::vec3 centerPos;
+            float radius;
+            uint32_t subdivisionCount;
+        };
+        void loadCubes(const std::vector<Cube> &cubes);
+        void loadSpheres(const std::vector<Sphere> &spheres);
         void loadScene(const std::string &fileName, std::string textureDirectory);
 
         std::vector<vulB::GltfLoader::GltfLight> lights;
@@ -66,6 +77,10 @@ class Scene
 
     private:
         vulB::VulDevice &m_vulDevice; 
+
+        void createBuffers(const std::vector<uint32_t> &indices, const std::vector<glm::vec3> &vertices,
+                const std::vector<glm::vec3> &normals, const std::vector<glm::vec4> &tangents, const std::vector<glm::vec2> &uvs,
+                const std::vector<PackedMaterial> &packedMaterials, const std::vector<PrimInfo> &primInfos);
 };
 
 }

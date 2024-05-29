@@ -180,7 +180,7 @@ void VulPipeline::draw( VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSe
     {
         VUL_PROFILE_SCOPE("Binding the pipeline, descriptor sets, vertex buffers and the index buffer")
         vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
-        vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+        if (descriptorSets.size() > 0) vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
 
         std::vector<VkDeviceSize> offsets(vertexBuffers.size());
         for (size_t i = 0; i < vertexBuffers.size(); i++) offsets.push_back(0);
@@ -191,8 +191,8 @@ void VulPipeline::draw( VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSe
     {
         VUL_PROFILE_SCOPE("Pushing constants and drawing indices")
         for (const DrawData &drawData : drawDatas){
-            vkCmdPushConstants(cmdBuf, m_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, drawData.pushDataSize, drawData.pPushData.get());
-            vkCmdDrawIndexed(cmdBuf, drawData.indexCount, 1, drawData.firstIndex, drawData.vertexOffset, 0);
+            if (drawData.pushDataSize > 0) vkCmdPushConstants(cmdBuf, m_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, drawData.pushDataSize, drawData.pPushData.get());
+            vkCmdDrawIndexed(cmdBuf, drawData.indexCount, drawData.instanceCount, drawData.firstIndex, drawData.vertexOffset, drawData.firstInstance);
         }
     }
 }
