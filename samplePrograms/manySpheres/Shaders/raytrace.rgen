@@ -1,0 +1,40 @@
+#version 460
+
+#extension GL_EXT_ray_tracing : require
+#extension GL_GOOGLE_include_directive : enable
+
+#include "../include/host_device.hpp"
+
+layout(binding = 0, set = 0, rgba32f) uniform image2D image;
+layout(binding = 1, set = 0) uniform accelerationStructureEXT tlas;
+layout(binding = 4, set = 0) uniform Ub {RtUbo ubo;};
+
+layout(location = 0) rayPayloadEXT vec3 prd;
+
+void main() 
+{
+    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+    vec2 uv = pixelCenter / vec2(gl_LaunchSizeEXT.xy) * 2.0 - vec2(1.0);
+
+    const vec3 origin = ubo.cameraPosition.xyz;
+    const vec4 target = ubo.inverseProjectionMatrix * vec4(uv, 1.0, 1.0);
+    const vec4 dir = ubo.inverseViewMatrix * vec4(normalize(target.xyz), 0.0);
+
+    const float minDst = 0.001;
+    const float maxDst = 1000.0;
+
+    traceRayEXT(tlas,               // acceleration structure
+            gl_RayFlagsOpaqueEXT,   // rayFlags
+            0xFF,                   // cullMask
+            0,                      // sbtRecordOffset
+            0,                      // sbtRecordStride
+            0,                      // missIndex
+            origin,                 // ray origin
+            minDst,                 // ray min range
+            dir.xyz,                // ray direction
+            maxDst,                 // ray max range
+            0                       // payload (location = 0)
+    );
+
+    imageStore(image, ivec2(gl_LaunchIDEXT.xy), vec4(prd, 1.0));
+}

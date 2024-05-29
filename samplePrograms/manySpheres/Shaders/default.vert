@@ -7,15 +7,13 @@
 
 layout (location = 0) in vec3 position;
 
-layout (location = 0) out vec3 fragPosWorld;
+layout (location = 0) out flat int idx;
 
 layout (set = 0, binding = 0) uniform Ub {Ubo ubo;};
-layout (set = 0, binding = 1) readonly buffer Trans {mat4 transforms[];};
+layout (set = 0, binding = 1) readonly buffer ObjDatas {ObjData objDatas[];};
 
 void main()
 {
-    const mat4 tranform = transforms[gl_InstanceIndex];
-    const vec4 worldPosition = tranform * vec4(position, 1.0);
-    gl_Position = ubo.projectionMatrix * ubo.viewMatrix * tranform * vec4(position, 1.0f);
-    fragPosWorld = worldPosition.xyz;
+    gl_Position = ubo.projectionMatrix * ubo.viewMatrix * vec4(position + objDatas[gl_InstanceIndex].pos.xyz, 1.0f);
+    idx = gl_InstanceIndex;
 }

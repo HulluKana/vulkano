@@ -1,0 +1,23 @@
+#version 460
+
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_GOOGLE_include_directive : enable
+
+layout(binding = 3, set = 0) readonly buffer SpheresBuf {vec4 spheres[];};
+
+void main()
+{
+    const vec4 sphere = spheres[gl_InstanceID * 5000000 + gl_PrimitiveID];
+    const vec3 rayDir = gl_WorldRayDirectionEXT;
+
+    const vec3 oc= gl_WorldRayOriginEXT - sphere.xyz;
+    const float a = dot(rayDir, rayDir);
+    const float b = 2.0 * dot(oc, rayDir);
+    const float c = dot(oc, oc) - sphere.w * sphere.w;
+    const float discriminant = b * b - 4 * a * c;
+    if(discriminant < 0) return;
+
+    const float tHit = (-b - sqrt(discriminant)) / (2.0 * a);
+    if (tHit >= 0) reportIntersectionEXT(tHit, 0);
+}

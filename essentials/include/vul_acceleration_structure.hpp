@@ -1,5 +1,3 @@
-#include "vul_buffer.hpp"
-#include "vul_gltf_loader.hpp"
 #include <vul_device.hpp>
 #include <vul_scene.hpp>
 #include <vulkan/vulkan_core.h>
@@ -10,12 +8,19 @@ namespace vul {
 
 class VulAs {
     public:
-        VulAs(vulB::VulDevice &vulDevice, const Scene &scene);
+        VulAs(vulB::VulDevice &vulDevice);
         ~VulAs();
 
         VulAs(const VulAs &) = delete;
         VulAs &operator=(const VulAs &) = delete;
         VulAs(VulAs &&) = default;
+
+        struct Aabb {
+            glm::vec3 minPos;
+            glm::vec3 maxPos;
+        };
+        void loadScene(const Scene &scene);
+        void loadAabbs(const std::unique_ptr<vulB::VulBuffer> &aabbBuf);
 
         const VkAccelerationStructureKHR *getPTlas() const {return &m_tlas.as;}
     private:
@@ -41,6 +46,7 @@ class VulAs {
 
         VkAccelerationStructureInstanceKHR blasToAsInstance(uint32_t index, const As &blas);
         BlasInput gltfNodesToBlasInput(const Scene &scene, uint32_t firstNode, uint32_t nodeCount, const std::unique_ptr<vulB::VulBuffer> &transformsBuffer);
+        BlasInput aabbsToBlasInput(const std::unique_ptr<vulB::VulBuffer> &aabbBuf, VkDeviceSize maxAabbCount, VkDeviceSize aabbOffset);
         std::unique_ptr<vulB::VulBuffer> createTransformsBuffer(const Scene &scene);
 
         As createAs(VkAccelerationStructureCreateInfoKHR &createInfo);

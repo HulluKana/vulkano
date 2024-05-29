@@ -2,11 +2,20 @@
 #include <vul_transform.hpp>
 #include <vul_acceleration_structure.hpp>
 #include <iostream>
+#include <vulkan/vulkan_core.h>
 
 using namespace vulB;
 namespace vul {
 
-VulAs::VulAs(VulDevice &vulDevice, const Scene &scene) : m_vulDevice{vulDevice}
+VulAs::VulAs(VulDevice &vulDevice) : m_vulDevice{vulDevice} {}
+
+VulAs::~VulAs()
+{
+    vkDestroyAccelerationStructureKHR(m_vulDevice.device(), m_tlas.as, nullptr);
+    for (As &as : m_blases) vkDestroyAccelerationStructureKHR(m_vulDevice.device(), as.as, nullptr);
+}
+
+void VulAs::loadScene(const Scene &scene)
 {
     m_transformsBuffer = createTransformsBuffer(scene);
 
@@ -16,15 +25,23 @@ VulAs::VulAs(VulDevice &vulDevice, const Scene &scene) : m_vulDevice{vulDevice}
     buildBlases(blasInputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 
     std::vector<VkAccelerationStructureInstanceKHR> asInsts;
-    for (size_t i = 0; i < m_blases.size(); i++) asInsts.emplace_back(blasToAsInstance(0, m_blases[i]));
+    for (size_t i = 0; i < m_blases.size(); i++) asInsts.emplace_back(blasToAsInstance(i, m_blases[i]));
 
     buildTlas(asInsts, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
-VulAs::~VulAs()
+void VulAs::loadAabbs(const std::unique_ptr<vulB::VulBuffer> &aabbBuf)
 {
-    vkDestroyAccelerationStructureKHR(m_vulDevice.device(), m_tlas.as, nullptr);
-    for (As &as : m_blases) vkDestroyAccelerationStructureKHR(m_vulDevice.device(), as.as, nullptr);
+    constexpr VkDeviceSize MAX_AABB_PER_BLAS = 5'000'000;
+    std::vector<BlasInput> blasInputs;
+    for (VkDeviceSize i = 0; i < aabbBuf->getBufferSize() / sizeof(Aabb); i += MAX_AABB_PER_BLAS) blasInputs.emplace_back(aabbsToBlasInput(aabbBuf, MAX_AABB_PER_BLAS, i));
+
+    buildBlases(blasInputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
+
+    std::vector<VkAccelerationStructureInstanceKHR> asInsts;
+    for (size_t i = 0; i < m_blases.size(); i++) asInsts.emplace_back(blasToAsInstance(i * MAX_AABB_PER_BLAS, m_blases[i]));
+
+    buildTlas(asInsts, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
 }
 
 void VulAs::buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asInsts, VkBuildAccelerationStructureFlagsKHR flags)
@@ -250,7 +267,7 @@ VulAs::BlasInput VulAs::gltfNodesToBlasInput(const Scene &scene, uint32_t firstN
         VkAccelerationStructureGeometryKHR asGeom{};
         asGeom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
         asGeom.geometryType = VK_GEOMETRY_TYPE_TRIANGLES_KHR;
-        if (scene.materials[mesh.materialIndex].alphaMode == GltfLoader::GltfAlphaMode::opaque) asGeom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+        if (scene.materials.size() == 0 || scene.materials[mesh.materialIndex].alphaMode == GltfLoader::GltfAlphaMode::opaque) asGeom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
         asGeom.geometry.triangles = triangles;
 
         VkAccelerationStructureBuildRangeInfoKHR offsetInfo{};
@@ -264,6 +281,31 @@ VulAs::BlasInput VulAs::gltfNodesToBlasInput(const Scene &scene, uint32_t firstN
     }
 
     return blasInput;
+}
+
+VulAs::BlasInput VulAs::aabbsToBlasInput(const std::unique_ptr<vulB::VulBuffer> &aabbBuf, VkDeviceSize maxAabbCount, VkDeviceSize aabbOffset)
+{
+    VkAccelerationStructureGeometryAabbsDataKHR aabbs{};
+    aabbs.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR;
+    aabbs.data.deviceAddress = aabbBuf->getBufferAddress();
+    aabbs.stride = sizeof(Aabb);
+
+    VkAccelerationStructureGeometryKHR asGeom{};
+    asGeom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
+    asGeom.geometryType = VK_GEOMETRY_TYPE_AABBS_KHR;
+    asGeom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+    asGeom.geometry.aabbs = aabbs;
+
+    VkAccelerationStructureBuildRangeInfoKHR offset{};
+    offset.firstVertex = 0;
+    offset.primitiveCount = std::min(aabbBuf->getBufferSize() / sizeof(Aabb) - aabbOffset, maxAabbCount);
+    offset.primitiveOffset = aabbOffset * sizeof(Aabb);
+    offset.transformOffset = 0;
+
+    BlasInput input{};
+    input.asGeometries.push_back(asGeom);
+    input.asBuildOffsetInfos.push_back(offset);
+    return input;
 }
 
 std::unique_ptr<VulBuffer> VulAs::createTransformsBuffer(const Scene &scene)
