@@ -88,7 +88,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
     bool prevSampleFromDepth = false;
     if (hasScene){
         for (const RenderData &renderData : renderDatas){
-            if (!renderData.is3d) continue;
+            if (!renderData.is3d || !renderData.enable) continue;
 
             if (firstPass || renderData.swapChainImageMode != prevSwapChainMode || renderData.depthImageMode != prevDepthImageMode || renderData.attachmentImages[vulRenderer.getFrameIndex()].size() > 0) {
                 if (!firstPass) vulRenderer.stopRendering(commandBuffer);
@@ -114,7 +114,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
     }
     if (object2Ds.size() > 0) {
         for (const RenderData &renderData : renderDatas){
-            if (renderData.is3d) continue;
+            if (renderData.is3d || !renderData.enable) continue;
 
             if (firstPass || renderData.swapChainImageMode != prevSwapChainMode || renderData.depthImageMode != prevDepthImageMode || renderData.attachmentImages[vulRenderer.getFrameIndex()].size() > 0) {
                 if (!firstPass) vulRenderer.stopRendering(commandBuffer);

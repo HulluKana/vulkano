@@ -8,7 +8,7 @@ namespace vul {
 
 class VulAs {
     public:
-        VulAs(vulB::VulDevice &vulDevice);
+        VulAs(const vulB::VulDevice &vulDevice);
         ~VulAs();
 
         VulAs(const VulAs &) = delete;
@@ -55,7 +55,7 @@ class VulAs {
         std::vector<As> m_blases;
         std::unique_ptr<vulB::VulBuffer> m_transformsBuffer;
 
-        vulB::VulDevice &m_vulDevice;
+        const vulB::VulDevice &m_vulDevice;
 };
 
 }

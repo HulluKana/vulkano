@@ -9,7 +9,7 @@ namespace vulB {
 
 class VulBuffer {
     public:
-        VulBuffer(VulDevice &vulDevice);
+        VulBuffer(const VulDevice &vulDevice);
         ~VulBuffer();
 
         VulBuffer(const VulBuffer &) = delete;
@@ -71,7 +71,7 @@ class VulBuffer {
             return vkGetBufferDeviceAddress(m_vulDevice.device(), &addressInfo);
         }
     private:
-        VulDevice &m_vulDevice; 
+        const VulDevice &m_vulDevice; 
 
         const void *m_inputData = nullptr;
         uint32_t m_elementSize = 0;

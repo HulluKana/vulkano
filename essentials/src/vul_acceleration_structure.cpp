@@ -7,7 +7,7 @@
 using namespace vulB;
 namespace vul {
 
-VulAs::VulAs(VulDevice &vulDevice) : m_vulDevice{vulDevice} {}
+VulAs::VulAs(const VulDevice &vulDevice) : m_vulDevice{vulDevice} {}
 
 VulAs::~VulAs()
 {

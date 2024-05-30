@@ -9,7 +9,7 @@ namespace vul {
 
 class VulRtPipeline {
     public:
-        VulRtPipeline(vulB::VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
+        VulRtPipeline(const vulB::VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
                 const std::vector<std::string> &closestHitShaders, const std::vector<std::string> &anyHitShaders,
                 const std::vector<std::string> &intersectionShaders, const std::vector<VkDescriptorSetLayout> &setLayouts);
         ~VulRtPipeline();
@@ -36,7 +36,7 @@ class VulRtPipeline {
         VkStridedDeviceAddressRegionKHR m_rhitRegion{};
         VkStridedDeviceAddressRegionKHR m_callRegion{};
 
-        vulB::VulDevice &m_vulDevice;
+        const vulB::VulDevice &m_vulDevice;
 };
 
 }

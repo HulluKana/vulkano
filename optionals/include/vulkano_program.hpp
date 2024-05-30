@@ -59,7 +59,7 @@ class Vulkano{
             hasScene = true;
         }
         
-        vulB::VulDevice &getVulDevice() {return m_vulDevice;}
+        const vulB::VulDevice &getVulDevice() const {return m_vulDevice;}
         VkExtent2D getSwapChainExtent() const {return vulRenderer.getSwapChainExtent();}
 
         enum class DescriptorType{
@@ -92,6 +92,7 @@ class Vulkano{
         VulCompPipeline createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight);        
 
         struct RenderData {
+            bool enable = true;
             bool is3d;
             std::shared_ptr<vulB::VulPipeline> pipeline;
             std::vector<vulB::VulPipeline::DrawData> drawDatas;

@@ -35,9 +35,9 @@ class VulPipeline{
             uint32_t indexCount = 0;
             uint32_t firstIndex = 0;
             int32_t vertexOffset = 0;
-            uint32_t instanceCount = 0;
+            uint32_t instanceCount = 1;
             uint32_t firstInstance = 0;
-            std::shared_ptr<void> pPushData;
+            std::shared_ptr<void> pPushData = nullptr;
             uint32_t pushDataSize = 0;
         };
         void draw(  VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSet> &descriptorSets, const std::vector<VkBuffer> &vertexBuffers,

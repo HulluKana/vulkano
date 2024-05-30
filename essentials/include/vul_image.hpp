@@ -16,16 +16,16 @@ class VulSampler {
         VulSampler &operator=(const VulSampler &) = delete;
         VulSampler(VulSampler &&) = default;
 
-        static std::shared_ptr<VulSampler> createDefaultTexSampler(vulB::VulDevice &vulDevice, uint32_t mipLevels);
-        static std::shared_ptr<VulSampler> createCustomSampler(vulB::VulDevice &vulDevice, VkFilter filter,
+        static std::shared_ptr<VulSampler> createDefaultTexSampler(const vulB::VulDevice &vulDevice, uint32_t mipLevels);
+        static std::shared_ptr<VulSampler> createCustomSampler(const vulB::VulDevice &vulDevice, VkFilter filter,
                 VkSamplerAddressMode addressMode, float maxAnisotropy, VkBorderColor borderColor,
                 VkSamplerMipmapMode mipMapMode,float mipLodBias, float mipMinLod, float mipMaxLod);
 
         VkSampler getSampler() const {return m_sampler;}
     private:
-        VulSampler(vulB::VulDevice &vulDevice, VkFilter filter, VkSamplerAddressMode addressMode, float maxAnisotropy,
+        VulSampler(const vulB::VulDevice &vulDevice, VkFilter filter, VkSamplerAddressMode addressMode, float maxAnisotropy,
                 VkBorderColor borderColor, VkSamplerMipmapMode mipMapMode, float mipLodBias, float mipMinLod, float mipMaxLod);
-        vulB::VulDevice &m_vulDevice;
+        const vulB::VulDevice &m_vulDevice;
         VkSampler m_sampler = VK_NULL_HANDLE;
 };
 
@@ -33,7 +33,7 @@ class VulSampler {
 
 class VulImage {
     public:
-        VulImage(vulB::VulDevice &vulDevice);
+        VulImage(const vulB::VulDevice &vulDevice);
         ~VulImage();
 
         VulImage(const VulImage &) = delete;
@@ -92,26 +92,26 @@ class VulImage {
             std::vector<std::vector<void *>> data;
         };
 
-        static std::unique_ptr<VulImage> createDefaultWholeImageAllInOneSingleTime(vulB::VulDevice &vulDevice, std::variant<std::string,
+        static std::unique_ptr<VulImage> createDefaultWholeImageAllInOneSingleTime(const vulB::VulDevice &vulDevice, std::variant<std::string,
                 RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format, bool addSampler,
                 InputDataType dataType, ImageType imageType);
-        static std::unique_ptr<VulImage> createDefaultWholeImageAllInOne(vulB::VulDevice &vulDevice, std::variant<std::string,
+        static std::unique_ptr<VulImage> createDefaultWholeImageAllInOne(const vulB::VulDevice &vulDevice, std::variant<std::string,
                 RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format, bool addSampler,
                 InputDataType dataType, ImageType imageType, VkCommandBuffer cmdBuf);
-        static std::unique_ptr<VulImage> createSamplerlessCustomImageAllInOneSingleTime(vulB::VulDevice &vulDevice,
+        static std::unique_ptr<VulImage> createSamplerlessCustomImageAllInOneSingleTime(const vulB::VulDevice &vulDevice,
                 std::variant<const std::string &, const RawImageData &> data, std::variant<KtxCompressionFormat,
                 VkFormat> format, InputDataType dataType, VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
                 VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling);
-        static std::unique_ptr<VulImage> createSamplerlessCustomImageAllInOne(vulB::VulDevice &vulDevice, std::variant<const std::string &,
+        static std::unique_ptr<VulImage> createSamplerlessCustomImageAllInOne(const vulB::VulDevice &vulDevice, std::variant<const std::string &,
                 const RawImageData &> data, std::variant<KtxCompressionFormat, VkFormat> format, InputDataType dataType,
                 VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryProperties,
                 VkImageTiling tiling, VkCommandBuffer cmdBuf);
-        static std::unique_ptr<VulImage> createCustomImageAllInOneSingleTime(vulB::VulDevice &vulDevice,
+        static std::unique_ptr<VulImage> createCustomImageAllInOneSingleTime(const vulB::VulDevice &vulDevice,
                 std::variant<const std::string &, const RawImageData &> data, std::variant<KtxCompressionFormat,
                 VkFormat> format, InputDataType dataType, VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
                 VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkFilter filter, VkSamplerAddressMode addressMode,
                 float maxAnisotropy, VkBorderColor borderColor, float mipLodBias, float mipMinLod, float mipMaxLod);
-        static std::unique_ptr<VulImage> createCustomImageAllInOne(vulB::VulDevice &vulDevice, std::variant<const std::string &,
+        static std::unique_ptr<VulImage> createCustomImageAllInOne(const vulB::VulDevice &vulDevice, std::variant<const std::string &,
                 const RawImageData &> data, std::variant<KtxCompressionFormat, VkFormat> format, InputDataType dataType,
                 VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryProperties,
                 VkImageTiling tiling, VkFilter filter, VkSamplerAddressMode addressMode, float maxAnisotropy,
@@ -243,7 +243,7 @@ class VulImage {
         VkImageView m_imageView = VK_NULL_HANDLE;
         VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
 
-        vulB::VulDevice &m_vulDevice;
+        const vulB::VulDevice &m_vulDevice;
 };
 
 }

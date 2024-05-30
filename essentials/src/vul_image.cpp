@@ -23,7 +23,7 @@
 using namespace vulB;
 namespace vul {
 
-VulSampler::VulSampler(VulDevice &vulDevice, VkFilter filter, VkSamplerAddressMode addressMode, float maxAnisotropy,
+VulSampler::VulSampler(const VulDevice &vulDevice, VkFilter filter, VkSamplerAddressMode addressMode, float maxAnisotropy,
         VkBorderColor borderColor, VkSamplerMipmapMode mipMapMode, float mipLodBias, float mipMinLod, float mipMaxLod)
     : m_vulDevice{vulDevice}
 {
@@ -58,7 +58,7 @@ VulSampler::~VulSampler()
     if (m_sampler != VK_NULL_HANDLE) vkDestroySampler(m_vulDevice.device(), m_sampler, nullptr);
 }
 
-std::shared_ptr<VulSampler> VulSampler::createDefaultTexSampler(vulB::VulDevice &vulDevice, uint32_t mipLevels)
+std::shared_ptr<VulSampler> VulSampler::createDefaultTexSampler(const vulB::VulDevice &vulDevice, uint32_t mipLevels)
 {
     std::shared_ptr<VulSampler> sampler;
     sampler.reset(new VulSampler{vulDevice, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
@@ -67,7 +67,7 @@ std::shared_ptr<VulSampler> VulSampler::createDefaultTexSampler(vulB::VulDevice 
     return sampler;
 }
 
-std::shared_ptr<VulSampler> VulSampler::createCustomSampler(vulB::VulDevice &vulDevice, VkFilter filter,
+std::shared_ptr<VulSampler> VulSampler::createCustomSampler(const vulB::VulDevice &vulDevice, VkFilter filter,
         VkSamplerAddressMode addressMode, float maxAnisotropy, VkBorderColor borderColor,
         VkSamplerMipmapMode mipMapMode, float mipLodBias, float mipMinLod, float mipMaxLod)
 {
@@ -81,15 +81,15 @@ std::shared_ptr<VulSampler> VulSampler::createCustomSampler(vulB::VulDevice &vul
 
 
 
-VulImage::VulImage(VulDevice &vulDevice) : m_vulDevice{vulDevice}
+VulImage::VulImage(const VulDevice &vulDevice) : m_vulDevice{vulDevice}
 {
 
 }
 
 VulImage::~VulImage()
 {
-    if (m_image != VK_NULL_HANDLE && m_ownsImage) vkDestroyImage(m_vulDevice.device(), m_image, nullptr);
     if (m_imageView != VK_NULL_HANDLE) vkDestroyImageView(m_vulDevice.device(), m_imageView, nullptr);
+    if (m_image != VK_NULL_HANDLE && m_ownsImage) vkDestroyImage(m_vulDevice.device(), m_image, nullptr);
     if (m_imageMemory != VK_NULL_HANDLE) vkFreeMemory(m_vulDevice.device(), m_imageMemory, nullptr);
 }
 
@@ -462,7 +462,7 @@ void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newL
     m_layout = newLayout;
 }
 
-std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOneSingleTime(vulB::VulDevice &vulDevice,
+std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOneSingleTime(const vulB::VulDevice &vulDevice,
         std::variant<std::string, RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format,
         bool addSampler, InputDataType dataType, ImageType imageType)
 {
@@ -475,7 +475,7 @@ std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOneSingleTime(vu
     return img;
 }
 
-std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOne(vulB::VulDevice &vulDevice, std::variant<std::string,
+std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOne(const vulB::VulDevice &vulDevice, std::variant<std::string,
         RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format, bool addSampler,
         InputDataType dataType, ImageType imageType, VkCommandBuffer cmdBuf)
 {

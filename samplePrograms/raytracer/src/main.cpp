@@ -147,7 +147,8 @@ int main() {
     std::unique_ptr<vul::VulImage> enviromentMap = vul::VulImage::createDefaultWholeImageAllInOneSingleTime(vulkano.getVulDevice(),
             "../enviromentMaps/sunsetCube.exr", {}, true, vul::VulImage::InputDataType::exrFile, vul::VulImage::ImageType::hdrCube);
 
-    vul::VulAs as(vulkano.getVulDevice(), vulkano.scene);
+    vul::VulAs as(vulkano.getVulDevice());
+    as.loadScene(vulkano.scene);
     std::array<std::unique_ptr<vul::VulImage>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> rtImgs;
     std::array<std::unique_ptr<vulB::VulBuffer>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> ubos;
     std::array<std::shared_ptr<vulB::VulDescriptorSet>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descSets;
@@ -167,7 +168,7 @@ int main() {
 
     vulkano.renderDatas.push_back(createRenderData(vulkano, vulkano.getVulDevice(), descSets));
     vul::VulRtPipeline rtPipeline(vulkano.getVulDevice(), "../bin/raytrace.rgen.spv", {"../bin/raytrace.rmiss.spv", "../bin/raytraceShadow.rmiss.spv"},
-            {"../bin/raytrace.rchit.spv"}, {"../bin/raytraceShadow.rahit.spv"},
+            {"../bin/raytrace.rchit.spv"}, {"../bin/raytraceShadow.rahit.spv"}, {},
             {vulkano.renderDatas[0].descriptorSets[0][0]->getLayout()->getDescriptorSetLayout()});
 
     bool stop = false;

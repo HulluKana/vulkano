@@ -11,7 +11,7 @@
 using namespace vulB;
 namespace vul {
 
-VulRtPipeline::VulRtPipeline(vulB::VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
+VulRtPipeline::VulRtPipeline(const vulB::VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
                 const std::vector<std::string> &closestHitShaders, const std::vector<std::string> &anyHitShaders,
                 const std::vector<std::string> &intersectionShaders, const std::vector<VkDescriptorSetLayout> &setLayouts) : m_vulDevice{vulDevice}
 {
