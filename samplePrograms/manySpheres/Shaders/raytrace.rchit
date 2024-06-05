@@ -13,5 +13,5 @@ layout(location = 0) rayPayloadInEXT vec3 prd;
 
 void main()
 {
-    prd = colors[gl_InstanceID * 5000000 + gl_PrimitiveID].xyz;
+    prd = colors[gl_InstanceCustomIndexEXT + gl_PrimitiveID].xyz;
 }

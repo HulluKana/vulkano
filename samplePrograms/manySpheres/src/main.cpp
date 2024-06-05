@@ -1,4 +1,5 @@
 #include "rasterizing.hpp"
+#include "vul_transform.hpp"
 #include<vulkano_program.hpp>
 #include <host_device.hpp>
 #include <raytracing.hpp>
@@ -27,6 +28,20 @@ int main() {
     RtResources rtRes = createRaytracingResources(vulkano);
     RasResources rasRes = createRasterizationResources(vulkano);
 
+    std::vector<vul::transform3D> transforms(VOLUME_LEN);
+    std::vector<glm::vec4> blasOffsets(VOLUME_LEN);
+    std::vector<vul::VulAs::BlasTransform> blasTransforms(VOLUME_LEN);
+    for (size_t i = 0; i < blasTransforms.size(); i++) {
+        transforms[i].pos = glm::vec3(0.0);
+        transforms[i].rot = glm::vec3(0.0);
+        transforms[i].scale = glm::vec3(1.0);
+
+        blasOffsets[i] = glm::vec4(0.0);
+
+        blasTransforms[i].blasIdx = i;
+        blasTransforms[i].transform = transforms[i].transformMat();
+    }
+
     bool stop = false;
     bool rasterize = false;
     bool fullUpdate = true;
@@ -40,6 +55,14 @@ int main() {
 
         if (rasterize) updateRasUbo(vulkano, rasRes, fullUpdate);
         else updateRtUbo(vulkano, rtRes, fullUpdate);
+
+        for (size_t i = 0; i < transforms.size(); i++) {
+            transforms[i].pos.z += vulkano.getFrameTime() * 0.05f * static_cast<float>(i);
+            blasOffsets[i] = glm::vec4(transforms[i].pos, 0.0);
+            blasTransforms[i].transform = transforms[i].transformMat();
+        }
+        rtRes.blasOffsetsBuf->writeVector(blasOffsets, 0);
+        rtRes.as->updateBlasTransforms(blasTransforms);
 
         if (!rasterize) raytrace(vulkano, rtRes, commandBuffer);
         vulkano.renderDatas[0].enable = !rasterize;

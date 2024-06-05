@@ -5,13 +5,14 @@
 #extension GL_GOOGLE_include_directive : enable
 
 layout(binding = 3, set = 0) readonly buffer SpheresBuf {vec4 spheres[];};
+layout(binding = 4, set = 0) readonly buffer BlasOffsetsBuf {vec4 blasOffsets[];};
 
 void main()
 {
-    const vec4 sphere = spheres[gl_InstanceID * 5000000 + gl_PrimitiveID];
+    const vec4 sphere = spheres[gl_InstanceCustomIndexEXT + gl_PrimitiveID];
     const vec3 rayDir = gl_WorldRayDirectionEXT;
 
-    const vec3 oc= gl_WorldRayOriginEXT - sphere.xyz;
+    const vec3 oc= gl_WorldRayOriginEXT - sphere.xyz - blasOffsets[gl_InstanceID].xyz;
     const float a = dot(rayDir, rayDir);
     const float b = 2.0 * dot(oc, rayDir);
     const float c = dot(oc, oc) - sphere.w * sphere.w;

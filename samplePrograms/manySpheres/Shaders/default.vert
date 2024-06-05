@@ -9,7 +9,7 @@ layout (location = 0) in vec3 position;
 
 layout (location = 0) out flat int idx;
 
-layout (set = 0, binding = 0) uniform Ub {Ubo ubo;};
+layout (set = 0, binding = 0) uniform Ub {RasUbo ubo;};
 layout (set = 0, binding = 1) readonly buffer ObjDatas {ObjData objDatas[];};
 
 void main()

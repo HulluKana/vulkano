@@ -4,10 +4,12 @@
 #include <vul_acceleration_structure.hpp>
 #include <vul_rt_pipeline.hpp>
 
+constexpr int VOLUME_LEN = 50;
+
 struct RtResources {
-    std::unique_ptr<vulB::VulBuffer> aabbBuf;
     std::unique_ptr<vulB::VulBuffer> colorBuf;
     std::unique_ptr<vulB::VulBuffer> spheresBuf;
+    std::unique_ptr<vulB::VulBuffer> blasOffsetsBuf;
     std::unique_ptr<vul::VulAs> as;
     std::unique_ptr<vul::VulRtPipeline> pipeline;
     std::array<std::unique_ptr<vul::VulImage>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> rtImgs;

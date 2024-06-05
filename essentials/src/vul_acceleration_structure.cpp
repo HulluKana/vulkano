@@ -1,3 +1,7 @@
+#include <algorithm>
+#include <cassert>
+#include <glm/matrix.hpp>
+#include <limits>
 #include <vul_debug_tools.hpp>
 #include <vul_transform.hpp>
 #include <vul_acceleration_structure.hpp>
@@ -27,25 +31,80 @@ void VulAs::loadScene(const Scene &scene)
     std::vector<VkAccelerationStructureInstanceKHR> asInsts;
     for (size_t i = 0; i < m_blases.size(); i++) asInsts.emplace_back(blasToAsInstance(i, m_blases[i]));
 
-    buildTlas(asInsts, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+    buildTlas(asInsts, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR, false);
 }
 
-void VulAs::loadAabbs(const std::unique_ptr<vulB::VulBuffer> &aabbBuf)
+void VulAs::loadAabbs(const std::vector<Aabb> &aabbs, const std::vector<uint32_t> &customBlasIndices, bool allowUpdating)
 {
-    constexpr VkDeviceSize MAX_AABB_PER_BLAS = 5'000'000;
-    std::vector<BlasInput> blasInputs;
-    for (VkDeviceSize i = 0; i < aabbBuf->getBufferSize() / sizeof(Aabb); i += MAX_AABB_PER_BLAS) blasInputs.emplace_back(aabbsToBlasInput(aabbBuf, MAX_AABB_PER_BLAS, i));
+    assert(aabbs.size());
+    assert(aabbs.size() > 0);
 
+    uint32_t minIdx = std::numeric_limits<uint32_t>::max();
+    uint32_t maxIdx = std::numeric_limits<uint32_t>::min();
+    for (const Aabb &aabb : aabbs) {
+        minIdx = std::min(minIdx, aabb.blasIndex);
+        maxIdx = std::max(maxIdx, aabb.blasIndex);
+    }
+
+    std::vector<std::vector<uint32_t>> aabbIndicesByBlasIdx(maxIdx - minIdx + 1);
+    assert(customBlasIndices.size() >= aabbIndicesByBlasIdx.size());
+    for (uint32_t i = 0; i < aabbs.size(); i++) aabbIndicesByBlasIdx[aabbs[i].blasIndex - minIdx].push_back(i);
+    std::vector<uint32_t> realIdxToBlasIdx(aabbIndicesByBlasIdx.size());
+    for (uint32_t i = 0; i < realIdxToBlasIdx.size(); i++) realIdxToBlasIdx[i] = i;
+    for (int i = aabbIndicesByBlasIdx.size() - 1; i >= 0; i--) {
+        if (aabbIndicesByBlasIdx[i].size() == 0) {
+            aabbIndicesByBlasIdx.erase(aabbIndicesByBlasIdx.begin() + i);
+            realIdxToBlasIdx.erase(realIdxToBlasIdx.begin() + i);
+        }
+    }
+
+    struct VkAabb {
+        glm::vec3 minPos;
+        glm::vec3 maxPos;
+    };
+    std::vector<VkAabb> orderedAabbs;
+    orderedAabbs.reserve(aabbs.size());
+    for (const std::vector<uint32_t> &aabbIndices : aabbIndicesByBlasIdx) {
+        for (uint32_t idx : aabbIndices) orderedAabbs.push_back({aabbs[idx].minPos, aabbs[idx].maxPos});
+    }
+
+    VulBuffer aabbBuf(m_vulDevice);
+    aabbBuf.loadVector(orderedAabbs);
+    aabbBuf.createBuffer(false, static_cast<VulBuffer::Usage>(VulBuffer::usage_transferDst | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead));
+
+    std::vector<BlasInput> blasInputs;
+    for (size_t i = 0, j = 0; i < aabbs.size(); i += aabbIndicesByBlasIdx[j].size(), j++) blasInputs.emplace_back(aabbsToBlasInput(aabbBuf, aabbIndicesByBlasIdx[j].size(), i));
     buildBlases(blasInputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 
+    for (size_t i = 0; i < m_blases.size(); i++) m_instancesMap[realIdxToBlasIdx[i]] = blasToAsInstance(customBlasIndices[realIdxToBlasIdx[i]], m_blases[i]);
     std::vector<VkAccelerationStructureInstanceKHR> asInsts;
-    for (size_t i = 0; i < m_blases.size(); i++) asInsts.emplace_back(blasToAsInstance(i * MAX_AABB_PER_BLAS, m_blases[i]));
+    for (const std::pair<const uint32_t, VkAccelerationStructureInstanceKHR> &instanceMapElem : m_instancesMap) asInsts.push_back(instanceMapElem.second);
 
-    buildTlas(asInsts, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR);
+    m_tlasBuildFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+    if (allowUpdating) m_tlasBuildFlags |= VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
+    buildTlas(asInsts, m_tlasBuildFlags, false);
 }
 
-void VulAs::buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asInsts, VkBuildAccelerationStructureFlagsKHR flags)
+void VulAs::updateBlasTransforms(const std::vector<BlasTransform> &blasTransforms)
 {
+    assert((m_tlasBuildFlags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR) == VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
+
+    for (const BlasTransform &blasTrans : blasTransforms) {
+        assert(m_instancesMap.count(blasTrans.blasIdx) > 0);
+
+        const glm::mat4 transposedTrans = glm::transpose(blasTrans.transform);
+        memcpy(&m_instancesMap[blasTrans.blasIdx].transform, &transposedTrans, sizeof(VkTransformMatrixKHR));
+    }
+    std::vector<VkAccelerationStructureInstanceKHR> asInsts;
+    for (const std::pair<const uint32_t, VkAccelerationStructureInstanceKHR> &instanceMapElem : m_instancesMap) asInsts.push_back(instanceMapElem.second);
+
+    buildTlas(asInsts, m_tlasBuildFlags, true);
+}
+
+void VulAs::buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asInsts, VkBuildAccelerationStructureFlagsKHR flags, bool update)
+{
+    assert((m_tlas.buffer == nullptr) ^ update);
+
     VulBuffer instsBuf(m_vulDevice); 
     instsBuf.loadVector(asInsts);
     instsBuf.createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead
@@ -70,7 +129,7 @@ void VulAs::buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asI
     VkAccelerationStructureBuildGeometryInfoKHR buildInfo{};
     buildInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR;
     buildInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-    buildInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+    buildInfo.mode = update ? VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR : VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
     buildInfo.flags = flags;
     buildInfo.geometryCount = 1;
     buildInfo.pGeometries = &tlasGeom;
@@ -81,15 +140,18 @@ void VulAs::buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asI
     uint32_t primitiveCount = static_cast<uint32_t>(asInsts.size());
     vkGetAccelerationStructureBuildSizesKHR(m_vulDevice.device(), VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildInfo, &primitiveCount, &sizeInfo);
 
-    VkAccelerationStructureCreateInfoKHR creatInf{};
-    creatInf.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-    creatInf.size = sizeInfo.accelerationStructureSize;
-    m_tlas = createAs(creatInf);
+    if (!update) {
+        VkAccelerationStructureCreateInfoKHR creatInf{};
+        creatInf.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+        creatInf.size = sizeInfo.accelerationStructureSize;
+        m_tlas = createAs(creatInf);
+    }
 
     VulBuffer scratchBuffer(m_vulDevice);
     scratchBuffer.keepEmpty(1, sizeInfo.buildScratchSize);
     scratchBuffer.createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_getAddress));
 
+    buildInfo.srcAccelerationStructure = update ? m_tlas.as : VK_NULL_HANDLE;
     buildInfo.dstAccelerationStructure = m_tlas.as;
     buildInfo.scratchData.deviceAddress = scratchBuffer.getBufferAddress();
 
@@ -283,12 +345,12 @@ VulAs::BlasInput VulAs::gltfNodesToBlasInput(const Scene &scene, uint32_t firstN
     return blasInput;
 }
 
-VulAs::BlasInput VulAs::aabbsToBlasInput(const std::unique_ptr<vulB::VulBuffer> &aabbBuf, VkDeviceSize maxAabbCount, VkDeviceSize aabbOffset)
+VulAs::BlasInput VulAs::aabbsToBlasInput(vulB::VulBuffer &aabbBuf, VkDeviceSize maxAabbCount, VkDeviceSize aabbOffset)
 {
     VkAccelerationStructureGeometryAabbsDataKHR aabbs{};
     aabbs.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR;
-    aabbs.data.deviceAddress = aabbBuf->getBufferAddress();
-    aabbs.stride = sizeof(Aabb);
+    aabbs.data.deviceAddress = aabbBuf.getBufferAddress();
+    aabbs.stride = sizeof(VkAabbPositionsKHR);
 
     VkAccelerationStructureGeometryKHR asGeom{};
     asGeom.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR;
@@ -298,8 +360,8 @@ VulAs::BlasInput VulAs::aabbsToBlasInput(const std::unique_ptr<vulB::VulBuffer> 
 
     VkAccelerationStructureBuildRangeInfoKHR offset{};
     offset.firstVertex = 0;
-    offset.primitiveCount = std::min(aabbBuf->getBufferSize() / sizeof(Aabb) - aabbOffset, maxAabbCount);
-    offset.primitiveOffset = aabbOffset * sizeof(Aabb);
+    offset.primitiveCount = std::min(aabbBuf.getBufferSize() / aabbs.stride - aabbOffset, maxAabbCount);
+    offset.primitiveOffset = aabbOffset * aabbs.stride;
     offset.transformOffset = 0;
 
     BlasInput input{};
