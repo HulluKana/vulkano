@@ -12,7 +12,6 @@ RasResources createRasterizationResources(vul::Vulkano &vulkano)
     std::mt19937 rng{dev()};
     std::uniform_real_distribution<> dist{-0.5, 0.5};
     std::vector<ObjData> objDatas;
-    constexpr int VOLUME_LEN = 50;
     for (int x = -VOLUME_LEN / 2; x < VOLUME_LEN / 2; x++) {
         for (int y = -VOLUME_LEN / 2; y < VOLUME_LEN / 2; y++) {
             for (int z = -VOLUME_LEN / 2; z < VOLUME_LEN / 2; z++) {

@@ -1,0 +1,25 @@
+#version 460
+
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+
+layout(binding = 2, set = 0) readonly buffer CubeBuf {vec4 cubes[];};
+
+void main()
+{
+    const vec4 cube = cubes[gl_PrimitiveID];
+    const vec3 minPos = cube.xyz + vec3(0.0, 0.0, float(gl_InstanceID)) - vec3(cube.w);
+    const vec3 maxPos = cube.xyz + vec3(0.0, 0.0, float(gl_InstanceID)) + vec3(cube.w);
+    const vec3 rayOrg = gl_WorldRayOriginEXT;
+    const vec3 invRayDir = vec3(1.0) / gl_WorldRayDirectionEXT;
+
+    const float t1 = (minPos.x - rayOrg.x) * invRayDir.x;
+    const float t2 = (maxPos.x - rayOrg.x) * invRayDir.x;
+    const float t3 = (minPos.y - rayOrg.y) * invRayDir.y;
+    const float t4 = (maxPos.y - rayOrg.y) * invRayDir.y;
+    const float t5 = (minPos.z - rayOrg.z) * invRayDir.z;
+    const float t6 = (maxPos.z - rayOrg.z) * invRayDir.z;
+
+    const float tHit = max(max(min(t1, t2), min(t3, t4)), min(t5, t6));
+    reportIntersectionEXT(tHit, 0);
+}

@@ -13,11 +13,11 @@ namespace vul {
 
 VulRtPipeline::VulRtPipeline(const vulB::VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
                 const std::vector<std::string> &closestHitShaders, const std::vector<std::string> &anyHitShaders,
-                const std::vector<std::string> &intersectionShaders, const std::vector<VkDescriptorSetLayout> &setLayouts) : m_vulDevice{vulDevice}
+                const std::vector<std::string> &intersectionShaders, const std::vector<HitGroup> &hitGroups,
+                const std::vector<VkDescriptorSetLayout> &setLayouts) : m_vulDevice{vulDevice}
 {
-    createPipeline(raygenShader, missShaders, closestHitShaders, anyHitShaders, intersectionShaders, setLayouts);
-    createSBT(static_cast<uint32_t>(missShaders.size()), static_cast<uint32_t>(std::max(std::max(closestHitShaders.size(),
-                        anyHitShaders.size()), intersectionShaders.size())));
+    createPipeline(raygenShader, missShaders, closestHitShaders, anyHitShaders, intersectionShaders, hitGroups, setLayouts);
+    createSBT(static_cast<uint32_t>(missShaders.size()), static_cast<uint32_t>(hitGroups.size()));
 }
 
 VulRtPipeline::~VulRtPipeline()
@@ -40,7 +40,8 @@ void VulRtPipeline::traceRays(uint32_t width, uint32_t height, uint32_t pushCons
 
 void VulRtPipeline::createPipeline(const std::string &raygenShader, const std::vector<std::string> &missShaders,
                 const std::vector<std::string> &closestHitShaders, const std::vector<std::string> &anyHitShaders,
-                const std::vector<std::string> &intersectionShaders, const std::vector<VkDescriptorSetLayout> &setLayouts)
+                const std::vector<std::string> &intersectionShaders, const std::vector<HitGroup> &hitGroups,
+                const std::vector<VkDescriptorSetLayout> &setLayouts)
 {
     const uint32_t missIdx = 1;
     const uint32_t closestIdx = missIdx + missShaders.size();
@@ -85,28 +86,23 @@ void VulRtPipeline::createPipeline(const std::string &raygenShader, const std::v
         stage.stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
         stages[i + anyHitIdx] = stage;
     }
-    group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR;
-    group.generalShader = VK_SHADER_UNUSED_KHR;
     for (size_t i = 0; i < intersectionShaders.size(); i++) {
         vulB::VulPipeline::createShaderModule(m_vulDevice, intersectionShaders[i], &stage.module);
         stage.stage = VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
         stages[i + intersectionIdx] = stage;
-
-        group.intersectionShader = i + intersectionIdx;
-        if (i < closestHitShaders.size()) group.closestHitShader = i + closestIdx;
-        else group.closestHitShader = VK_SHADER_UNUSED_KHR;
-        if (i < anyHitShaders.size()) group.anyHitShader = i + anyHitIdx;
-        else group.anyHitShader = VK_SHADER_UNUSED_KHR;
-        m_shaderGroups.push_back(group);
     }
 
-    group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
-    group.intersectionShader = VK_SHADER_UNUSED_KHR;
-    for (size_t i = intersectionShaders.size(); i < std::max(closestHitShaders.size(), anyHitShaders.size()); i++) {
-        if (i < closestHitShaders.size()) group.closestHitShader = i + closestIdx;
+    group.generalShader = VK_SHADER_UNUSED_KHR;
+    for (const HitGroup &hit : hitGroups) {
+        if (hit.intersectionIdx >= 0) group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR;
+        else group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+
+        if (hit.closestHitIdx >= 0) group.closestHitShader = hit.closestHitIdx + closestIdx;
         else group.closestHitShader = VK_SHADER_UNUSED_KHR;
-        if (i < anyHitShaders.size()) group.anyHitShader = i + anyHitIdx;
+        if (hit.anyHitIdx >= 0) group.anyHitShader = hit.anyHitIdx + anyHitIdx;
         else group.anyHitShader = VK_SHADER_UNUSED_KHR;
+        if (hit.intersectionIdx >= 0) group.intersectionShader = hit.intersectionIdx + intersectionIdx;
+        else group.intersectionShader = VK_SHADER_UNUSED_KHR;
         m_shaderGroups.push_back(group);
     }
 

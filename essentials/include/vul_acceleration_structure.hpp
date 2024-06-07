@@ -21,14 +21,20 @@ class VulAs {
             glm::vec3 maxPos;
             uint32_t blasIndex;
         };
-        void loadScene(const Scene &scene);
-        void loadAabbs(const std::vector<Aabb> &aabbs, const std::vector<uint32_t> &customBlasIndices, bool allowUpdating);
-
-        struct BlasTransform {
+        struct InstanceInfo {
             uint32_t blasIdx;
+            uint32_t customIndex;
+            uint32_t shaderBindingTableRecordOffset;
             glm::mat4 transform;
         };
-        void updateBlasTransforms(const std::vector<BlasTransform> &blasTransforms);
+        void loadScene(const Scene &scene);
+        void loadAabbs(const std::vector<Aabb> &aabbs, const std::vector<InstanceInfo> &instanceInfos, bool allowUpdating);
+
+        struct InstanceTransform {
+            uint32_t instanceIdx;
+            glm::mat4 transform;
+        };
+        void updateInstanceTransforms(const std::vector<InstanceTransform> &instanceTransforms);
 
         const VkAccelerationStructureKHR *getPTlas() const {return &m_tlas.as;}
     private:
@@ -52,12 +58,12 @@ class VulAs {
         void buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAccelerationStructureFlagsKHR flags);
         As buildBlas(BlasBuildData &buildData, VkDeviceAddress scratchBufferAddress, VkQueryPool queryPool, uint32_t queryIndex, VkCommandBuffer cmdBuf);
 
-        VkAccelerationStructureInstanceKHR blasToAsInstance(uint32_t index, const As &blas);
+        VkAccelerationStructureInstanceKHR blasToAsInstance(uint32_t index, uint32_t sbtOffset, const glm::mat4 &transform, const As &blas);
         BlasInput gltfNodesToBlasInput(const Scene &scene, uint32_t firstNode, uint32_t nodeCount, const std::unique_ptr<vulB::VulBuffer> &transformsBuffer);
         BlasInput aabbsToBlasInput(vulB::VulBuffer &aabbBuf, VkDeviceSize maxAabbCount, VkDeviceSize aabbOffset);
         std::unique_ptr<vulB::VulBuffer> createTransformsBuffer(const Scene &scene);
 
-        As createAs(VkAccelerationStructureCreateInfoKHR &createInfo);
+        As createAs(VkAccelerationStructureCreateInfoKHR &createInfo, bool deviceLocal);
 
         As m_tlas;
         std::vector<As> m_blases;
@@ -65,7 +71,7 @@ class VulAs {
 
         VkBuildAccelerationStructureFlagsKHR m_tlasBuildFlags;
 
-        std::map<uint32_t, VkAccelerationStructureInstanceKHR> m_instancesMap;
+        std::vector<VkAccelerationStructureInstanceKHR> m_instances;
 
         const vulB::VulDevice &m_vulDevice;
 };

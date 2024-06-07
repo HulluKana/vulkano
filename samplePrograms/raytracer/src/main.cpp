@@ -168,7 +168,7 @@ int main() {
 
     vulkano.renderDatas.push_back(createRenderData(vulkano, vulkano.getVulDevice(), descSets));
     vul::VulRtPipeline rtPipeline(vulkano.getVulDevice(), "../bin/raytrace.rgen.spv", {"../bin/raytrace.rmiss.spv", "../bin/raytraceShadow.rmiss.spv"},
-            {"../bin/raytrace.rchit.spv"}, {"../bin/raytraceShadow.rahit.spv"}, {},
+            {"../bin/raytrace.rchit.spv"}, {"../bin/raytraceShadow.rahit.spv"}, {}, {},
             {vulkano.renderDatas[0].descriptorSets[0][0]->getLayout()->getDescriptorSetLayout()});
 
     bool stop = false;

@@ -12,6 +12,8 @@ using vec4 = glm::vec4;
 using mat4 = glm::mat4;
 #endif
 
+#define VOLUME_LEN 1024
+
 struct ObjData {
     vec4 pos;
     vec4 color;

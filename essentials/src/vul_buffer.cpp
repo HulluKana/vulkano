@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <vulkan/vulkan_core.h>
+#include <cassert>
 
 namespace vulB {
 
@@ -72,7 +73,6 @@ VkResult VulBuffer::createBuffer(bool isLocal, VulBuffer::Usage usage)
     allocInfo.allocationSize = memRequirements.size;
     allocInfo.memoryTypeIndex = m_vulDevice.findMemoryType(memRequirements.memoryTypeBits, m_memoryPropertyFlags);
     
-
     result = vkAllocateMemory(m_vulDevice.device(), &allocInfo, nullptr, &m_memory);
     if (result != VK_SUCCESS) return result;
     result = vkBindBufferMemory(m_vulDevice.device(), m_buffer, m_memory, 0);

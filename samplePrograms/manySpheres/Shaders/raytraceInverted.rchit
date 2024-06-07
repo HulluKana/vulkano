@@ -7,11 +7,12 @@
 #include "../include/host_device.hpp"
 
 layout(binding = 1, set = 0) uniform accelerationStructureEXT tlas;
-layout(binding = 2, set = 0) readonly buffer ColorBuf {vec4 colors[];};
 
 layout(location = 0) rayPayloadInEXT vec3 prd;
 
 void main()
 {
-    prd = colors[gl_InstanceCustomIndexEXT + gl_PrimitiveID].xyz;
+    const vec3 pos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
+    const vec3 color = (pos + float(VOLUME_LEN / 2)) / float(VOLUME_LEN);
+    prd = vec3(1.0) - color;
 }

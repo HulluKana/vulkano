@@ -3,57 +3,47 @@
 
 #include <vul_acceleration_structure.hpp>
 #include <vul_rt_pipeline.hpp>
-
-#include <random>
+#include <iostream>
 
 RtResources createRaytracingResources(vul::Vulkano &vulkano)
 {
     RtResources res{};
 
     vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
-    std::vector<vul::VulAs::Aabb> aabbs;
-    std::vector<uint32_t> customBlasIndices;
-    std::vector<glm::vec4> colors;
-    std::vector<glm::vec4> spheres;
 
-    std::random_device dev{};
-    std::mt19937 rng{dev()};
-    std::uniform_real_distribution<> dist{-0.5, 0.5};
-    for (int z = -VOLUME_LEN / 2; z < VOLUME_LEN / 2; z++) {
+    {
+        std::vector<vul::VulAs::Aabb> aabbs;
         for (int y = -VOLUME_LEN / 2; y < VOLUME_LEN / 2; y++) {
             for (int x = -VOLUME_LEN / 2; x < VOLUME_LEN / 2; x++) {
-                glm::vec3 pos = glm::vec3(x, y, z);
-                // pos += glm::vec3(dist(rng), dist(rng), dist(rng));
+                glm::vec3 pos = glm::vec3(x, y, 0);
+                aabbs.emplace_back(vul::VulAs::Aabb{pos - glm::vec3(0.3f), pos + glm::vec3(0.3f), 0});
+            }
+        }
 
-                const glm::vec3 offset = pos - glm::vec3(-static_cast<float>(VOLUME_LEN) / 2.0f); 
-                const glm::vec3 color = offset / static_cast<float>(VOLUME_LEN);
+        std::vector<vul::VulAs::InstanceInfo> instanceInfos;
+        for (int i = 0; i < VOLUME_LEN; i++) {
+            vul::transform3D trans{};
+            trans.pos = glm::vec3(0.0f, 0.0f, i - VOLUME_LEN / 2);
+            instanceInfos.push_back(vul::VulAs::InstanceInfo{0, 0, static_cast<uint32_t>(i % 2), trans.transformMat()});
+        };
 
-                aabbs.emplace_back(vul::VulAs::Aabb{pos - glm::vec3(0.3f), pos + glm::vec3(0.3f), static_cast<uint32_t>(z + VOLUME_LEN / 2)});
-                colors.push_back(glm::vec4(color, 1.0f));
+        res.as = std::make_unique<vul::VulAs>(vulkano.getVulDevice());
+        res.as->loadAabbs(aabbs, instanceInfos, true);
+    }
+    {
+        std::vector<glm::vec4> spheres;
+        for (int y = -VOLUME_LEN / 2; y < VOLUME_LEN / 2; y++) {
+            for (int x = -VOLUME_LEN / 2; x < VOLUME_LEN / 2; x++) {
+                glm::vec3 pos = glm::vec3(x, y, -VOLUME_LEN / 2);
                 spheres.emplace_back(glm::vec4{pos, 0.3f});
             }
         }
+        res.spheresBuf = std::make_unique<vulB::VulBuffer>(vulkano.getVulDevice());
+        res.spheresBuf->loadVector(spheres);
+        res.spheresBuf->createBuffer(true, static_cast<vulB::VulBuffer::Usage>(
+                    vulB::VulBuffer::usage_ssbo | vulB::VulBuffer::usage_transferDst));
     }
-    for (int i = 0; i < VOLUME_LEN; i++) customBlasIndices.push_back(i * VOLUME_LEN * VOLUME_LEN);
 
-    std::vector<glm::vec4> blasOffsets(VOLUME_LEN);
-    res.blasOffsetsBuf = std::make_unique<vulB::VulBuffer>(vulkano.getVulDevice());
-    res.blasOffsetsBuf->loadVector(blasOffsets);
-    res.blasOffsetsBuf->createBuffer(true, static_cast<vulB::VulBuffer::Usage>(
-                vulB::VulBuffer::usage_ssbo | vulB::VulBuffer::usage_transferDst));
-
-    res.colorBuf = std::make_unique<vulB::VulBuffer>(vulkano.getVulDevice());
-    res.colorBuf->loadVector(colors);
-    res.colorBuf->createBuffer(true, static_cast<vulB::VulBuffer::Usage>(
-                vulB::VulBuffer::usage_ssbo | vulB::VulBuffer::usage_transferDst));
-
-    res.spheresBuf = std::make_unique<vulB::VulBuffer>(vulkano.getVulDevice());
-    res.spheresBuf->loadVector(spheres);
-    res.spheresBuf->createBuffer(true, static_cast<vulB::VulBuffer::Usage>(
-                vulB::VulBuffer::usage_ssbo | vulB::VulBuffer::usage_transferDst));
-
-    res.as = std::make_unique<vul::VulAs>(vulkano.getVulDevice());
-    res.as->loadAabbs(aabbs, customBlasIndices, true);
     for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
         res.rtImgs[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());
         res.rtImgs[i]->keepRegularRaw2d32bitRgbaEmpty(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height);
@@ -75,19 +65,12 @@ RtResources createRaytracingResources(vul::Vulkano &vulkano)
 
         desc.type = vul::Vulkano::DescriptorType::accelerationStructure;
         desc.stages = {vul::Vulkano::ShaderStage::rgen, vul::Vulkano::ShaderStage::rchit};
-        desc.count = 1;
         desc.content = res.as.get();
         descriptors.push_back(desc);
 
         desc.type = vul::Vulkano::DescriptorType::ssbo;
-        desc.stages = {vul::Vulkano::ShaderStage::rchit};
-        desc.content = res.colorBuf.get();
-        descriptors.push_back(desc);
-
         desc.stages = {vul::Vulkano::ShaderStage::rint};
         desc.content = res.spheresBuf.get();
-        descriptors.push_back(desc);
-        desc.content = res.blasOffsetsBuf.get();
         descriptors.push_back(desc);
 
         desc.type = vul::Vulkano::DescriptorType::ubo;
@@ -118,8 +101,9 @@ RtResources createRaytracingResources(vul::Vulkano &vulkano)
     vulkano.renderDatas.push_back(renderData);
 
     res.pipeline = std::make_unique<vul::VulRtPipeline>(vulkano.getVulDevice(), "../bin/raytrace.rgen.spv",
-            std::vector<std::string>{"../bin/raytrace.rmiss.spv"}, std::vector<std::string>{"../bin/raytrace.rchit.spv"},
-            std::vector<std::string>(), std::vector<std::string>{"../bin/raytrace.rint.spv"},
+            std::vector<std::string>{"../bin/raytrace.rmiss.spv"}, std::vector<std::string>{"../bin/raytraceNormal.rchit.spv",
+            "../bin/raytraceInverted.rchit.spv"}, std::vector<std::string>(), std::vector<std::string>{"../bin/raytraceSphere.rint.spv",
+            "../bin/raytraceCube.rint.spv"}, std::vector<vul::VulRtPipeline::HitGroup>{{0, -1, 0}, {1, -1, 1}},
             std::vector{res.descSets[0]->getLayout()->getDescriptorSetLayout()});
     return res;
 }
