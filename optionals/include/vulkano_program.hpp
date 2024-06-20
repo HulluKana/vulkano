@@ -53,9 +53,9 @@ class Vulkano{
         
         void createSquare(float x, float y, float width, float height);
         void createTriangle(glm::vec2 corner1, glm::vec2 corner2, glm::vec2 corner3);
-        void loadScene(const std::string &fileName, std::string textureDirectory)
+        void loadScene(const std::string &fileName, std::string textureDirectory, Scene::WantedBuffers wantedBuffers)
         {
-            scene.loadScene(fileName, textureDirectory);
+            scene.loadScene(fileName, textureDirectory, wantedBuffers);
             hasScene = true;
         }
         

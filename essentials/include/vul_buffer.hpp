@@ -3,6 +3,7 @@
 #include"vul_device.hpp"
 
 #include <memory>
+#include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
 namespace vulB {
@@ -17,8 +18,7 @@ class VulBuffer {
         VulBuffer(VulBuffer &&) = default;
         VulBuffer &operator=(VulBuffer &&) = default;
 
-        template<typename T>
-        void loadVector(const std::vector<T> &vector) {loadData(vector.data(), sizeof(T), static_cast<uint32_t>(vector.size()));}
+        template<typename T> void loadVector(const std::vector<T> &vector) {loadData(vector.data(), sizeof(T), static_cast<uint32_t>(vector.size()));}
         void loadData(const void *data, uint32_t elementSize, uint32_t elementCount);
         void keepEmpty(uint32_t elementSize, uint32_t elementCount) {loadData(nullptr, elementSize, elementCount);}
 
@@ -37,9 +37,17 @@ class VulBuffer {
         };
         VkResult createBuffer(bool isLocal, Usage usage);
 
-        template<typename T>
-        VkResult writeVector(const std::vector<T> &vector, VkDeviceSize offset) {return writeData(vector.data(), sizeof(T) * vector.size(), sizeof(T) * offset);}
         VkResult writeData(const void *data, VkDeviceSize size, VkDeviceSize offset);
+        template<typename T> VkResult writeVector(const std::vector<T> &vector, VkDeviceSize offset) {return writeData(vector.data(), sizeof(T) * vector.size(), sizeof(T) * offset);}
+        
+        VkResult readData(void *data, VkDeviceSize size, VkDeviceSize offset);
+        template<typename T> VkResult readVector(std::vector<T> &vector, size_t elementCount, VkDeviceSize offset)
+        {
+            if (sizeof(T) != m_elementSize) throw std::runtime_error("Size of the element in the read destination vector must be the same as the size of the element in the buffer");
+            size_t oldSizeInBytes = vector.size() * sizeof(T);
+            vector.resize(vector.size() + elementCount);
+            return readData(vector.data() + oldSizeInBytes, elementCount * sizeof(T), offset);
+        }
 
         void copyDataFromBufferSingleTime(VulBuffer &srcBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset);
         void copyDataFromBuffer(VulBuffer &srcBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset, VkCommandBuffer cmdBuf);
@@ -48,13 +56,16 @@ class VulBuffer {
         VkResult map(VkDeviceSize size, VkDeviceSize offset);
         void unmap();
 
-        template<typename T>
-        VkResult resizeBufferWithVector(const std::vector<T> &vector) {return resizeBufferWithData(vector.data(), sizeof(T), static_cast<uint32_t>(vector.size()));}
         VkResult resizeBufferWithData(const void *data, uint32_t elementSize, uint32_t elementCount);
+        template<typename T> VkResult resizeBufferWithVector(const std::vector<T> &vector) {return resizeBufferWithData(vector.data(), sizeof(T), static_cast<uint32_t>(vector.size()));}
         VkResult resizeBufferAsEmpty(uint32_t elementSize, uint32_t elementCount) {return resizeBufferWithData(nullptr, elementSize, elementCount);}
 
+        VkResult appendData(const void *data, uint32_t elementCount);
+        template<typename T> VkResult appendVector(const std::vector<T> &vector) {return appendData(vector.data(), static_cast<uint32_t>(vector.size()));}
+        VkResult appendEmpty(uint32_t elementCount) {return appendData(nullptr, elementCount);}
+
         VkResult addStagingBuffer();
-        void deleteStagingBuffer() {delete m_stagingBuffer.release();}
+        void deleteStagingBuffer() {delete m_stagingBuffer.release(); m_stagingBuffer = nullptr;}
 
         VkBuffer getBuffer() const { return m_buffer; }
         VkDeviceMemory getMemory() const {return m_memory; }
@@ -66,7 +77,8 @@ class VulBuffer {
         VkDeviceSize getBufferSize() const { return m_bufferSize; }
 
         VkDescriptorBufferInfo getDescriptorInfo() const {return VkDescriptorBufferInfo{m_buffer, 0, m_bufferSize};}
-        VkDeviceAddress getBufferAddress() const {
+        VkDeviceAddress getBufferAddress() const
+        {
             VkBufferDeviceAddressInfo addressInfo{VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO, nullptr, m_buffer};
             return vkGetBufferDeviceAddress(m_vulDevice.device(), &addressInfo);
         }
@@ -86,5 +98,6 @@ class VulBuffer {
         VkDeviceSize m_bufferSize;
         VkBufferUsageFlags m_usageFlags;
         VkMemoryPropertyFlags m_memoryPropertyFlags;
+        bool m_isDeviceLocal;
 };
 }

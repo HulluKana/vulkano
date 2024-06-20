@@ -22,7 +22,7 @@ Scene::Scene(vulB::VulDevice &vulDevice) : m_vulDevice{vulDevice}
 
 }
 
-void Scene::loadCubes(const std::vector<Cube> &cubes)
+void Scene::loadCubes(const std::vector<Cube> &cubes, WantedBuffers wantedBuffers)
 {
     std::vector<glm::vec3> vertices;
     std::vector<uint> indices;
@@ -138,7 +138,7 @@ void Scene::loadCubes(const std::vector<Cube> &cubes)
     createBuffers(indices, vertices, {}, {}, {}, {packedMat}, primInfos);
 }
 
-void Scene::loadSpheres(const std::vector<Sphere> &spheres)
+void Scene::loadSpheres(const std::vector<Sphere> &spheres, WantedBuffers wantedBuffers)
 {
     std::vector<glm::vec3> vertices;
     std::vector<uint32_t> indices;
@@ -250,7 +250,7 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres)
     createBuffers(indices, vertices, {}, {}, {}, {packedMat}, primInfos);
 }
 
-void Scene::loadScene(const std::string &fileName, std::string textureDirectory)
+void Scene::loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers)
 {
     tinygltf::Model model;
     tinygltf::TinyGLTF context;

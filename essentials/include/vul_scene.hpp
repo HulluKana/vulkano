@@ -1,5 +1,5 @@
-#ifndef VUL_SCENE
-#define VUL_SCENE
+#ifndef VUL_SCENE_H
+#define VUL_SCENE_H
 
 #ifdef __cplusplus
 #include <cstdint>
@@ -14,7 +14,6 @@ namespace vul
 class Scene
 {
     public:
-
         Scene(vulB::VulDevice &vulDevice);
 
         struct Cube {
@@ -26,9 +25,18 @@ class Scene
             float radius;
             uint32_t subdivisionCount;
         };
-        void loadCubes(const std::vector<Cube> &cubes);
-        void loadSpheres(const std::vector<Sphere> &spheres);
-        void loadScene(const std::string &fileName, std::string textureDirectory);
+        struct WantedBuffers {
+            bool vertex = true;
+            bool index = true;
+            bool normal = true;
+            bool tangent = true;
+            bool uv = true;
+            bool material = true;
+            bool primInfo = true;
+        };
+        void loadCubes(const std::vector<Cube> &cubes, WantedBuffers wantedBuffers);
+        void loadSpheres(const std::vector<Sphere> &spheres, WantedBuffers wantedBuffers);
+        void loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers);
 
         std::vector<vulB::GltfLoader::GltfLight> lights;
         std::vector<vulB::GltfLoader::GltfNode> nodes;
@@ -49,7 +57,7 @@ class Scene
         using vec4 = glm::vec4;
         using mat4 = glm::mat4;
         using uint = uint32_t;
-        #endif
+        #endif // __cplusplus
 
         struct PackedMaterial{
             vec4 colorFactor;
@@ -85,5 +93,5 @@ class Scene
 
 }
 
-#endif
-#endif
+#endif // __cplusplus
+#endif // VUL_SCENE_H

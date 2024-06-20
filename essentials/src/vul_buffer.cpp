@@ -45,6 +45,7 @@ VkResult VulBuffer::createBuffer(bool isLocal, VulBuffer::Usage usage)
     m_usageFlags = usage; 
     m_memoryPropertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     if (!isLocal) m_memoryPropertyFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    m_isDeviceLocal = true;
 
     VkDeviceSize minOffsetAlignment = 1;
     if (usage & usage_ubo) minOffsetAlignment = m_vulDevice.properties.limits.minUniformBufferOffsetAlignment;
@@ -93,7 +94,7 @@ VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize 
     VUL_PROFILE_FUNC()
 
     if (m_buffer == nullptr) throw std::runtime_error("Tried to write to buffer before it was created");
-    if (m_memoryPropertyFlags == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) {
+    if (m_isDeviceLocal) {
         bool stagingBufferNeedRemoving = false;
         if (!hasStagingBuffer()) {
             stagingBufferNeedRemoving = true;
@@ -116,6 +117,23 @@ VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize 
         }
         memcpy(reinterpret_cast<char *>(m_mapped), data, size);
         if (needUnmapping) unmap();
+    }
+    return VK_SUCCESS;
+}
+
+VkResult VulBuffer::readData(void *data, VkDeviceSize size, VkDeviceSize offset)
+{
+    if (size + offset > m_bufferSize) throw std::runtime_error("Size + offset of the read data must be at most equal to the size of the buffer");
+    if (size == 0) return VK_SUCCESS;
+
+    if (m_isDeviceLocal) {
+        VkResult result = addStagingBuffer();
+        if (result != VK_SUCCESS) return result;
+        memcpy(data, static_cast<uint8_t *>(m_stagingBuffer->getMappedMemory()) + offset, size);
+    } else {
+        VkResult result = map(size, offset);
+        if (result != VK_SUCCESS) return result;
+        memcpy(data, m_mapped, size);
     }
     return VK_SUCCESS;
 }
@@ -151,14 +169,18 @@ VkResult VulBuffer::map(VkDeviceSize size, VkDeviceSize offset)
 {
     VUL_PROFILE_FUNC()
 
+    if (m_mapped) return VK_SUCCESS;
+
     if (m_buffer == nullptr) throw std::runtime_error("Tried to map buffer before it was created");
-    if (m_memoryPropertyFlags == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT) throw std::runtime_error("Cannot map device local buffer");
+    if (m_isDeviceLocal) throw std::runtime_error("Cannot map device local buffer");
     return vkMapMemory(m_vulDevice.device(), m_memory, offset, size, 0, &m_mapped);
 }
 
 void VulBuffer::unmap()
 {
-    if (m_mapped != nullptr){
+    VUL_PROFILE_FUNC()
+
+    if (m_mapped){
         vkUnmapMemory(m_vulDevice.device(), m_memory);
         m_mapped = nullptr;
     }
@@ -174,12 +196,30 @@ VkResult VulBuffer::resizeBufferWithData(const void *data, uint32_t elementSize,
     m_elementSize = elementSize;
     m_elementCount = elementCount;
     m_inputData = data;
-    return createBuffer(m_memoryPropertyFlags == VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, static_cast<Usage>(m_usageFlags));
+    return createBuffer(m_isDeviceLocal, static_cast<Usage>(m_usageFlags));
+}
+
+VkResult VulBuffer::appendDataToBuffer(const void *data, uint32_t elementCount)
+{
+    VUL_PROFILE_FUNC()
+
+    if (elementCount == 0) return VK_SUCCESS;
+
+    uint8_t *newData = new uint8_t[m_bufferSize + m_elementSize * elementCount];
+    if (!newData) return VK_ERROR_OUT_OF_HOST_MEMORY;
+
+    VkResult result = readData(newData, m_bufferSize, 0);
+    if (result != VK_SUCCESS) return result;
+    if (data != nullptr) memcpy(newData + m_bufferSize, data, m_elementSize * elementCount);
+
+    return resizeBufferWithData(newData, m_elementSize, elementCount + m_elementCount);
 }
 
 VkResult VulBuffer::addStagingBuffer()
 {
     VUL_PROFILE_FUNC()
+
+    if (m_stagingBuffer) return VK_SUCCESS;
 
     if (!m_creationPreparationDone) throw std::runtime_error("Buffer creation preparations need to be done before creating staging buffer");
     m_stagingBuffer = std::make_unique<VulBuffer>(m_vulDevice);

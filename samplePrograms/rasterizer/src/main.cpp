@@ -456,7 +456,7 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 
 int main() {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
-    vulkano.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza");
+    vulkano.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza", {});
     Resources resources = createReources(vulkano);
     RenderDataIndices renderDataIndices = createDescriptors(vulkano, resources, vulkano.scene.images);
     createPipelines(vulkano, renderDataIndices);
