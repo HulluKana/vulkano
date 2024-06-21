@@ -3,6 +3,7 @@
 #include "vul_transform.hpp"
 #include <cmath>
 #include <cstdlib>
+#include <glm/ext/vector_float4.hpp>
 #include <string>
 #include<vul_debug_tools.hpp>
 #include<vul_gltf_loader.hpp>
@@ -135,17 +136,22 @@ void Scene::loadCubes(const std::vector<Cube> &cubes, WantedBuffers wantedBuffer
     packedMat.padding2 = 69;
     packedMat.padding3 = 420;
 
-    createBuffers(indices, vertices, {}, {}, {}, {packedMat}, primInfos);
+    createBuffers(indices, vertices, {}, {}, {}, {packedMat}, primInfos, wantedBuffers);
 }
 
-void Scene::loadSpheres(const std::vector<Sphere> &spheres, WantedBuffers wantedBuffers)
+void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vulB::GltfLoader::Material> &mats, WantedBuffers wantedBuffers)
 {
+    const size_t oldIdxCount = indexBuffer.get() ? indexBuffer->getBufferSize() / sizeof(uint32_t) : 0;
+    const size_t oldVertexCount = vertexBuffer.get() ? vertexBuffer->getBufferSize() / sizeof(glm::vec3) : 0;
+
     std::vector<glm::vec3> vertices;
     std::vector<uint32_t> indices;
     std::vector<PrimInfo> primInfos;
 
     for (size_t i = 0; i < spheres.size(); i++) {
         std::vector<glm::vec3> unitVertices;
+        const uint32_t lastVertCount = vertices.size();
+        const uint32_t lastIdxCount = indices.size();
         const glm::vec3 pos = spheres[i].centerPos;
         const float rad = spheres[i].radius;
         const uint32_t vertsPerRow = std::pow(2, spheres[i].subdivisionCount) + 1;
@@ -167,7 +173,7 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres, WantedBuffers wanted
             uint32_t currIdx = j * vertsPerRow;
             uint32_t nextIdx = currIdx + vertsPerRow;
             for (uint32_t k = 0; k < vertsPerRow; k++, currIdx++, nextIdx++) {
-                vertices.emplace_back(unitVertices[j * vertsPerRow + k] * rad);
+                vertices.emplace_back(unitVertices[j * vertsPerRow + k]);
                 if (j < vertsPerRow - 1 && j < vertsPerRow - 1) {
                     indices.push_back(nextIdx);
                     indices.push_back(currIdx);
@@ -182,44 +188,44 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres, WantedBuffers wanted
 
         // -X face
         uint32_t startIdx = vertCount;
-        for (uint32_t j = 0; j < vertCount; j++) vertices.emplace_back(glm::vec3(-vertices[j].x, vertices[j].y, -vertices[j].z));
-        for (uint32_t j = 0; j < idxCount; j++) indices.push_back(startIdx + indices[j]);
+        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) vertices.emplace_back(glm::vec3(-vertices[j].x, vertices[j].y, -vertices[j].z));
+        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) indices.push_back(startIdx + indices[j]);
         // +Y face
         startIdx += vertCount;
-        for (uint32_t j = 0; j < vertCount; j++) vertices.emplace_back(glm::vec3(-vertices[j].z, vertices[j].x, -vertices[j].y));
-        for (uint32_t j = 0; j < idxCount; j++) indices.push_back(startIdx + indices[j]);
+        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) vertices.emplace_back(glm::vec3(-vertices[j].z, vertices[j].x, -vertices[j].y));
+        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) indices.push_back(startIdx + indices[j]);
         // -Y face
         startIdx += vertCount;
-        for (uint32_t j = 0; j < vertCount; j++) vertices.emplace_back(glm::vec3(-vertices[j].z, -vertices[j].x, vertices[j].y));
-        for (uint32_t j = 0; j < idxCount; j++) indices.push_back(startIdx + indices[j]);
+        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) vertices.emplace_back(glm::vec3(-vertices[j].z, -vertices[j].x, vertices[j].y));
+        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) indices.push_back(startIdx + indices[j]);
         // +Z face
         startIdx += vertCount;
-        for (uint32_t j = 0; j < vertCount; j++) vertices.emplace_back(glm::vec3(-vertices[j].z, vertices[j].y, vertices[j].x));
-        for (uint32_t j = 0; j < idxCount; j++) indices.push_back(startIdx + indices[j]);
+        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) vertices.emplace_back(glm::vec3(-vertices[j].z, vertices[j].y, vertices[j].x));
+        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) indices.push_back(startIdx + indices[j]);
         // -Z face
         startIdx += vertCount;
-        for (uint32_t j = 0; j < vertCount; j++) vertices.emplace_back(glm::vec3(vertices[j].z, vertices[j].y, -vertices[j].x));
-        for (uint32_t j = 0; j < idxCount; j++) indices.push_back(startIdx + indices[j]);
+        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) vertices.emplace_back(glm::vec3(vertices[j].z, vertices[j].y, -vertices[j].x));
+        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) indices.push_back(startIdx + indices[j]);
 
         GltfLoader::GltfPrimMesh mesh;
         mesh.name = "Procedural sphere mesh " + std::to_string(i);
         mesh.posMin = pos - glm::vec3(rad);
         mesh.posMax = pos + glm::vec3(rad);
-        mesh.firstIndex = indices.size() - idxCount * 6;
         mesh.indexCount = idxCount * 6;
-        mesh.vertexOffset = 0;
+        mesh.firstIndex = indices.size() - mesh.indexCount + oldIdxCount;
         mesh.vertexCount = vertCount * 6;
-        mesh.materialIndex = 0;
+        mesh.vertexOffset = vertices.size() - mesh.vertexCount + oldVertexCount;
+        mesh.materialIndex = spheres[i].matIdx + materials.size();
         meshes.push_back(mesh);
 
         transform3D transform;
-        transform.pos = glm::vec3(0.0f);
-        transform.scale = glm::vec3(1.0f);
+        transform.pos = pos;
+        transform.scale = glm::vec3(rad);
         transform.rot = glm::vec3(0.0f);
 
         GltfLoader::GltfNode node;
         node.name = "Procedural sphere " + std::to_string(i);
-        node.primMesh = i;
+        node.primMesh = meshes.size() - 1;
         node.position = pos;
         node.worldMatrix = transform.transformMat();
         node.normalMatrix = transform.normalMat();
@@ -235,19 +241,27 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres, WantedBuffers wanted
         primInfos.push_back(primInfo);
     }
 
-    PackedMaterial packedMat;
-    packedMat.colorFactor = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f);
-    packedMat.emissiveFactor = glm::vec4(0.0f);
-    packedMat.roughness = 0.5f;
-    packedMat.metalliness = 0.0f;
-    packedMat.colorTextureIndex = -1;
-    packedMat.normalTextureIndex = -1;
-    packedMat.roughnessMetallicTextureIndex = -1;
-    packedMat.padding1 = 42;
-    packedMat.padding2 = 69;
-    packedMat.padding3 = 420;
+    std::vector<PackedMaterial> packedMats(mats.size());
+    for (size_t i = 0; i < mats.size(); i++) {
+        const GltfLoader::Material &mat = mats[i];
 
-    createBuffers(indices, vertices, {}, {}, {}, {packedMat}, primInfos);
+        PackedMaterial packedMat;
+        packedMat.colorFactor = mat.colorFactor;
+        packedMat.emissiveFactor = glm::vec4(mat.emissiveFactor, mat.emissionStrength);
+        packedMat.roughness = mat.roughness;
+        packedMat.metalliness = mat.metalliness;
+        packedMat.colorTextureIndex = mat.colorTextureIndex;
+        packedMat.normalTextureIndex = mat.normalTextureIndex;
+        packedMat.roughnessMetallicTextureIndex = mat.roughnessMetallinessTextureIndex;
+        packedMat.padding1 = 42;
+        packedMat.padding2 = 69;
+        packedMat.padding3 = 420;
+
+        packedMats[i] = packedMat;
+        materials.push_back(mat);
+    }
+
+    createBuffers(indices, vertices, vertices, {}, {}, packedMats, primInfos, wantedBuffers);
 }
 
 void Scene::loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers)
@@ -303,59 +317,78 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory,
     materials = gltfLoader.materials;
     images = gltfLoader.images;
 
-    createBuffers(gltfLoader.indices, gltfLoader.positions, gltfLoader.normals, gltfLoader.tangents, gltfLoader.uvCoords, packedMaterials, primInfos);
+    createBuffers(gltfLoader.indices, gltfLoader.positions, gltfLoader.normals, gltfLoader.tangents, gltfLoader.uvCoords, packedMaterials, primInfos, wantedBuffers);
 }
 
 void Scene::createBuffers(const std::vector<uint32_t> &indices, const std::vector<glm::vec3> &vertices,
                 const std::vector<glm::vec3> &normals, const std::vector<glm::vec4> &tangents, const std::vector<glm::vec2> &uvs,
-                const std::vector<PackedMaterial> &packedMaterials, const std::vector<PrimInfo> &primInfos)
+                const std::vector<PackedMaterial> &packedMaterials, const std::vector<PrimInfo> &primInfos, WantedBuffers wantedBuffers)
 {
     VulBuffer::Usage rtFlags = VulBuffer::usage_none;
     if (settings::deviceInitConfig.enableRaytracingSupport)
         rtFlags = static_cast<VulBuffer::Usage>(VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead);
 
-    if (indices.size() > 0) {
-        indexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
-        indexBuffer->loadVector(indices);
-        indexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_indexBuffer |
-                    VulBuffer::usage_transferDst | VulBuffer::usage_ssbo | rtFlags));
+    if (indices.size() > 0 && wantedBuffers.index) {
+        if (indexBuffer.get() == nullptr) {
+            indexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            indexBuffer->loadVector(indices);
+            indexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_indexBuffer |
+                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo | rtFlags));
+        } else indexBuffer->appendVector(indices);
         VUL_NAME_VK(indexBuffer->getBuffer())
     }
-    if (vertices.size() > 0) {
-        vertexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
-        vertexBuffer->loadVector(vertices);
-        vertexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
-                    VulBuffer::usage_transferDst | VulBuffer::usage_ssbo | rtFlags));
+    if (vertices.size() > 0 && wantedBuffers.vertex) {
+        if (vertexBuffer.get() == nullptr) {
+            vertexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            vertexBuffer->loadVector(vertices);
+            vertexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
+                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo | rtFlags));
+        } else vertexBuffer->appendVector(vertices);
         VUL_NAME_VK(vertexBuffer->getBuffer())
     }
-    if (normals.size() > 0) {
-        normalBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
-        normalBuffer->loadVector(normals);
-        normalBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst | VulBuffer::usage_ssbo));
+    if (normals.size() > 0 && wantedBuffers.normal) {
+        if (normalBuffer.get() == nullptr) {
+            normalBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            normalBuffer->loadVector(normals);
+            normalBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
+                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo));
+        } else normalBuffer->appendVector(normals);
         VUL_NAME_VK(normalBuffer->getBuffer())
     }
-    if (tangents.size() > 0) {
-        tangentBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
-        tangentBuffer->loadVector(tangents);
-        tangentBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst | VulBuffer::usage_ssbo));
+    if (tangents.size() > 0 && wantedBuffers.tangent) {
+        if (tangentBuffer.get() == nullptr) {
+            tangentBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            tangentBuffer->loadVector(tangents);
+            tangentBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
+                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo));
+        } else tangentBuffer->appendVector(tangents);
         VUL_NAME_VK(tangentBuffer->getBuffer())
     }
-    if (uvs.size() > 0) {
-        uvBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
-        uvBuffer->loadVector(uvs);
-        uvBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer | VulBuffer::usage_transferDst | VulBuffer::usage_ssbo));
+    if (uvs.size() > 0 && wantedBuffers.uv) {
+        if (uvBuffer.get() == nullptr) {
+            uvBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            uvBuffer->loadVector(uvs);
+            uvBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
+                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo));
+        } else uvBuffer->appendVector(uvs);
         VUL_NAME_VK(uvBuffer->getBuffer())
     }
-    if (packedMaterials.size() > 0) {
-        materialBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
-        materialBuffer->loadVector(packedMaterials);
-        materialBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_transferDst));
+    if (packedMaterials.size() > 0 && wantedBuffers.material) {
+        if (materialBuffer.get() == nullptr) {
+            materialBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            materialBuffer->loadVector(packedMaterials);
+            materialBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo |
+                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc));
+        } else materialBuffer->appendVector(packedMaterials);
         VUL_NAME_VK(materialBuffer->getBuffer())
     }
-    if (primInfos.size() > 0) {
-        primInfoBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
-        primInfoBuffer->loadVector(primInfos);
-        primInfoBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_transferDst));
+    if (primInfos.size() > 0 && wantedBuffers.primInfo) {
+        if (primInfoBuffer.get() == nullptr) {
+            primInfoBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            primInfoBuffer->loadVector(primInfos);
+            primInfoBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo |
+                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc));
+        } else primInfoBuffer->appendVector(primInfos);
         VUL_NAME_VK(primInfoBuffer->getBuffer())
     }
 }

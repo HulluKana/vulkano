@@ -44,9 +44,9 @@ class VulBuffer {
         template<typename T> VkResult readVector(std::vector<T> &vector, size_t elementCount, VkDeviceSize offset)
         {
             if (sizeof(T) != m_elementSize) throw std::runtime_error("Size of the element in the read destination vector must be the same as the size of the element in the buffer");
-            size_t oldSizeInBytes = vector.size() * sizeof(T);
+            size_t oldSizeInBytes = vector.size();
             vector.resize(vector.size() + elementCount);
-            return readData(vector.data() + oldSizeInBytes, elementCount * sizeof(T), offset);
+            return readData(&vector[oldSizeInBytes], elementCount * sizeof(T), offset);
         }
 
         void copyDataFromBufferSingleTime(VulBuffer &srcBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset);

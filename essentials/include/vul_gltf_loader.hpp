@@ -46,9 +46,9 @@ class GltfLoader
             blend
         };
         struct Material{
-            glm::vec4 colorFactor = glm::vec4(1.0f);
+            glm::vec4 colorFactor = glm::vec4(0.8f);
             glm::vec3 emissiveFactor = glm::vec3(0.0f);
-            float roughness = 1.0f;
+            float roughness = 0.5f;
             float metalliness = 0.0f;
 
             int colorTextureIndex = -1;

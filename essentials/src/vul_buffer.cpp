@@ -45,7 +45,7 @@ VkResult VulBuffer::createBuffer(bool isLocal, VulBuffer::Usage usage)
     m_usageFlags = usage; 
     m_memoryPropertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     if (!isLocal) m_memoryPropertyFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    m_isDeviceLocal = true;
+    m_isDeviceLocal = isLocal;
 
     VkDeviceSize minOffsetAlignment = 1;
     if (usage & usage_ubo) minOffsetAlignment = m_vulDevice.properties.limits.minUniformBufferOffsetAlignment;
@@ -129,7 +129,8 @@ VkResult VulBuffer::readData(void *data, VkDeviceSize size, VkDeviceSize offset)
     if (m_isDeviceLocal) {
         VkResult result = addStagingBuffer();
         if (result != VK_SUCCESS) return result;
-        memcpy(data, static_cast<uint8_t *>(m_stagingBuffer->getMappedMemory()) + offset, size);
+        m_stagingBuffer->copyDataFromBufferSingleTime(*this, size, offset, 0);
+        memcpy(data, m_stagingBuffer->getMappedMemory(), size);
     } else {
         VkResult result = map(size, offset);
         if (result != VK_SUCCESS) return result;
@@ -193,33 +194,43 @@ VkResult VulBuffer::resizeBufferWithData(const void *data, uint32_t elementSize,
     unmap();
     vkDestroyBuffer(m_vulDevice.device(), m_buffer, nullptr);
     vkFreeMemory(m_vulDevice.device(), m_memory, nullptr);
+
     m_elementSize = elementSize;
     m_elementCount = elementCount;
     m_inputData = data;
-    return createBuffer(m_isDeviceLocal, static_cast<Usage>(m_usageFlags));
+    bool hasStaging = false;
+    if (hasStagingBuffer()) {
+        hasStaging = true;
+        deleteStagingBuffer();
+    }
+
+    VkResult result = createBuffer(m_isDeviceLocal, static_cast<Usage>(m_usageFlags));
+    if (result != VK_SUCCESS) return result;
+    if (hasStaging) return addStagingBuffer();
+    return VK_SUCCESS;
 }
 
-VkResult VulBuffer::appendDataToBuffer(const void *data, uint32_t elementCount)
+VkResult VulBuffer::appendData(const void *data, uint32_t elementCount)
 {
     VUL_PROFILE_FUNC()
 
     if (elementCount == 0) return VK_SUCCESS;
 
-    uint8_t *newData = new uint8_t[m_bufferSize + m_elementSize * elementCount];
-    if (!newData) return VK_ERROR_OUT_OF_HOST_MEMORY;
+    std::unique_ptr<uint8_t> newData = std::unique_ptr<uint8_t>(new uint8_t[m_bufferSize + m_elementSize * elementCount]);
+    if (!newData.get()) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
-    VkResult result = readData(newData, m_bufferSize, 0);
+    VkResult result = readData(newData.get(), m_bufferSize, 0);
     if (result != VK_SUCCESS) return result;
-    if (data != nullptr) memcpy(newData + m_bufferSize, data, m_elementSize * elementCount);
+    if (data != nullptr) memcpy(newData.get() + m_bufferSize, data, m_elementSize * elementCount);
 
-    return resizeBufferWithData(newData, m_elementSize, elementCount + m_elementCount);
+    return resizeBufferWithData(newData.get(), m_elementSize, elementCount + m_elementCount);
 }
 
 VkResult VulBuffer::addStagingBuffer()
 {
     VUL_PROFILE_FUNC()
 
-    if (m_stagingBuffer) return VK_SUCCESS;
+    if (m_stagingBuffer.get()) return VK_SUCCESS;
 
     if (!m_creationPreparationDone) throw std::runtime_error("Buffer creation preparations need to be done before creating staging buffer");
     m_stagingBuffer = std::make_unique<VulBuffer>(m_vulDevice);

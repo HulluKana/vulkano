@@ -24,6 +24,7 @@ class Scene
             glm::vec3 centerPos;
             float radius;
             uint32_t subdivisionCount;
+            uint32_t matIdx;
         };
         struct WantedBuffers {
             bool vertex = true;
@@ -35,7 +36,7 @@ class Scene
             bool primInfo = true;
         };
         void loadCubes(const std::vector<Cube> &cubes, WantedBuffers wantedBuffers);
-        void loadSpheres(const std::vector<Sphere> &spheres, WantedBuffers wantedBuffers);
+        void loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vulB::GltfLoader::Material> &mats, WantedBuffers wantedBuffers);
         void loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers);
 
         std::vector<vulB::GltfLoader::GltfLight> lights;
@@ -88,7 +89,7 @@ class Scene
 
         void createBuffers(const std::vector<uint32_t> &indices, const std::vector<glm::vec3> &vertices,
                 const std::vector<glm::vec3> &normals, const std::vector<glm::vec4> &tangents, const std::vector<glm::vec2> &uvs,
-                const std::vector<PackedMaterial> &packedMaterials, const std::vector<PrimInfo> &primInfos);
+                const std::vector<PackedMaterial> &packedMaterials, const std::vector<PrimInfo> &primInfos, WantedBuffers wantedBuffers);
 };
 
 }
