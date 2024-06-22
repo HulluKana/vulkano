@@ -19,6 +19,7 @@ class Scene
         struct Cube {
             glm::vec3 centerPos;
             glm::vec3 dimensions;
+            uint32_t matIdx;
         };
         struct Sphere {
             glm::vec3 centerPos;
@@ -35,7 +36,7 @@ class Scene
             bool material = true;
             bool primInfo = true;
         };
-        void loadCubes(const std::vector<Cube> &cubes, WantedBuffers wantedBuffers);
+        void loadCubes(const std::vector<Cube> &cubes, const std::vector<vulB::GltfLoader::Material> &mats, WantedBuffers wantedBuffers);
         void loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vulB::GltfLoader::Material> &mats, WantedBuffers wantedBuffers);
         void loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers);
 
@@ -89,7 +90,7 @@ class Scene
 
         void createBuffers(const std::vector<uint32_t> &indices, const std::vector<glm::vec3> &vertices,
                 const std::vector<glm::vec3> &normals, const std::vector<glm::vec4> &tangents, const std::vector<glm::vec2> &uvs,
-                const std::vector<PackedMaterial> &packedMaterials, const std::vector<PrimInfo> &primInfos, WantedBuffers wantedBuffers);
+                const std::vector<vulB::GltfLoader::Material> &mats, const std::vector<vulB::GltfLoader::GltfNode> &nods, WantedBuffers wantedBuffers);
 };
 
 }

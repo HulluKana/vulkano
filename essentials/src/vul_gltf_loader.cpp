@@ -74,6 +74,8 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
 
 void GltfLoader::importTextures(const tinygltf::Model &model, const std::string &textureDirectory, VulDevice &device)
 {
+    if (model.images.size() == 0) return;
+
     std::set<int> transparentColorTextures;
     std::set<int> opaqueColorTextures;
     std::set<int> normalMaps;

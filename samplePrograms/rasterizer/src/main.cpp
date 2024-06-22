@@ -1,6 +1,8 @@
 #include "vul_descriptors.hpp"
 #include "vul_image.hpp"
 #include "vul_swap_chain.hpp"
+#include <iomanip>
+#include <ios>
 #include <vulkan/vulkan_core.h>
 #include<vulkano_program.hpp>
 #include<host_device.hpp>
@@ -456,9 +458,10 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 
 int main() {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
-    vulkano.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza", {});
+    vulkano.loadScene("../Models/room/Room.gltf", "../Models/room", {});
     vulkano.scene.loadSpheres({{{-3.0f, 3.0f, 2.0f}, 2.5f, 4, 0}, {{4.0f, 8.0f, 3.0f}, 3.5f, 2, 0}}, {{}}, {});
-    vulkano.hasScene = true;
+    vulkano.scene.loadCubes({{{7.0f, 5.0f, -4.0f}, {1.0f, 1.0f, 1.0f}, 0}, {{-5.5f, 9.0f, 0.0f}, {2.0f, 1.5f, 0.7f}, 0}}, {{}}, {});
+    vulkano.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza", {});
     Resources resources = createReources(vulkano);
     RenderDataIndices renderDataIndices = createDescriptors(vulkano, resources, vulkano.scene.images);
     createPipelines(vulkano, renderDataIndices);

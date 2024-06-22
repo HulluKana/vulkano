@@ -2,6 +2,7 @@
 #include "vul_settings.hpp"
 #include "vul_transform.hpp"
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <glm/ext/vector_float4.hpp>
 #include <string>
@@ -23,82 +24,85 @@ Scene::Scene(vulB::VulDevice &vulDevice) : m_vulDevice{vulDevice}
 
 }
 
-void Scene::loadCubes(const std::vector<Cube> &cubes, WantedBuffers wantedBuffers)
+void Scene::loadCubes(const std::vector<Cube> &cubes, const std::vector<vulB::GltfLoader::Material> &mats, WantedBuffers wantedBuffers)
 {
+    const uint32_t oldIdxCount = indexBuffer.get() ? indexBuffer->getBufferSize() / sizeof(uint32_t) : 0;
+    const uint32_t oldVertexCount = vertexBuffer.get() ? vertexBuffer->getBufferSize() / sizeof(glm::vec3) : 0;
+
     std::vector<glm::vec3> vertices;
-    std::vector<uint> indices;
-    std::vector<PrimInfo> primInfos;
+    std::vector<glm::vec3> normals;
+    std::vector<uint32_t> indices;
+    std::vector<GltfLoader::GltfNode> nods;
     for (size_t i = 0; i < cubes.size(); i++) {
+        constexpr uint32_t FACES_PER_CUBE = 6;
+        constexpr uint32_t VERTS_PER_FACE = 4;
+        constexpr uint32_t VERTS_PER_CUBE = VERTS_PER_FACE * FACES_PER_CUBE;
+        constexpr uint32_t IDXS_PER_FACE = 6;
+        constexpr uint32_t IDXS_PER_CUBE = IDXS_PER_FACE * FACES_PER_CUBE;
         const glm::vec3 &pos = cubes[i].centerPos;
         const glm::vec3 halfDims = cubes[i].dimensions / 2.0f;
-        size_t vertOffset = i * 8;
-
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y, -halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y, -halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y, -halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y, -halfDims.z});
 
         // Top face
-        indices.push_back(vertOffset + 0);
-        indices.push_back(vertOffset + 4);
-        indices.push_back(vertOffset + 5);
-        indices.push_back(vertOffset + 5);
-        indices.push_back(vertOffset + 1);
-        indices.push_back(vertOffset + 0);
+        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y,  halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y,  halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y, -halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y, -halfDims.z});
+        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) normals.emplace_back(glm::vec3{0.0f, 1.0f, 0.0f});
 
         // Bottom face
-        indices.push_back(vertOffset + 7);
-        indices.push_back(vertOffset + 6);
-        indices.push_back(vertOffset + 2);
-        indices.push_back(vertOffset + 2);
-        indices.push_back(vertOffset + 3);
-        indices.push_back(vertOffset + 7);
+        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y, -halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y,  halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y,  halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y, -halfDims.z});
+        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) normals.emplace_back(glm::vec3{0.0f, -1.0f, 0.0f});
 
         // Front face
-        indices.push_back(vertOffset + 6);
-        indices.push_back(vertOffset + 4);
-        indices.push_back(vertOffset + 0);
-        indices.push_back(vertOffset + 0);
-        indices.push_back(vertOffset + 2);
-        indices.push_back(vertOffset + 6);
+        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y,  halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y,  halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y,  halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y,  halfDims.z});
+        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) normals.emplace_back(glm::vec3{0.0f, 0.0f, 1.0f});
 
         // Back face
-        indices.push_back(vertOffset + 1);
-        indices.push_back(vertOffset + 5);
-        indices.push_back(vertOffset + 7);
-        indices.push_back(vertOffset + 7);
-        indices.push_back(vertOffset + 3);
-        indices.push_back(vertOffset + 1);
+        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y, -halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y, -halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y, -halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y, -halfDims.z});
+        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) normals.emplace_back(glm::vec3{0.0f, -1.0f, -1.0f});
 
         // Right face
-        indices.push_back(vertOffset + 0);
-        indices.push_back(vertOffset + 1);
-        indices.push_back(vertOffset + 3);
-        indices.push_back(vertOffset + 3);
-        indices.push_back(vertOffset + 2);
-        indices.push_back(vertOffset + 0);
+        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y,  halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y, -halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y, -halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y,  halfDims.z});
+        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) normals.emplace_back(glm::vec3{1.0f, 0.0f, 0.0f});
 
         // Left face
-        indices.push_back(vertOffset + 5);
-        indices.push_back(vertOffset + 4);
-        indices.push_back(vertOffset + 6);
-        indices.push_back(vertOffset + 6);
-        indices.push_back(vertOffset + 7);
-        indices.push_back(vertOffset + 5);
+        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y, -halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y,  halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y,  halfDims.z});
+        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y, -halfDims.z});
+        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) normals.emplace_back(glm::vec3{-1.0f, 0.0f, 0.0f});
+
+        for (uint32_t j = 0; j < FACES_PER_CUBE; j++) {
+            const uint32_t vertOffset = i * VERTS_PER_CUBE + j * VERTS_PER_FACE;
+            indices.push_back(vertOffset);
+            indices.push_back(vertOffset + 1);
+            indices.push_back(vertOffset + 2);
+            indices.push_back(vertOffset + 2);
+            indices.push_back(vertOffset + 3);
+            indices.push_back(vertOffset);
+        }
 
         GltfLoader::GltfPrimMesh mesh;
         mesh.name = "Procedural cube mesh " + std::to_string(i);
         mesh.posMin = pos - halfDims;
         mesh.posMax = pos + halfDims;
-        mesh.firstIndex = 36 * i;
-        mesh.indexCount = 36;
-        mesh.vertexOffset = 0;
-        mesh.vertexCount = 8;
-        mesh.materialIndex = 0;
+        mesh.firstIndex = IDXS_PER_CUBE * i + oldIdxCount;
+        mesh.indexCount = IDXS_PER_CUBE;
+        mesh.vertexOffset = oldVertexCount;
+        mesh.vertexCount = VERTS_PER_CUBE;
+        mesh.materialIndex = cubes[i].matIdx + materials.size();
         meshes.push_back(mesh);
 
         transform3D transform;
@@ -108,35 +112,19 @@ void Scene::loadCubes(const std::vector<Cube> &cubes, WantedBuffers wantedBuffer
 
         GltfLoader::GltfNode node;
         node.name = "Procedural cube " + std::to_string(i);
-        node.primMesh = i;
+        node.primMesh = meshes.size() - 1;
         node.position = pos;
         node.worldMatrix = transform.transformMat();
         node.normalMatrix = transform.normalMat();
-        nodes.push_back(node);
-
-        PrimInfo primInfo;
-        primInfo.transformMatrix = node.worldMatrix;
-        primInfo.normalMatrix = node.normalMatrix;
-        primInfo.materialIndex = mesh.materialIndex;
-        primInfo.firstIndex = mesh.firstIndex;
-        primInfo.vertexOffset = mesh.vertexOffset;
-        primInfo.padding = 69;
-        primInfos.push_back(primInfo);
+        nods.push_back(node);
     }
+    nodes.insert(nodes.end(), nods.begin(), nods.end());
+    materials.insert(materials.end(), mats.begin(), mats.end());
+    
+    std::vector<glm::vec4> uselessTangents(vertices.size());
+    std::vector<glm::vec2> uselessUvs(vertices.size());
 
-    PackedMaterial packedMat;
-    packedMat.colorFactor = glm::vec4(0.8f, 0.8f, 0.8f, 1.0f);
-    packedMat.emissiveFactor = glm::vec4(0.0f);
-    packedMat.roughness = 0.5f;
-    packedMat.metalliness = 0.0f;
-    packedMat.colorTextureIndex = -1;
-    packedMat.normalTextureIndex = -1;
-    packedMat.roughnessMetallicTextureIndex = -1;
-    packedMat.padding1 = 42;
-    packedMat.padding2 = 69;
-    packedMat.padding3 = 420;
-
-    createBuffers(indices, vertices, {}, {}, {}, {packedMat}, primInfos, wantedBuffers);
+    createBuffers(indices, vertices, normals, uselessTangents, uselessUvs, mats, nods, wantedBuffers);
 }
 
 void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vulB::GltfLoader::Material> &mats, WantedBuffers wantedBuffers)
@@ -146,7 +134,7 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vu
 
     std::vector<glm::vec3> vertices;
     std::vector<uint32_t> indices;
-    std::vector<PrimInfo> primInfos;
+    std::vector<GltfLoader::GltfNode> nods;
 
     for (size_t i = 0; i < spheres.size(); i++) {
         std::vector<glm::vec3> unitVertices;
@@ -174,7 +162,7 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vu
             uint32_t nextIdx = currIdx + vertsPerRow;
             for (uint32_t k = 0; k < vertsPerRow; k++, currIdx++, nextIdx++) {
                 vertices.emplace_back(unitVertices[j * vertsPerRow + k]);
-                if (j < vertsPerRow - 1 && j < vertsPerRow - 1) {
+                if (j < vertsPerRow - 1 && k < vertsPerRow - 1) {
                     indices.push_back(nextIdx);
                     indices.push_back(currIdx);
                     indices.push_back(currIdx + 1);
@@ -229,39 +217,15 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vu
         node.position = pos;
         node.worldMatrix = transform.transformMat();
         node.normalMatrix = transform.normalMat();
-        nodes.push_back(node);
-
-        PrimInfo primInfo;
-        primInfo.transformMatrix = node.worldMatrix;
-        primInfo.normalMatrix = node.normalMatrix;
-        primInfo.materialIndex = mesh.materialIndex;
-        primInfo.firstIndex = mesh.firstIndex;
-        primInfo.vertexOffset = mesh.vertexOffset;
-        primInfo.padding = 69;
-        primInfos.push_back(primInfo);
+        nods.push_back(node);
     }
+    nodes.insert(nodes.end(), nods.begin(), nods.end());
+    materials.insert(materials.end(), mats.begin(), mats.end());
 
-    std::vector<PackedMaterial> packedMats(mats.size());
-    for (size_t i = 0; i < mats.size(); i++) {
-        const GltfLoader::Material &mat = mats[i];
+    std::vector<glm::vec4> uselessTangents(vertices.size());
+    std::vector<glm::vec2> uselessUvs(vertices.size());
 
-        PackedMaterial packedMat;
-        packedMat.colorFactor = mat.colorFactor;
-        packedMat.emissiveFactor = glm::vec4(mat.emissiveFactor, mat.emissionStrength);
-        packedMat.roughness = mat.roughness;
-        packedMat.metalliness = mat.metalliness;
-        packedMat.colorTextureIndex = mat.colorTextureIndex;
-        packedMat.normalTextureIndex = mat.normalTextureIndex;
-        packedMat.roughnessMetallicTextureIndex = mat.roughnessMetallinessTextureIndex;
-        packedMat.padding1 = 42;
-        packedMat.padding2 = 69;
-        packedMat.padding3 = 420;
-
-        packedMats[i] = packedMat;
-        materials.push_back(mat);
-    }
-
-    createBuffers(indices, vertices, vertices, {}, {}, packedMats, primInfos, wantedBuffers);
+    createBuffers(indices, vertices, vertices, uselessTangents, uselessUvs, mats, nods, wantedBuffers);
 }
 
 void Scene::loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers)
@@ -281,8 +245,38 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory,
     gltfLoader.importDrawableNodes(model, GltfLoader::gltfAttribOr(GltfLoader::gltfAttribOr(GltfLoader::GltfAttributes::Normal,
                     GltfLoader::GltfAttributes::Tangent), GltfLoader::GltfAttributes::TexCoord));
 
+    const uint32_t oldIdxCount = indexBuffer.get() ? indexBuffer->getBufferSize() / sizeof(uint32_t) : 0;
+    const uint32_t oldVertCount = vertexBuffer.get() ? vertexBuffer->getBufferSize() / sizeof(glm::vec3) : 0;
+    const uint32_t oldMatCount = materials.size();
+    const uint32_t oldMeshCount = meshes.size();
+    const uint32_t oldImgCount = images.size();
+    for (GltfLoader::GltfPrimMesh &mesh : gltfLoader.primMeshes) {
+        mesh.firstIndex += oldIdxCount;
+        mesh.vertexOffset += oldVertCount;
+        mesh.materialIndex += oldMatCount;
+    }
+    for (GltfLoader::GltfNode &node : gltfLoader.nodes) node.primMesh += oldMeshCount;
+    for (GltfLoader::Material &mat : gltfLoader.materials) {
+        if (mat.colorTextureIndex >= 0) mat.colorTextureIndex += oldImgCount;
+        if (mat.normalTextureIndex >= 0) mat.normalTextureIndex += oldImgCount;
+        if (mat.roughnessMetallinessTextureIndex >= 0) mat.roughnessMetallinessTextureIndex += oldImgCount;
+    }
+
+    lights.insert(lights.end(), gltfLoader.lights.begin(), gltfLoader.lights.end());
+    nodes.insert(nodes.end(), gltfLoader.nodes.begin(), gltfLoader.nodes.end());
+    meshes.insert(meshes.end(), gltfLoader.primMeshes.begin(), gltfLoader.primMeshes.end());
+    materials.insert(materials.end(), gltfLoader.materials.begin(), gltfLoader.materials.end());
+    images.insert(images.end(), gltfLoader.images.begin(), gltfLoader.images.end());
+
+    createBuffers(gltfLoader.indices, gltfLoader.positions, gltfLoader.normals, gltfLoader.tangents, gltfLoader.uvCoords, gltfLoader.materials, gltfLoader.nodes, wantedBuffers);
+}
+
+void Scene::createBuffers(const std::vector<uint32_t> &indices, const std::vector<glm::vec3> &vertices,
+                const std::vector<glm::vec3> &normals, const std::vector<glm::vec4> &tangents, const std::vector<glm::vec2> &uvs,
+                const std::vector<vulB::GltfLoader::Material> &mats, const std::vector<vulB::GltfLoader::GltfNode> &nods, WantedBuffers wantedBuffers)
+{
     std::vector<PackedMaterial> packedMaterials;
-    for (const GltfLoader::Material &mat : gltfLoader.materials){
+    for (const GltfLoader::Material &mat : mats) {
         PackedMaterial packedMat;
         packedMat.colorFactor = mat.colorFactor;
         packedMat.emissiveFactor = glm::vec4(mat.emissiveFactor, mat.emissionStrength);
@@ -291,15 +285,14 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory,
         packedMat.colorTextureIndex = mat.colorTextureIndex;
         packedMat.normalTextureIndex = mat.normalTextureIndex;
         packedMat.roughnessMetallicTextureIndex = mat.roughnessMetallinessTextureIndex;
-        packedMat.padding1 = 14;
+        packedMat.padding1 = 42;
         packedMat.padding2 = 69;
         packedMat.padding3 = 420;
         packedMaterials.push_back(packedMat);
     }
-
     std::vector<PrimInfo> primInfos;
-    for (const GltfLoader::GltfNode &node : gltfLoader.nodes) {
-        const GltfLoader::GltfPrimMesh &mesh = gltfLoader.primMeshes[node.primMesh];
+    for (const GltfLoader::GltfNode &node : nods) {
+        const GltfLoader::GltfPrimMesh &mesh = meshes[node.primMesh];
 
         PrimInfo primInfo;
         primInfo.transformMatrix = node.worldMatrix;
@@ -309,21 +302,8 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory,
         primInfo.materialIndex = mesh.materialIndex;
         primInfo.padding = 69;
         primInfos.push_back(primInfo);
-    } 
+    }
 
-    lights = gltfLoader.lights;
-    nodes = gltfLoader.nodes;
-    meshes = gltfLoader.primMeshes;
-    materials = gltfLoader.materials;
-    images = gltfLoader.images;
-
-    createBuffers(gltfLoader.indices, gltfLoader.positions, gltfLoader.normals, gltfLoader.tangents, gltfLoader.uvCoords, packedMaterials, primInfos, wantedBuffers);
-}
-
-void Scene::createBuffers(const std::vector<uint32_t> &indices, const std::vector<glm::vec3> &vertices,
-                const std::vector<glm::vec3> &normals, const std::vector<glm::vec4> &tangents, const std::vector<glm::vec2> &uvs,
-                const std::vector<PackedMaterial> &packedMaterials, const std::vector<PrimInfo> &primInfos, WantedBuffers wantedBuffers)
-{
     VulBuffer::Usage rtFlags = VulBuffer::usage_none;
     if (settings::deviceInitConfig.enableRaytracingSupport)
         rtFlags = static_cast<VulBuffer::Usage>(VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead);

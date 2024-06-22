@@ -48,6 +48,7 @@ class VulBuffer {
             vector.resize(vector.size() + elementCount);
             return readData(&vector[oldSizeInBytes], elementCount * sizeof(T), offset);
         }
+        template<typename T> VkResult readVectorAll(std::vector<T> &vector) {return readVector(vector, m_elementCount, 0);}
 
         void copyDataFromBufferSingleTime(VulBuffer &srcBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset);
         void copyDataFromBuffer(VulBuffer &srcBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset, VkCommandBuffer cmdBuf);
