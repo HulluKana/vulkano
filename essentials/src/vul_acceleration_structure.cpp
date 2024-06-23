@@ -1,7 +1,9 @@
+#include "vul_buffer.hpp"
 #include <algorithm>
 #include <cassert>
 #include <glm/matrix.hpp>
-#include <limits>
+#include <iterator>
+#include <set>
 #include <vul_debug_tools.hpp>
 #include <vul_transform.hpp>
 #include <vul_acceleration_structure.hpp>
@@ -19,67 +21,84 @@ VulAs::~VulAs()
     for (As &as : m_blases) vkDestroyAccelerationStructureKHR(m_vulDevice.device(), as.as, nullptr);
 }
 
-void VulAs::loadScene(const Scene &scene)
+void VulAs::loadScene(const Scene &scene, const std::vector<AsNode> &nodes, const std::vector<InstanceInfo> &instanceInfos, bool allowUpdating)
 {
-    m_transformsBuffer = createTransformsBuffer(scene);
+    assert(nodes.size() > 0);
+    assert(instanceInfos.size() > 0);
 
+    std::set<uint32_t> uniqueBlasIndices;
+    for (const AsNode node : nodes) uniqueBlasIndices.insert(node.blasIndex);
+    for (size_t i = 0; i < uniqueBlasIndices.size(); i++) assert(uniqueBlasIndices.find(i) != uniqueBlasIndices.end());
+
+    std::vector<uint32_t> orderedNodes;
+    std::vector<uint32_t> nodeCountPerBlas(uniqueBlasIndices.size());
+    for (uint32_t i = 0; i < uniqueBlasIndices.size(); i++) {
+        uint32_t nodeCount = 0;
+        for (size_t j = 0; j < nodes.size(); j++) if (nodes[j].blasIndex == i) {
+            orderedNodes.push_back(nodes[j].nodeIndex);
+            nodeCount++;
+        }
+        nodeCountPerBlas[i] = nodeCount;
+    }
+
+    std::unique_ptr<VulBuffer> transformsBuf = createTransformsBuffer(scene, orderedNodes);
     std::vector<BlasInput> blasInputs;
-    blasInputs.emplace_back(gltfNodesToBlasInput(scene, 0, static_cast<uint32_t>(scene.nodes.size()), m_transformsBuffer));
-
+    uint32_t usedNodeCount = 0;
+    for (uint32_t nodeCount : nodeCountPerBlas) {
+        blasInputs.emplace_back(gltfNodesToBlasInput(scene, orderedNodes, usedNodeCount, nodeCount, transformsBuf));
+        usedNodeCount += nodeCount;
+    }
     buildBlases(blasInputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 
-    std::vector<VkAccelerationStructureInstanceKHR> asInsts;
-    for (size_t i = 0; i < m_blases.size(); i++) asInsts.emplace_back(blasToAsInstance(i, 0, {}, m_blases[i]));
+    for (size_t i = 0; i < instanceInfos.size(); i++) {
+        const InstanceInfo &instInf = instanceInfos[i];
+        m_instances.push_back(blasToAsInstance(instInf.customIndex, instInf.shaderBindingTableRecordOffset, instInf.transform, m_blases[instInf.blasIdx]));
+    }
 
-    buildTlas(asInsts, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR, false);
+    m_tlasBuildFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+    if (allowUpdating) m_tlasBuildFlags |= VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
+    buildTlas(m_instances, m_tlasBuildFlags, false);
 }
 
 void VulAs::loadAabbs(const std::vector<Aabb> &aabbs, const std::vector<InstanceInfo> &instanceInfos, bool allowUpdating)
 {
-    assert(aabbs.size());
     assert(aabbs.size() > 0);
+    assert(instanceInfos.size() > 0);
 
-    uint32_t minIdx = std::numeric_limits<uint32_t>::max();
-    uint32_t maxIdx = std::numeric_limits<uint32_t>::min();
-    for (const Aabb &aabb : aabbs) {
-        minIdx = std::min(minIdx, aabb.blasIndex);
-        maxIdx = std::max(maxIdx, aabb.blasIndex);
-    }
-
-    std::vector<std::vector<uint32_t>> aabbIndicesByBlasIdx(maxIdx - minIdx + 1);
-    for (uint32_t i = 0; i < aabbs.size(); i++) aabbIndicesByBlasIdx[aabbs[i].blasIndex - minIdx].push_back(i);
-    std::vector<int> blasIdxToRealIdx(aabbIndicesByBlasIdx.size());
-    for (uint32_t i = 0; i < blasIdxToRealIdx.size(); i++) blasIdxToRealIdx[i] = i;
-    for (int i = aabbIndicesByBlasIdx.size() - 1; i >= 0; i--) {
-        if (aabbIndicesByBlasIdx[i].size() == 0) {
-            aabbIndicesByBlasIdx.erase(aabbIndicesByBlasIdx.begin() + i);
-            blasIdxToRealIdx[i] = -1;
-        }
-    }
+    std::set<uint32_t> uniqueBlasIndices;
+    for (const Aabb &aabb : aabbs) uniqueBlasIndices.insert(aabb.blasIndex);
+    for (size_t i = 0; i < uniqueBlasIndices.size(); i++) assert(uniqueBlasIndices.find(i) != uniqueBlasIndices.end());
 
     struct VkAabb {
         glm::vec3 minPos;
         glm::vec3 maxPos;
     };
     std::vector<VkAabb> orderedAabbs;
-    orderedAabbs.reserve(aabbs.size());
-    for (const std::vector<uint32_t> &aabbIndices : aabbIndicesByBlasIdx) {
-        for (uint32_t idx : aabbIndices) orderedAabbs.push_back({aabbs[idx].minPos, aabbs[idx].maxPos});
-    }
+    std::vector<uint32_t> aabbCountPerBlas(uniqueBlasIndices.size());
+    for (uint32_t i = 0; i < uniqueBlasIndices.size(); i++) {
+        uint32_t aabbCount = 0;
+        for (size_t j = 0; j < aabbs.size(); j++) if (aabbs[j].blasIndex == i) {
+            orderedAabbs.emplace_back(VkAabb{aabbs[j].minPos, aabbs[j].maxPos});
+            aabbCount++;
+        }
+        aabbCountPerBlas[i] = aabbCount;
+    } 
 
     VulBuffer aabbBuf(m_vulDevice);
     aabbBuf.loadVector(orderedAabbs);
     aabbBuf.createBuffer(false, static_cast<VulBuffer::Usage>(VulBuffer::usage_transferDst | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead));
 
     std::vector<BlasInput> blasInputs;
-    for (size_t i = 0, j = 0; i < aabbs.size(); i += aabbIndicesByBlasIdx[j].size(), j++) blasInputs.emplace_back(aabbsToBlasInput(aabbBuf, aabbIndicesByBlasIdx[j].size(), i));
+    size_t usedAabbCount = 0;
+    for (uint32_t aabbCount : aabbCountPerBlas) {
+        blasInputs.emplace_back(aabbsToBlasInput(aabbBuf, aabbCount, usedAabbCount));
+        usedAabbCount += aabbCount;
+    }
     buildBlases(blasInputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 
     for (size_t i = 0; i < instanceInfos.size(); i++) {
         const InstanceInfo &instInf = instanceInfos[i];
-        const int blasIdx = blasIdxToRealIdx[instInf.blasIdx];
-        assert(blasIdx >= 0);
-        m_instances.push_back(blasToAsInstance(instInf.customIndex, instInf.shaderBindingTableRecordOffset, instInf.transform, m_blases[blasIdx]));
+        m_instances.push_back(blasToAsInstance(instInf.customIndex, instInf.shaderBindingTableRecordOffset, instInf.transform, m_blases[instInf.blasIdx]));
     }
 
     m_tlasBuildFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
@@ -305,11 +324,11 @@ VkAccelerationStructureInstanceKHR VulAs::blasToAsInstance(uint32_t index, uint3
     return asInst;
 }
 
-VulAs::BlasInput VulAs::gltfNodesToBlasInput(const Scene &scene, uint32_t firstNode, uint32_t nodeCount, const std::unique_ptr<vulB::VulBuffer> &transformsBuffer)
+VulAs::BlasInput VulAs::gltfNodesToBlasInput(const Scene &scene, const std::vector<uint32_t> &orderedNodesIndices, uint32_t startIdx, uint32_t count, const std::unique_ptr<vulB::VulBuffer> &transformsBuffer)
 {
     BlasInput blasInput{};
-    for (uint32_t i = firstNode; i < firstNode + nodeCount; i++) {
-        const GltfLoader::GltfPrimMesh &mesh = scene.meshes[scene.nodes[i].primMesh];
+    for (uint32_t i = startIdx; i < startIdx + count; i++) {
+        const GltfLoader::GltfPrimMesh &mesh = scene.meshes[scene.nodes[orderedNodesIndices[i]].primMesh];
 
         VkAccelerationStructureGeometryTrianglesDataKHR triangles{};
         triangles.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR;
@@ -365,11 +384,11 @@ VulAs::BlasInput VulAs::aabbsToBlasInput(vulB::VulBuffer &aabbBuf, VkDeviceSize 
     return input;
 }
 
-std::unique_ptr<VulBuffer> VulAs::createTransformsBuffer(const Scene &scene)
+std::unique_ptr<VulBuffer> VulAs::createTransformsBuffer(const Scene &scene, const std::vector<uint32_t> &orderedNodesIndices)
 {
-    std::vector<VkTransformMatrixKHR> transforms(scene.nodes.size());
-    for (size_t i = 0; i < scene.nodes.size(); i++) {
-        glm::mat4 trasposedTransformMat = glm::transpose(scene.nodes[i].worldMatrix);
+    std::vector<VkTransformMatrixKHR> transforms(orderedNodesIndices.size());
+    for (size_t i = 0; i < orderedNodesIndices.size(); i++) {
+        glm::mat4 trasposedTransformMat = glm::transpose(scene.nodes[orderedNodesIndices[i]].worldMatrix);
         memcpy(&transforms[i], &trasposedTransformMat, sizeof(VkTransformMatrixKHR));
     }
 

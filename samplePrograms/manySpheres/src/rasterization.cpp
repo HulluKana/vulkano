@@ -29,8 +29,8 @@ RasResources createRasterizationResources(vul::Vulkano &vulkano)
     res.objDataBuf->loadVector(objDatas);
     res.objDataBuf->createBuffer(true, static_cast<vulB::VulBuffer::Usage>(vulB::VulBuffer::usage_ssbo | vulB::VulBuffer::usage_transferDst));
 
-    //vulkano.scene.loadCubes({{{0.0f, 0.0f, 0.0f}, {0.3f, 0.3f, 0.3f}}});
-    vulkano.scene.loadSpheres({{{0.0f, 0.0f, 0.0f}, 0.3f, 3}});
+    //vulkano.scene.loadCubes({{{0.0f, 0.0f, 0.0f}, {0.3f, 0.3f, 0.3f}}}, {{}}, {});
+    vulkano.scene.loadSpheres({{{0.0f, 0.0f, 0.0f}, 0.3f, 3}}, {{}}, {});
     vulkano.hasScene = true;
 
     vulB::VulPipeline::DrawData drawData;

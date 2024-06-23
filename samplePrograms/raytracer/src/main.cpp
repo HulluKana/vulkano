@@ -1,5 +1,9 @@
-#include "vul_image.hpp"
+#include "vul_scene.hpp"
+#include "vul_transform.hpp"
+#include <algorithm>
 #include <array>
+#include <iostream>
+#include <random>
 #include <vul_rt_pipeline.hpp>
 #include<vulkano_program.hpp>
 #include<host_device.hpp>
@@ -140,15 +144,19 @@ void updateUbo(const vul::Vulkano &vulkano, std::unique_ptr<vulB::VulBuffer> &ub
 int main() {
     vul::settings::deviceInitConfig.enableRaytracingSupport = true;
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
-    vulkano.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza/");
+    vulkano.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza/", {});
     vulkano.createSquare(0.0f, 0.0f, 1.0f, 1.0f);
     vul::settings::maxFps = 60.0f;
 
     std::unique_ptr<vul::VulImage> enviromentMap = vul::VulImage::createDefaultWholeImageAllInOneSingleTime(vulkano.getVulDevice(),
             "../enviromentMaps/sunsetCube.exr", {}, true, vul::VulImage::InputDataType::exrFile, vul::VulImage::ImageType::hdrCube);
 
+    std::vector<vul::VulAs::AsNode> asNodes(vulkano.scene.nodes.size());
+    for (size_t i = 0; i < vulkano.scene.nodes.size(); i++) asNodes[i] = {.nodeIndex = static_cast<uint32_t>(i), .blasIndex = 0};
     vul::VulAs as(vulkano.getVulDevice());
-    as.loadScene(vulkano.scene);
+    as.loadScene(vulkano.scene, asNodes, {vul::VulAs::InstanceInfo{.blasIdx = 0, .customIndex = 0,
+            .shaderBindingTableRecordOffset = 0, .transform = vul::transform3D{}.transformMat()}}, false);
+
     std::array<std::unique_ptr<vul::VulImage>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> rtImgs;
     std::array<std::unique_ptr<vulB::VulBuffer>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> ubos;
     std::array<std::shared_ptr<vulB::VulDescriptorSet>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descSets;
@@ -168,7 +176,7 @@ int main() {
 
     vulkano.renderDatas.push_back(createRenderData(vulkano, vulkano.getVulDevice(), descSets));
     vul::VulRtPipeline rtPipeline(vulkano.getVulDevice(), "../bin/raytrace.rgen.spv", {"../bin/raytrace.rmiss.spv", "../bin/raytraceShadow.rmiss.spv"},
-            {"../bin/raytrace.rchit.spv"}, {"../bin/raytraceShadow.rahit.spv"}, {}, {},
+            {"../bin/raytrace.rchit.spv"}, {"../bin/raytraceShadow.rahit.spv"}, {}, {{0, 0, -1}},
             {vulkano.renderDatas[0].descriptorSets[0][0]->getLayout()->getDescriptorSetLayout()});
 
     bool stop = false;

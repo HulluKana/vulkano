@@ -1,4 +1,5 @@
-#include <map>
+#include "vul_gltf_loader.hpp"
+#include <iterator>
 #include <vul_device.hpp>
 #include <vul_scene.hpp>
 #include <vulkan/vulkan_core.h>
@@ -21,13 +22,17 @@ class VulAs {
             glm::vec3 maxPos;
             uint32_t blasIndex;
         };
+        struct AsNode {
+            uint32_t nodeIndex;
+            uint32_t blasIndex;
+        };
         struct InstanceInfo {
             uint32_t blasIdx;
             uint32_t customIndex;
             uint32_t shaderBindingTableRecordOffset;
             glm::mat4 transform;
         };
-        void loadScene(const Scene &scene);
+        void loadScene(const Scene &scene, const std::vector<AsNode> &nodes, const std::vector<InstanceInfo> &instanceInfos, bool allowUpdating);
         void loadAabbs(const std::vector<Aabb> &aabbs, const std::vector<InstanceInfo> &instanceInfos, bool allowUpdating);
 
         struct InstanceTransform {
@@ -59,15 +64,14 @@ class VulAs {
         As buildBlas(BlasBuildData &buildData, VkDeviceAddress scratchBufferAddress, VkQueryPool queryPool, uint32_t queryIndex, VkCommandBuffer cmdBuf);
 
         VkAccelerationStructureInstanceKHR blasToAsInstance(uint32_t index, uint32_t sbtOffset, const glm::mat4 &transform, const As &blas);
-        BlasInput gltfNodesToBlasInput(const Scene &scene, uint32_t firstNode, uint32_t nodeCount, const std::unique_ptr<vulB::VulBuffer> &transformsBuffer);
+        BlasInput gltfNodesToBlasInput(const Scene &scene, const std::vector<uint32_t> &orderedNodesIndices, uint32_t startIdx, uint32_t count, const std::unique_ptr<vulB::VulBuffer> &transformsBuffer);
         BlasInput aabbsToBlasInput(vulB::VulBuffer &aabbBuf, VkDeviceSize maxAabbCount, VkDeviceSize aabbOffset);
-        std::unique_ptr<vulB::VulBuffer> createTransformsBuffer(const Scene &scene);
+        std::unique_ptr<vulB::VulBuffer> createTransformsBuffer(const Scene &scene, const std::vector<uint32_t> &orderedNodesIndices);
 
         As createAs(VkAccelerationStructureCreateInfoKHR &createInfo, bool deviceLocal);
 
         As m_tlas;
         std::vector<As> m_blases;
-        std::unique_ptr<vulB::VulBuffer> m_transformsBuffer;
 
         VkBuildAccelerationStructureFlagsKHR m_tlasBuildFlags;
 
