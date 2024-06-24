@@ -1,9 +1,6 @@
 #pragma once
 
-#include "vul_buffer.hpp"
-#include "vul_device.hpp"
-#include <vul_pipeline.hpp>
-#include <vulkan/vulkan_core.h>
+#include <vul_buffer.hpp>
 
 namespace vul {
 
@@ -14,7 +11,7 @@ class VulRtPipeline {
             int anyHitIdx;
             int intersectionIdx;
         };
-        VulRtPipeline(const vulB::VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
+        VulRtPipeline(const VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
                 const std::vector<std::string> &closestHitShaders, const std::vector<std::string> &anyHitShaders,
                 const std::vector<std::string> &intersectionShaders, const std::vector<HitGroup> &hitGroups,
                 const std::vector<VkDescriptorSetLayout> &setLayouts);
@@ -37,13 +34,13 @@ class VulRtPipeline {
         VkPipelineLayout m_layout;
         VkPipeline m_pipeline;
 
-        std::unique_ptr<vulB::VulBuffer> m_SBTBuffer;
+        std::unique_ptr<VulBuffer> m_SBTBuffer;
         VkStridedDeviceAddressRegionKHR m_rgenRegion{};
         VkStridedDeviceAddressRegionKHR m_rmissRegion{};
         VkStridedDeviceAddressRegionKHR m_rhitRegion{};
         VkStridedDeviceAddressRegionKHR m_callRegion{};
 
-        const vulB::VulDevice &m_vulDevice;
+        const VulDevice &m_vulDevice;
 };
 
 }

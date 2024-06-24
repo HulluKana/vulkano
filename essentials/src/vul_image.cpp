@@ -20,7 +20,7 @@
 
 #include <iostream>
 
-using namespace vulB;
+
 namespace vul {
 
 VulSampler::VulSampler(const VulDevice &vulDevice, VkFilter filter, VkSamplerAddressMode addressMode, float maxAnisotropy,
@@ -58,7 +58,7 @@ VulSampler::~VulSampler()
     if (m_sampler != VK_NULL_HANDLE) vkDestroySampler(m_vulDevice.device(), m_sampler, nullptr);
 }
 
-std::shared_ptr<VulSampler> VulSampler::createDefaultTexSampler(const vulB::VulDevice &vulDevice, uint32_t mipLevels)
+std::shared_ptr<VulSampler> VulSampler::createDefaultTexSampler(const vul::VulDevice &vulDevice, uint32_t mipLevels)
 {
     std::shared_ptr<VulSampler> sampler;
     sampler.reset(new VulSampler{vulDevice, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
@@ -67,7 +67,7 @@ std::shared_ptr<VulSampler> VulSampler::createDefaultTexSampler(const vulB::VulD
     return sampler;
 }
 
-std::shared_ptr<VulSampler> VulSampler::createCustomSampler(const vulB::VulDevice &vulDevice, VkFilter filter,
+std::shared_ptr<VulSampler> VulSampler::createCustomSampler(const vul::VulDevice &vulDevice, VkFilter filter,
         VkSamplerAddressMode addressMode, float maxAnisotropy, VkBorderColor borderColor,
         VkSamplerMipmapMode mipMapMode, float mipLodBias, float mipMinLod, float mipMaxLod)
 {
@@ -335,10 +335,10 @@ void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkI
     if (containsData && isDeviceLocal) {
         transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
         for (size_t i = 0; i < m_mipLevelsCount; i++) {
-            m_stagingBuffers.push_back(std::make_unique<vulB::VulBuffer>(m_vulDevice));
+            m_stagingBuffers.push_back(std::make_unique<vul::VulBuffer>(m_vulDevice));
             const size_t stgIdx = m_stagingBuffers.size() - 1;
             m_stagingBuffers[stgIdx]->loadData(m_mipLevels[i].layers[0], 1, m_mipLevels[i].layerSize * m_arrayLayersCount);
-            m_stagingBuffers[stgIdx]->createBuffer(false, vulB::VulBuffer::usage_transferSrc);
+            m_stagingBuffers[stgIdx]->createBuffer(false, vul::VulBuffer::usage_transferSrc);
             copyBufferToImage(m_stagingBuffers[stgIdx]->getBuffer(), i, cmdBuf);
 
             VUL_NAME_VK(m_stagingBuffers[stgIdx]->getBuffer())
@@ -462,7 +462,7 @@ void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newL
     m_layout = newLayout;
 }
 
-std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOneSingleTime(const vulB::VulDevice &vulDevice,
+std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOneSingleTime(const vul::VulDevice &vulDevice,
         std::variant<std::string, RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format,
         bool addSampler, InputDataType dataType, ImageType imageType)
 {
@@ -475,7 +475,7 @@ std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOneSingleTime(co
     return img;
 }
 
-std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOne(const vulB::VulDevice &vulDevice, std::variant<std::string,
+std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOne(const vul::VulDevice &vulDevice, std::variant<std::string,
         RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format, bool addSampler,
         InputDataType dataType, ImageType imageType, VkCommandBuffer cmdBuf)
 {

@@ -18,7 +18,7 @@
 
 #include <iostream>
 
-using namespace vulB;
+
 namespace vul{
 
 Vulkano::Vulkano(uint32_t width, uint32_t height, std::string name) : m_vulWindow{(int)width, (int)height, name}
@@ -108,7 +108,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
             if (scene.normalBuffer.get() != nullptr) vertexBuffers.push_back(scene.normalBuffer->getBuffer());
             if (scene.tangentBuffer.get() != nullptr) vertexBuffers.push_back(scene.tangentBuffer->getBuffer());
             if (scene.uvBuffer.get() != nullptr) vertexBuffers.push_back(scene.uvBuffer->getBuffer());
-            for (const std::shared_ptr<vulB::VulBuffer> &vertexBuf : renderData.additionalVertexBuffers) vertexBuffers.push_back(vertexBuf->getBuffer());
+            for (const std::shared_ptr<vul::VulBuffer> &vertexBuf : renderData.additionalVertexBuffers) vertexBuffers.push_back(vertexBuf->getBuffer());
             renderData.pipeline->draw(commandBuffer, descriptorSets, vertexBuffers, scene.indexBuffer->getBuffer(), renderData.drawDatas);
         }
     }

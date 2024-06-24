@@ -5,7 +5,7 @@
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
-using namespace vulB;
+
 namespace vul
 {
 
@@ -14,12 +14,12 @@ VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vecto
     if (maxFramesInFlight == 0) throw std::runtime_error("Max frames in flight for compute pipelines must be at least 1");
     m_maxFramesInFlight = maxFramesInFlight;
 
-    VulPipeline::createShaderModule(m_vulDevice, shaderName, &m_shader);
+    VkShaderModule shader = VulPipeline::createShaderModule(m_vulDevice, shaderName);
 
     VkPipelineShaderStageCreateInfo stageInfo{};
     stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    stageInfo.module = m_shader;
+    stageInfo.module = shader;
     stageInfo.pName = "main";
 
     VkPushConstantRange pushConstant{};
@@ -63,18 +63,18 @@ VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vecto
             throw std::runtime_error("Failed to create fence while creating compute pipeline");
     }
 
-    VUL_NAME_VK(m_shader)
     VUL_NAME_VK(m_layout)
     VUL_NAME_VK(m_pipeline)
     for (VkCommandBuffer cmdBuf : m_cmdBufs) VUL_NAME_VK(cmdBuf)
     for (VkFence fence : m_fences) VUL_NAME_VK(fence)
+
+    vkDestroyShaderModule(m_vulDevice.device(), shader, nullptr);
 }
 
 VulCompPipeline::~VulCompPipeline()
 {
     vkDestroyPipeline(m_vulDevice.device(), m_pipeline, nullptr);
     vkDestroyPipelineLayout(m_vulDevice.device(), m_layout, nullptr);
-    vkDestroyShaderModule(m_vulDevice.device(), m_shader, nullptr);
     vkFreeCommandBuffers(m_vulDevice.device(), m_vulDevice.getComputeCommandPool(), m_maxFramesInFlight, m_cmdBufs.data());
     for (uint32_t i = 0; i < m_maxFramesInFlight; i++)
         vkDestroyFence(m_vulDevice.device(), m_fences[i], nullptr);

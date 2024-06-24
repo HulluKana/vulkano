@@ -7,7 +7,7 @@
 #include <vulkan/vulkan_core.h>
 #include <cassert>
 
-namespace vulB {
+namespace vul {
 
 VulBuffer::VulBuffer(const VulDevice &vulDevice) : m_vulDevice{vulDevice}
 {

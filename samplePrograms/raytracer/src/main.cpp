@@ -21,7 +21,7 @@ void GuiStuff(vul::Vulkano &vulkano) {
     ImGui::End();
 }
 
-std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulkano, const vul::VulAs &as, const std::unique_ptr<vul::VulImage> &rtImg, const std::unique_ptr<vulB::VulBuffer> &ubo, const std::unique_ptr<vul::VulImage> &enviromentMap)
+std::unique_ptr<vul::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulkano, const vul::VulAs &as, const std::unique_ptr<vul::VulImage> &rtImg, const std::unique_ptr<vul::VulBuffer> &ubo, const std::unique_ptr<vul::VulImage> &enviromentMap)
 {
     std::vector<vul::Vulkano::Descriptor> descriptors;
     vul::Vulkano::Descriptor desc{};
@@ -80,9 +80,9 @@ std::unique_ptr<vulB::VulDescriptorSet> createRtDescSet(const vul::Vulkano &vulk
     return vulkano.createDescriptorSet(descriptors);
 }
 
-vul::Vulkano::RenderData createRenderData(const vul::Vulkano &vulkano, const vulB::VulDevice &device, const std::array<std::shared_ptr<vulB::VulDescriptorSet>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> &descSets)
+vul::Vulkano::RenderData createRenderData(const vul::Vulkano &vulkano, const vul::VulDevice &device, const std::array<std::shared_ptr<vul::VulDescriptorSet>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> &descSets)
 {
-    vulB::VulPipeline::PipelineConfigInfo pipConf{};
+    vul::VulPipeline::PipelineConfigInfo pipConf{};
     pipConf.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32_SFLOAT, 0}};
     pipConf.bindingDescriptions = {{0, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
     pipConf.colorAttachmentFormats = {vulkano.vulRenderer.getSwapChainColorFormat()};
@@ -93,16 +93,16 @@ vul::Vulkano::RenderData createRenderData(const vul::Vulkano &vulkano, const vul
 
     vul::Vulkano::RenderData renderData{};
     renderData.is3d = false;
-    renderData.depthImageMode = vulB::VulRenderer::DepthImageMode::noDepthImage;
-    renderData.swapChainImageMode = vulB::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent;
+    renderData.depthImageMode = vul::VulRenderer::DepthImageMode::noDepthImage;
+    renderData.swapChainImageMode = vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent;
     renderData.sampleFromDepth = false;
-    for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) renderData.descriptorSets[i].push_back(descSets[i]);
-    renderData.pipeline = std::make_shared<vulB::VulPipeline>(device, "../bin/raytrace.vert.spv", "../bin/raytrace.frag.spv", pipConf);
+    for (int i = 0; i < vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) renderData.descriptorSets[i].push_back(descSets[i]);
+    renderData.pipeline = std::make_shared<vul::VulPipeline>(device, "../bin/raytrace.vert.spv", "../bin/raytrace.frag.spv", pipConf);
 
     return renderData;
 }
 
-void resizeRtImgs(vul::Vulkano &vulkano, std::array<std::unique_ptr<vul::VulImage>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> &rtImgs)
+void resizeRtImgs(vul::Vulkano &vulkano, std::array<std::unique_ptr<vul::VulImage>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> &rtImgs)
 {
     VkCommandBuffer cmdBuf = vulkano.getVulDevice().beginSingleTimeCommands();
     for (size_t i = 0; i < rtImgs.size(); i++) {
@@ -118,7 +118,7 @@ void resizeRtImgs(vul::Vulkano &vulkano, std::array<std::unique_ptr<vul::VulImag
     }
 }
 
-void updateUbo(const vul::Vulkano &vulkano, std::unique_ptr<vulB::VulBuffer> &ubo)
+void updateUbo(const vul::Vulkano &vulkano, std::unique_ptr<vul::VulBuffer> &ubo)
 {
     GlobalUbo uboData{};
     uboData.inverseViewMatrix = glm::inverse(vulkano.camera.getView());
@@ -157,19 +157,19 @@ int main() {
     as.loadScene(vulkano.scene, asNodes, {vul::VulAs::InstanceInfo{.blasIdx = 0, .customIndex = 0,
             .shaderBindingTableRecordOffset = 0, .transform = vul::transform3D{}.transformMat()}}, false);
 
-    std::array<std::unique_ptr<vul::VulImage>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> rtImgs;
-    std::array<std::unique_ptr<vulB::VulBuffer>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> ubos;
-    std::array<std::shared_ptr<vulB::VulDescriptorSet>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descSets;
-    for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+    std::array<std::unique_ptr<vul::VulImage>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> rtImgs;
+    std::array<std::unique_ptr<vul::VulBuffer>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> ubos;
+    std::array<std::shared_ptr<vul::VulDescriptorSet>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descSets;
+    for (int i = 0; i < vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
         rtImgs[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());
         rtImgs[i]->keepRegularRaw2d32bitRgbaEmpty(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height);
         VkCommandBuffer cmdBuf = vulkano.getVulDevice().beginSingleTimeCommands();
         rtImgs[i]->createDefaultImage(vul::VulImage::ImageType::storage2d, cmdBuf);
         vulkano.getVulDevice().endSingleTimeCommands(cmdBuf);
 
-        ubos[i] = std::make_unique<vulB::VulBuffer>(vulkano.getVulDevice());
+        ubos[i] = std::make_unique<vul::VulBuffer>(vulkano.getVulDevice());
         ubos[i]->keepEmpty(sizeof(GlobalUbo), 1);
-        ubos[i]->createBuffer(false, vulB::VulBuffer::usage_ubo);
+        ubos[i]->createBuffer(false, vul::VulBuffer::usage_ubo);
 
         descSets[i] = createRtDescSet(vulkano, as, rtImgs[i], ubos[i], enviromentMap);
     }
@@ -188,7 +188,7 @@ int main() {
         if (vulkano.shouldShowGUI()) GuiStuff(vulkano);
         updateUbo(vulkano, ubos[frameIdx]);
 
-        std::vector<VkDescriptorSet> descSets = {vulkano.renderDatas[0].descriptorSets[(frameIdx + 1) % vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT]
+        std::vector<VkDescriptorSet> descSets = {vulkano.renderDatas[0].descriptorSets[(frameIdx + 1) % vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT]
             [0]->getSet()};
         rtPipeline.traceRays(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, 0, nullptr, descSets, commandBuffer);
         stop = vulkano.endFrame(commandBuffer);

@@ -38,21 +38,21 @@ RtResources createRaytracingResources(vul::Vulkano &vulkano)
                 spheres.emplace_back(glm::vec4{pos, 0.3f});
             }
         }
-        res.spheresBuf = std::make_unique<vulB::VulBuffer>(vulkano.getVulDevice());
+        res.spheresBuf = std::make_unique<vul::VulBuffer>(vulkano.getVulDevice());
         res.spheresBuf->loadVector(spheres);
-        res.spheresBuf->createBuffer(true, static_cast<vulB::VulBuffer::Usage>(
-                    vulB::VulBuffer::usage_ssbo | vulB::VulBuffer::usage_transferDst));
+        res.spheresBuf->createBuffer(true, static_cast<vul::VulBuffer::Usage>(
+                    vul::VulBuffer::usage_ssbo | vul::VulBuffer::usage_transferDst));
     }
 
-    for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
+    for (int i = 0; i < vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
         res.rtImgs[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());
         res.rtImgs[i]->keepRegularRaw2d32bitRgbaEmpty(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height);
         res.rtImgs[i]->createDefaultImageSingleTime(vul::VulImage::ImageType::storage2d);
 
-        res.ubos[i] = std::make_unique<vulB::VulBuffer>(vulkano.getVulDevice());
+        res.ubos[i] = std::make_unique<vul::VulBuffer>(vulkano.getVulDevice());
         res.ubos[i]->keepEmpty(sizeof(RtUbo), 1);
-        res.ubos[i]->createBuffer(false, static_cast<vulB::VulBuffer::Usage>(
-                    vulB::VulBuffer::usage_ubo | vulB::VulBuffer::usage_transferDst));
+        res.ubos[i]->createBuffer(false, static_cast<vul::VulBuffer::Usage>(
+                    vul::VulBuffer::usage_ubo | vul::VulBuffer::usage_transferDst));
 
         std::vector<vul::Vulkano::Descriptor> descriptors;
         vul::Vulkano::Descriptor desc{};
@@ -81,7 +81,7 @@ RtResources createRaytracingResources(vul::Vulkano &vulkano)
         res.descSets[i] = vulkano.createDescriptorSet(descriptors);
     }
 
-    vulB::VulPipeline::PipelineConfigInfo pipConf{};
+    vul::VulPipeline::PipelineConfigInfo pipConf{};
     pipConf.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32_SFLOAT, 0}};
     pipConf.bindingDescriptions = {{0, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX},
         {1, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
@@ -92,11 +92,11 @@ RtResources createRaytracingResources(vul::Vulkano &vulkano)
 
     vul::Vulkano::RenderData renderData{};
     renderData.is3d = false;
-    renderData.depthImageMode = vulB::VulRenderer::DepthImageMode::noDepthImage;
-    renderData.swapChainImageMode = vulB::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent;
+    renderData.depthImageMode = vul::VulRenderer::DepthImageMode::noDepthImage;
+    renderData.swapChainImageMode = vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent;
     renderData.sampleFromDepth = false;
-    for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) renderData.descriptorSets[i].push_back(res.descSets[i]);
-    renderData.pipeline = std::make_shared<vulB::VulPipeline>(vulkano.getVulDevice(),
+    for (int i = 0; i < vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) renderData.descriptorSets[i].push_back(res.descSets[i]);
+    renderData.pipeline = std::make_shared<vul::VulPipeline>(vulkano.getVulDevice(),
             "../bin/raytrace.vert.spv", "../bin/raytrace.frag.spv", pipConf);
     vulkano.renderDatas.push_back(renderData);
 
@@ -110,7 +110,7 @@ RtResources createRaytracingResources(vul::Vulkano &vulkano)
 
 void raytrace(const vul::Vulkano &vulkano, const RtResources &res, VkCommandBuffer cmdBuf)
 {
-    std::vector<VkDescriptorSet> vkDescSets = {res.descSets[(vulkano.getFrameIdx()) % vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT]->getSet()};
+    std::vector<VkDescriptorSet> vkDescSets = {res.descSets[(vulkano.getFrameIdx()) % vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT]->getSet()};
     res.pipeline->traceRays(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height, 0, nullptr, vkDescSets, cmdBuf);
 }
 
@@ -121,7 +121,7 @@ void updateRtUbo(const vul::Vulkano &vulkano, RtResources &res, bool fullUpdate)
         ubo.cameraPosition = glm::vec4(vulkano.cameraTransform.pos, 1.0f);
         ubo.inverseViewMatrix = glm::inverse(vulkano.camera.getView());
         ubo.inverseProjectionMatrix = glm::inverse(vulkano.camera.getProjection());
-        for (int i = 0; i < vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++)
+        for (int i = 0; i < vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++)
             res.ubos[i]->writeData(&ubo, sizeof(ubo), 0);
     }
     else {
@@ -135,7 +135,7 @@ void updateRtUbo(const vul::Vulkano &vulkano, RtResources &res, bool fullUpdate)
 void resizeRtImgs(const vul::Vulkano &vulkano, RtResources &res)
 {
     VkCommandBuffer cmdBuf = vulkano.getVulDevice().beginSingleTimeCommands();
-    std::array<vul::VulImage *, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> oldRtImgs;
+    std::array<vul::VulImage *, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> oldRtImgs;
     for (size_t i = 0; i < res.rtImgs.size(); i++) {
         oldRtImgs[i] = res.rtImgs[i].release();
         res.rtImgs[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());

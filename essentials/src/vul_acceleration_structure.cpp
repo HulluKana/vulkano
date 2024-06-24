@@ -10,7 +10,7 @@
 #include <iostream>
 #include <vulkan/vulkan_core.h>
 
-using namespace vulB;
+
 namespace vul {
 
 VulAs::VulAs(const VulDevice &vulDevice) : m_vulDevice{vulDevice} {}
@@ -324,7 +324,7 @@ VkAccelerationStructureInstanceKHR VulAs::blasToAsInstance(uint32_t index, uint3
     return asInst;
 }
 
-VulAs::BlasInput VulAs::gltfNodesToBlasInput(const Scene &scene, const std::vector<uint32_t> &orderedNodesIndices, uint32_t startIdx, uint32_t count, const std::unique_ptr<vulB::VulBuffer> &transformsBuffer)
+VulAs::BlasInput VulAs::gltfNodesToBlasInput(const Scene &scene, const std::vector<uint32_t> &orderedNodesIndices, uint32_t startIdx, uint32_t count, const std::unique_ptr<vul::VulBuffer> &transformsBuffer)
 {
     BlasInput blasInput{};
     for (uint32_t i = startIdx; i < startIdx + count; i++) {
@@ -359,7 +359,7 @@ VulAs::BlasInput VulAs::gltfNodesToBlasInput(const Scene &scene, const std::vect
     return blasInput;
 }
 
-VulAs::BlasInput VulAs::aabbsToBlasInput(vulB::VulBuffer &aabbBuf, VkDeviceSize maxAabbCount, VkDeviceSize aabbOffset)
+VulAs::BlasInput VulAs::aabbsToBlasInput(vul::VulBuffer &aabbBuf, VkDeviceSize maxAabbCount, VkDeviceSize aabbOffset)
 {
     VkAccelerationStructureGeometryAabbsDataKHR aabbs{};
     aabbs.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR;
@@ -392,7 +392,7 @@ std::unique_ptr<VulBuffer> VulAs::createTransformsBuffer(const Scene &scene, con
         memcpy(&transforms[i], &trasposedTransformMat, sizeof(VkTransformMatrixKHR));
     }
 
-    std::unique_ptr<vulB::VulBuffer> transformsBuffer = std::make_unique<VulBuffer>(m_vulDevice);
+    std::unique_ptr<vul::VulBuffer> transformsBuffer = std::make_unique<VulBuffer>(m_vulDevice);
     transformsBuffer->loadVector(transforms);
     assert(transformsBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_transferDst | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead)) == VK_SUCCESS);
     return transformsBuffer;

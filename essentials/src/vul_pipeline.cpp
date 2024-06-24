@@ -6,14 +6,14 @@
 #include<iostream>
 #include <vulkan/vulkan_core.h>
 
-namespace vulB{
+namespace vul{
 
 VulPipeline::VulPipeline(const VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo) : m_vulDevice(device)
 {
-    createShaderModule(m_vulDevice, vertFile, &vertShaderModule);
-    createShaderModule(m_vulDevice, fragFile, &fragShaderModule);
+    VkShaderModule vertShaderModule = createShaderModule(m_vulDevice, vertFile);
+    VkShaderModule fragShaderModule = createShaderModule(m_vulDevice, fragFile);
 
-    VkPipelineShaderStageCreateInfo shaderStages[2]{};
+    std::vector<VkPipelineShaderStageCreateInfo> shaderStages(2);
     shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
     shaderStages[0].module = vertShaderModule;
@@ -30,6 +30,49 @@ VulPipeline::VulPipeline(const VulDevice& device, const std::string& vertFile, c
     shaderStages[1].pNext = nullptr;
     shaderStages[1].pSpecializationInfo = nullptr;
 
+    PipelineContents pipelineContents = createPipelineContents(device, shaderStages, configInfo);
+    m_pipeline = pipelineContents.pipeline;
+    m_layout = pipelineContents.layout;
+
+    vkDestroyShaderModule(m_vulDevice.device(), vertShaderModule, nullptr);
+    vkDestroyShaderModule(m_vulDevice.device(), fragShaderModule, nullptr);
+
+    VUL_NAME_VK(m_pipeline)
+    VUL_NAME_VK(m_layout)
+}
+
+VulPipeline::~VulPipeline() {
+    vkDestroyPipeline(m_vulDevice.device(), m_pipeline, nullptr);
+    vkDestroyPipelineLayout(m_vulDevice.device(), m_layout, nullptr);
+}
+
+void VulPipeline::draw( VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSet> &descriptorSets, const std::vector<VkBuffer> &vertexBuffers,
+                        VkBuffer indexBuffer, const std::vector<DrawData> &drawDatas)
+{
+    VUL_PROFILE_FUNC()
+    {
+        VUL_PROFILE_SCOPE("Binding the pipeline, descriptor sets, vertex buffers and the index buffer")
+        vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+        if (descriptorSets.size() > 0) vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
+
+        std::vector<VkDeviceSize> offsets(vertexBuffers.size());
+        for (size_t i = 0; i < vertexBuffers.size(); i++) offsets.push_back(0);
+        vkCmdBindVertexBuffers(cmdBuf, 0, static_cast<uint32_t>(vertexBuffers.size()), vertexBuffers.data(), offsets.data());
+        vkCmdBindIndexBuffer(cmdBuf, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
+    }
+
+    {
+        VUL_PROFILE_SCOPE("Pushing constants and drawing indices")
+        for (const DrawData &drawData : drawDatas){
+            if (drawData.pushDataSize > 0) vkCmdPushConstants(cmdBuf, m_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, drawData.pushDataSize, drawData.pPushData.get());
+            vkCmdDrawIndexed(cmdBuf, drawData.indexCount, drawData.instanceCount, drawData.firstIndex, drawData.vertexOffset, drawData.firstInstance);
+        }
+    }
+}
+
+VulPipeline::PipelineContents VulPipeline::createPipelineContents(const VulDevice &vulDevice,
+        const std::vector<VkPipelineShaderStageCreateInfo> &shaderStageCreateInfos, const PipelineConfigInfo &configInfo)
+{
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
     vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(configInfo.attributeDescriptions.size());
@@ -124,7 +167,7 @@ VulPipeline::VulPipeline(const VulDevice& device, const std::string& vertFile, c
     VkPushConstantRange pushConstantRange{};
     pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
     pushConstantRange.offset = 0;
-    pushConstantRange.size = m_vulDevice.properties.limits.maxPushConstantsSize; 
+    pushConstantRange.size = vulDevice.properties.limits.maxPushConstantsSize; 
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -132,15 +175,16 @@ VulPipeline::VulPipeline(const VulDevice& device, const std::string& vertFile, c
     pipelineLayoutInfo.pSetLayouts = configInfo.setLayouts.data();
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
-    if (vkCreatePipelineLayout(m_vulDevice.device(), &pipelineLayoutInfo, nullptr, &m_layout) != VK_SUCCESS){
+    VkPipelineLayout layout;
+    if (vkCreatePipelineLayout(vulDevice.device(), &pipelineLayoutInfo, nullptr, &layout) != VK_SUCCESS){
         throw std::runtime_error("Failed to create pipelineLayout in RenderSystem.cpp file");
     }
 
     VkGraphicsPipelineCreateInfo pipelineInfo{};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
     pipelineInfo.pNext = &pipelineRenderingInfo;
-    pipelineInfo.stageCount = 2;
-    pipelineInfo.pStages = shaderStages;
+    pipelineInfo.stageCount = shaderStageCreateInfos.size();
+    pipelineInfo.pStages = shaderStageCreateInfos.data();
     pipelineInfo.pVertexInputState = &vertexInputInfo;
     pipelineInfo.pInputAssemblyState = &inputAssemblyInfo;
     pipelineInfo.pViewportState = &viewportInfo;
@@ -150,54 +194,21 @@ VulPipeline::VulPipeline(const VulDevice& device, const std::string& vertFile, c
     pipelineInfo.pDepthStencilState = &depthStencilInfo;
     pipelineInfo.pDynamicState = &dynamicStateInfo;
 
-    pipelineInfo.layout = m_layout;
+    pipelineInfo.layout = layout;
     pipelineInfo.renderPass = nullptr;
     pipelineInfo.subpass = 0;
 
     pipelineInfo.basePipelineIndex = -1;
     pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
 
-    if (vkCreateGraphicsPipelines(m_vulDevice.device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline) != VK_SUCCESS){
+    VkPipeline pipeline;
+    if (vkCreateGraphicsPipelines(vulDevice.device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &pipeline) != VK_SUCCESS){
         throw std::runtime_error("Failed to create graphics pipeline in vul_pipeline.cpp file");
     }
-
-    vkDestroyShaderModule(m_vulDevice.device(), vertShaderModule, nullptr);
-    vkDestroyShaderModule(m_vulDevice.device(), fragShaderModule, nullptr);
-
-    VUL_NAME_VK(m_pipeline)
-    VUL_NAME_VK(m_layout)
+    return {.pipeline = pipeline, .layout = layout};
 }
 
-VulPipeline::~VulPipeline() {
-    vkDestroyPipeline(m_vulDevice.device(), m_pipeline, nullptr);
-    vkDestroyPipelineLayout(m_vulDevice.device(), m_layout, nullptr);
-}
-
-void VulPipeline::draw( VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSet> &descriptorSets, const std::vector<VkBuffer> &vertexBuffers,
-                        VkBuffer indexBuffer, const std::vector<DrawData> &drawDatas)
-{
-    VUL_PROFILE_FUNC()
-    {
-        VUL_PROFILE_SCOPE("Binding the pipeline, descriptor sets, vertex buffers and the index buffer")
-        vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
-        if (descriptorSets.size() > 0) vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout, 0, descriptorSets.size(), descriptorSets.data(), 0, nullptr);
-
-        std::vector<VkDeviceSize> offsets(vertexBuffers.size());
-        for (size_t i = 0; i < vertexBuffers.size(); i++) offsets.push_back(0);
-        vkCmdBindVertexBuffers(cmdBuf, 0, static_cast<uint32_t>(vertexBuffers.size()), vertexBuffers.data(), offsets.data());
-        vkCmdBindIndexBuffer(cmdBuf, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
-    }
-
-    {
-        VUL_PROFILE_SCOPE("Pushing constants and drawing indices")
-        for (const DrawData &drawData : drawDatas){
-            if (drawData.pushDataSize > 0) vkCmdPushConstants(cmdBuf, m_layout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, drawData.pushDataSize, drawData.pPushData.get());
-            vkCmdDrawIndexed(cmdBuf, drawData.indexCount, drawData.instanceCount, drawData.firstIndex, drawData.vertexOffset, drawData.firstInstance);
-        }
-    }
-}
-
-void VulPipeline::createShaderModule(const VulDevice &m_vulDevice, const std::string &filePath, VkShaderModule* shaderModule)
+VkShaderModule VulPipeline::createShaderModule(const VulDevice &m_vulDevice, const std::string &filePath)
 {
     std::ifstream file{filePath, std::ios::ate | std::ios::binary};
     if (!file.is_open()) throw std::runtime_error("Failed to open file in vul_pipeline readFile function. Filepath: " + filePath);
@@ -213,9 +224,11 @@ void VulPipeline::createShaderModule(const VulDevice &m_vulDevice, const std::st
     createInfo.codeSize = code.size();
     createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 
-    if (vkCreateShaderModule(m_vulDevice.device(), &createInfo, nullptr, shaderModule) != VK_SUCCESS){
+    VkShaderModule shaderModule;
+    if (vkCreateShaderModule(m_vulDevice.device(), &createInfo, nullptr, &shaderModule) != VK_SUCCESS){
         throw std::runtime_error("Failed to create shader module in vul_pipeline.cpp file");
     }
+    return shaderModule;
 }
 
 }

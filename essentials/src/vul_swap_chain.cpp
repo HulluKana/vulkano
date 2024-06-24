@@ -13,7 +13,7 @@
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
-namespace vulB {
+namespace vul {
 
 VulSwapChain::VulSwapChain(VulDevice &deviceRef, VkExtent2D extent)
     : device{deviceRef}, windowExtent{extent}

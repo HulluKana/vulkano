@@ -6,7 +6,7 @@
 #include <stdexcept>
 #include <vulkan/vulkan_core.h>
 
-namespace vulB {
+namespace vul {
 
 class VulBuffer {
     public:

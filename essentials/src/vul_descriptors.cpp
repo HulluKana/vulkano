@@ -7,7 +7,7 @@
 #include <iostream>
 #include <vulkan/vulkan_core.h>
  
-namespace vulB {
+namespace vul {
  
 // *************** Descriptor Set Layout Builder *********************
 

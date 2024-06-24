@@ -8,7 +8,7 @@
 #include <memory>
 #include <vector>
 
-namespace vulB {
+namespace vul {
 
 class VulSwapChain {
  public:
@@ -22,7 +22,7 @@ class VulSwapChain {
   VulSwapChain &operator=(const VulSwapChain &) = delete;
 
   size_t imageCount() { return swapChainImages.size(); }
-  std::shared_ptr<vul::VulImage> getImage(uint32_t index) {return swapChainImages[index];}
+  std::shared_ptr<VulImage> getImage(uint32_t index) {return swapChainImages[index];}
   VkFormat getSwapChainImageFormat() { return swapChainImageFormat; }
   VkExtent2D getSwapChainExtent() { return swapChainExtent; }
   uint32_t width() { return swapChainExtent.width; }
@@ -55,7 +55,7 @@ class VulSwapChain {
   VkFormat swapChainImageFormat;
   VkExtent2D swapChainExtent;
 
-  std::vector<std::shared_ptr<vul::VulImage>> swapChainImages;
+  std::vector<std::shared_ptr<VulImage>> swapChainImages;
 
   VulDevice &device;
   VkExtent2D windowExtent;

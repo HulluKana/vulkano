@@ -3,7 +3,7 @@
 #include"vul_transform.hpp"
 #include"vul_window.hpp"
 
-namespace vulB{
+namespace vul{
 
 class MovementController{
     public:
@@ -28,9 +28,9 @@ class MovementController{
             int resetAll = GLFW_KEY_R;
         };
 
-        void modifyValues(GLFWwindow *window, vul::transform3D &transform);
-        void rotate(GLFWwindow *window, float dt, vul::transform3D &transform, int screenWidth, int screenHeight);
-        void move(GLFWwindow *window, float dt, vul::transform3D &transform);
+        void modifyValues(GLFWwindow *window, transform3D &transform);
+        void rotate(GLFWwindow *window, float dt, transform3D &transform, int screenWidth, int screenHeight);
+        void move(GLFWwindow *window, float dt, transform3D &transform);
 
         bool hideGUI = false;
 

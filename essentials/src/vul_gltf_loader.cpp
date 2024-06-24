@@ -28,8 +28,8 @@
 #define TINYGLTF_NO_EXTERNAL_IMAGE
 #include <tiny_gltf.h>
 
-using namespace vul;
-namespace vulB
+
+namespace vul
 {
 
 void GltfLoader::importMaterials(const tinygltf::Model &model)

@@ -8,7 +8,7 @@
 #include<cassert>
 #include<memory>
 
-namespace vulB{
+namespace vul{
 
 class VulRenderer{
     public:
@@ -26,7 +26,7 @@ class VulRenderer{
         VkFormat getSwapChainColorFormat() const {return vulSwapChain->getSwapChainImageFormat();}
         bool wasSwapChainRecreated() const {return m_swapchainRecreated;}
         VkFormat getDepthFormat() const {return m_depthFormat;}
-        const std::vector<std::unique_ptr<vul::VulImage>> &getDepthImages() const {return m_depthImages;}
+        const std::vector<std::unique_ptr<VulImage>> &getDepthImages() const {return m_depthImages;}
         bool isFrameInProgress() const {return isFrameStarted;}
 
         VkCommandBuffer getCurrentCommandBuffer() const {
@@ -53,7 +53,7 @@ class VulRenderer{
             clearPreviousDiscardCurrent,
             noDepthImage
         };
-        void beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<vul::VulImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, uint32_t renderWidth, uint32_t renderHeight);
+        void beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, uint32_t renderWidth, uint32_t renderHeight);
         void stopRendering(VkCommandBuffer commandBuffer);
         
     private:
@@ -65,7 +65,7 @@ class VulRenderer{
         std::unique_ptr<VulSwapChain> vulSwapChain;
         std::vector<VkCommandBuffer> commandBuffers;
 
-        std::vector<std::unique_ptr<vul::VulImage>> m_depthImages;
+        std::vector<std::unique_ptr<VulImage>> m_depthImages;
         VkFormat m_depthFormat;
 
         uint32_t currentImageIndex;

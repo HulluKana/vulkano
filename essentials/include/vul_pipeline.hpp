@@ -4,8 +4,9 @@
 #include<string>
 #include<vector>
 #include<memory>
+#include <vulkan/vulkan_core.h>
 
-namespace vulB{
+namespace vul{
 
 class VulPipeline{
     public:
@@ -43,7 +44,13 @@ class VulPipeline{
         void draw(  VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSet> &descriptorSets, const std::vector<VkBuffer> &vertexBuffers,
                     VkBuffer indexBuffer, const std::vector<DrawData> &drawDatas);
 
-        static void createShaderModule(const VulDevice &vulDevice, const std::string &filePath, VkShaderModule* shaderModule);
+        struct PipelineContents {
+            VkPipeline pipeline;
+            VkPipelineLayout layout;
+        };
+        static PipelineContents createPipelineContents(const VulDevice &vulDevice,
+                const std::vector<VkPipelineShaderStageCreateInfo> &shaderStageCreateInfos, const PipelineConfigInfo &configInfo);
+        static VkShaderModule createShaderModule(const VulDevice &vulDevice, const std::string &filePath);
 
         VkPipeline getPipeline() const {return m_pipeline;}
         VkPipelineLayout getPipelineLayout() const {return m_layout;}
@@ -51,7 +58,5 @@ class VulPipeline{
         const VulDevice& m_vulDevice;
         VkPipeline m_pipeline;
         VkPipelineLayout m_layout;
-        VkShaderModule vertShaderModule;
-        VkShaderModule fragShaderModule;
 };
 }

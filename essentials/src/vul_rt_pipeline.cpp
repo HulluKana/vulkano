@@ -8,10 +8,10 @@
 #include <vulkan/vulkan_core.h>
 #include <iostream>
 
-using namespace vulB;
+
 namespace vul {
 
-VulRtPipeline::VulRtPipeline(const vulB::VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
+VulRtPipeline::VulRtPipeline(const vul::VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
                 const std::vector<std::string> &closestHitShaders, const std::vector<std::string> &anyHitShaders,
                 const std::vector<std::string> &intersectionShaders, const std::vector<HitGroup> &hitGroups,
                 const std::vector<VkDescriptorSetLayout> &setLayouts) : m_vulDevice{vulDevice}
@@ -61,7 +61,7 @@ void VulRtPipeline::createPipeline(const std::string &raygenShader, const std::v
     group.intersectionShader = VK_SHADER_UNUSED_KHR;
 
     group.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
-    vulB::VulPipeline::createShaderModule(m_vulDevice, raygenShader, &stage.module);
+    stage.module = vul::VulPipeline::createShaderModule(m_vulDevice, raygenShader);
     stage.stage = VK_SHADER_STAGE_RAYGEN_BIT_KHR;
     stages[0] = stage;
 
@@ -69,7 +69,7 @@ void VulRtPipeline::createPipeline(const std::string &raygenShader, const std::v
     m_shaderGroups.push_back(group);
 
     for (size_t i = 0; i < missShaders.size(); i++) {
-        vulB::VulPipeline::createShaderModule(m_vulDevice, missShaders[i], &stage.module);
+        stage.module = vul::VulPipeline::createShaderModule(m_vulDevice, missShaders[i]);
         stage.stage = VK_SHADER_STAGE_MISS_BIT_KHR;
         stages[i + missIdx] = stage;
 
@@ -77,17 +77,17 @@ void VulRtPipeline::createPipeline(const std::string &raygenShader, const std::v
         m_shaderGroups.push_back(group);
     }
     for (size_t i = 0; i < closestHitShaders.size(); i++) {
-        vulB::VulPipeline::createShaderModule(m_vulDevice, closestHitShaders[i], &stage.module);
+        stage.module = vul::VulPipeline::createShaderModule(m_vulDevice, closestHitShaders[i]);
         stage.stage = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR;
         stages[i + closestIdx] = stage;
     }
     for (size_t i = 0; i < anyHitShaders.size(); i++) {
-        vulB::VulPipeline::createShaderModule(m_vulDevice, anyHitShaders[i], &stage.module);
+        stage.module = vul::VulPipeline::createShaderModule(m_vulDevice, anyHitShaders[i]);
         stage.stage = VK_SHADER_STAGE_ANY_HIT_BIT_KHR;
         stages[i + anyHitIdx] = stage;
     }
     for (size_t i = 0; i < intersectionShaders.size(); i++) {
-        vulB::VulPipeline::createShaderModule(m_vulDevice, intersectionShaders[i], &stage.module);
+        stage.module = vul::VulPipeline::createShaderModule(m_vulDevice, intersectionShaders[i]);
         stage.stage = VK_SHADER_STAGE_INTERSECTION_BIT_KHR;
         stages[i + intersectionIdx] = stage;
     }

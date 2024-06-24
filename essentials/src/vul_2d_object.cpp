@@ -2,7 +2,9 @@
 #include<vul_2d_object.hpp>
 #include <vulkan/vulkan_core.h>
 
-void Object2D::addSquare(vulB::VulDevice &vulDevice, float x, float y, float width, float height)
+namespace vul{
+
+void Object2D::addSquare(vul::VulDevice &vulDevice, float x, float y, float width, float height)
 {
     std::vector<glm::vec2> positions = {
         {x - width, y - height},
@@ -13,38 +15,38 @@ void Object2D::addSquare(vulB::VulDevice &vulDevice, float x, float y, float wid
     std::vector<glm::vec2> uvCoords = {{0.0f, 0.0f}, {0.0f, 1.0f}, {1.0f, 1.0f}, {1.0f, 0.0f}};
     std::vector<uint32_t> indices = {0, 1, 2, 0, 3, 2};
 
-    m_indexBuf = std::make_unique<vulB::VulBuffer>(vulDevice);
-    m_posBuf = std::make_unique<vulB::VulBuffer>(vulDevice);
-    m_uvBuf = std::make_unique<vulB::VulBuffer>(vulDevice);
+    m_indexBuf = std::make_unique<vul::VulBuffer>(vulDevice);
+    m_posBuf = std::make_unique<vul::VulBuffer>(vulDevice);
+    m_uvBuf = std::make_unique<vul::VulBuffer>(vulDevice);
 
     m_indexBuf->loadVector(indices);
     m_posBuf->loadVector(positions);
     m_uvBuf->loadVector(uvCoords);
 
-    m_indexBuf->createBuffer(true, static_cast<vulB::VulBuffer::Usage>(vulB::VulBuffer::usage_indexBuffer | vulB::VulBuffer::usage_transferDst));
-    m_posBuf->createBuffer(true, static_cast<vulB::VulBuffer::Usage>(vulB::VulBuffer::usage_vertexBuffer | vulB::VulBuffer::usage_transferDst));
-    m_uvBuf->createBuffer(true, static_cast<vulB::VulBuffer::Usage>(vulB::VulBuffer::usage_vertexBuffer | vulB::VulBuffer::usage_transferDst));
+    m_indexBuf->createBuffer(true, static_cast<vul::VulBuffer::Usage>(vul::VulBuffer::usage_indexBuffer | vul::VulBuffer::usage_transferDst));
+    m_posBuf->createBuffer(true, static_cast<vul::VulBuffer::Usage>(vul::VulBuffer::usage_vertexBuffer | vul::VulBuffer::usage_transferDst));
+    m_uvBuf->createBuffer(true, static_cast<vul::VulBuffer::Usage>(vul::VulBuffer::usage_vertexBuffer | vul::VulBuffer::usage_transferDst));
 
     m_indexCount = static_cast<uint32_t>(indices.size());
 }
 
-void Object2D::addTriangle(vulB::VulDevice &vulDevice, glm::vec2 corner1, glm::vec2 corner2, glm::vec2 corner3)
+void Object2D::addTriangle(vul::VulDevice &vulDevice, glm::vec2 corner1, glm::vec2 corner2, glm::vec2 corner3)
 {
     std::vector<glm::vec2> positions = {corner1, corner2, corner3};
     std::vector<glm::vec2> uvCoords = {{0.0f, 0.0f}, {1.0f, 0.0f}, {0.5f, 1.0f}};
     std::vector<uint32_t> indices = {0, 1, 2};
 
-    m_indexBuf = std::make_unique<vulB::VulBuffer>(vulDevice);
-    m_posBuf = std::make_unique<vulB::VulBuffer>(vulDevice);
-    m_uvBuf = std::make_unique<vulB::VulBuffer>(vulDevice);
+    m_indexBuf = std::make_unique<vul::VulBuffer>(vulDevice);
+    m_posBuf = std::make_unique<vul::VulBuffer>(vulDevice);
+    m_uvBuf = std::make_unique<vul::VulBuffer>(vulDevice);
 
     m_indexBuf->loadVector(indices);
     m_posBuf->loadVector(positions);
     m_uvBuf->loadVector(uvCoords);
 
-    m_indexBuf->createBuffer(true, static_cast<vulB::VulBuffer::Usage>(vulB::VulBuffer::usage_indexBuffer | vulB::VulBuffer::usage_transferDst));
-    m_posBuf->createBuffer(true, static_cast<vulB::VulBuffer::Usage>(vulB::VulBuffer::usage_vertexBuffer | vulB::VulBuffer::usage_transferDst));
-    m_uvBuf->createBuffer(true, static_cast<vulB::VulBuffer::Usage>(vulB::VulBuffer::usage_vertexBuffer | vulB::VulBuffer::usage_transferDst));
+    m_indexBuf->createBuffer(true, static_cast<vul::VulBuffer::Usage>(vul::VulBuffer::usage_indexBuffer | vul::VulBuffer::usage_transferDst));
+    m_posBuf->createBuffer(true, static_cast<vul::VulBuffer::Usage>(vul::VulBuffer::usage_vertexBuffer | vul::VulBuffer::usage_transferDst));
+    m_uvBuf->createBuffer(true, static_cast<vul::VulBuffer::Usage>(vul::VulBuffer::usage_vertexBuffer | vul::VulBuffer::usage_transferDst));
 
     m_indexCount = static_cast<uint32_t>(indices.size());
 }
@@ -63,4 +65,6 @@ void Object2D::draw(VkCommandBuffer &cmdBuf)
 {
     VUL_PROFILE_FUNC()
     vkCmdDrawIndexed(cmdBuf, m_indexCount, 1, 0, 0, 0);
+}
+
 }

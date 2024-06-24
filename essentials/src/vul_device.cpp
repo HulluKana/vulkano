@@ -10,7 +10,7 @@
 #include <unordered_set>
 #include <vulkan/vulkan_core.h>
 
-namespace vulB {
+namespace vul {
 
 // local callback functions
 static VKAPI_ATTR VkBool32 VKAPI_CALL
@@ -56,7 +56,7 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance,
 }
 
 // class member functions
-VulDevice::VulDevice(vulB::VulWindow &window) : window{window} {
+VulDevice::VulDevice(vul::VulWindow &window) : window{window} {
     createInstance();
     setupDebugMessenger();
     createSurface();
@@ -574,4 +574,4 @@ void VulDevice::copyBufferToImage(VkBuffer buffer, VkImage image,
   endSingleTimeCommands(commandBuffer);
 }
 
-} // namespace vulB
+} // namespace vul

@@ -1,6 +1,6 @@
 #include<vul_extensions.hpp>
 
-using namespace vulB::extensions;
+using namespace vul::extensions;
 
 // Acceleration structure functions start here
 //----------------------------------------------------------------------------------------------------------------------
@@ -195,7 +195,7 @@ VkDeviceSize vkGetRayTracingShaderGroupStackSizeKHR(
 //----------------------------------------------------------------------------------------------------------------------
 // Ray tracing pipeline functions end here
 
-namespace vulB {
+namespace vul {
 
 namespace extensions{
 

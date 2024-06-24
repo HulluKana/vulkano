@@ -8,7 +8,7 @@
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
-namespace vulB {
+namespace vul {
 
 class VulDescriptorSetLayout {
     public:

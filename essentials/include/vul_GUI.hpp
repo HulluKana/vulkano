@@ -3,7 +3,7 @@
 #include"vul_renderer.hpp"
 #include"vul_device.hpp"
 
-namespace vulB{
+namespace vul{
 
 class VulGUI{
     public:

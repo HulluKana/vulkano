@@ -14,7 +14,7 @@ namespace vul
 class Scene
 {
     public:
-        Scene(vulB::VulDevice &vulDevice);
+        Scene(VulDevice &vulDevice);
 
         struct Cube {
             glm::vec3 centerPos;
@@ -36,23 +36,23 @@ class Scene
             bool material = true;
             bool primInfo = true;
         };
-        void loadCubes(const std::vector<Cube> &cubes, const std::vector<vulB::GltfLoader::Material> &mats, WantedBuffers wantedBuffers);
-        void loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vulB::GltfLoader::Material> &mats, WantedBuffers wantedBuffers);
+        void loadCubes(const std::vector<Cube> &cubes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers);
+        void loadSpheres(const std::vector<Sphere> &spheres, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers);
         void loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers);
 
-        std::vector<vulB::GltfLoader::GltfLight> lights;
-        std::vector<vulB::GltfLoader::GltfNode> nodes;
-        std::vector<vulB::GltfLoader::GltfPrimMesh> meshes;
-        std::vector<vulB::GltfLoader::Material> materials;
+        std::vector<GltfLoader::GltfLight> lights;
+        std::vector<GltfLoader::GltfNode> nodes;
+        std::vector<GltfLoader::GltfPrimMesh> meshes;
+        std::vector<GltfLoader::Material> materials;
         std::vector<std::shared_ptr<VulImage>> images;
 
-        std::unique_ptr<vulB::VulBuffer> vertexBuffer;
-        std::unique_ptr<vulB::VulBuffer> normalBuffer;
-        std::unique_ptr<vulB::VulBuffer> tangentBuffer;
-        std::unique_ptr<vulB::VulBuffer> uvBuffer;
-        std::unique_ptr<vulB::VulBuffer> indexBuffer;
-        std::unique_ptr<vulB::VulBuffer> materialBuffer;
-        std::unique_ptr<vulB::VulBuffer> primInfoBuffer;
+        std::unique_ptr<VulBuffer> vertexBuffer;
+        std::unique_ptr<VulBuffer> normalBuffer;
+        std::unique_ptr<VulBuffer> tangentBuffer;
+        std::unique_ptr<VulBuffer> uvBuffer;
+        std::unique_ptr<VulBuffer> indexBuffer;
+        std::unique_ptr<VulBuffer> materialBuffer;
+        std::unique_ptr<VulBuffer> primInfoBuffer;
 
         using vec2 = glm::vec2;
         using vec3 = glm::vec3;
@@ -86,11 +86,11 @@ class Scene
         #ifdef __cplusplus
 
     private:
-        vulB::VulDevice &m_vulDevice; 
+        VulDevice &m_vulDevice; 
 
         void createBuffers(const std::vector<uint32_t> &indices, const std::vector<glm::vec3> &vertices,
                 const std::vector<glm::vec3> &normals, const std::vector<glm::vec4> &tangents, const std::vector<glm::vec2> &uvs,
-                const std::vector<vulB::GltfLoader::Material> &mats, const std::vector<vulB::GltfLoader::GltfNode> &nods, WantedBuffers wantedBuffers);
+                const std::vector<GltfLoader::Material> &mats, const std::vector<GltfLoader::GltfNode> &nods, WantedBuffers wantedBuffers);
 };
 
 }

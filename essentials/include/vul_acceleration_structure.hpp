@@ -10,7 +10,7 @@ namespace vul {
 
 class VulAs {
     public:
-        VulAs(const vulB::VulDevice &vulDevice);
+        VulAs(const VulDevice &vulDevice);
         ~VulAs();
 
         VulAs(const VulAs &) = delete;
@@ -45,7 +45,7 @@ class VulAs {
     private:
         struct As {
             VkAccelerationStructureKHR as;
-            std::unique_ptr<vulB::VulBuffer> buffer;
+            std::unique_ptr<VulBuffer> buffer;
         };
         struct BlasInput {
             std::vector<VkAccelerationStructureGeometryKHR> asGeometries;
@@ -64,9 +64,9 @@ class VulAs {
         As buildBlas(BlasBuildData &buildData, VkDeviceAddress scratchBufferAddress, VkQueryPool queryPool, uint32_t queryIndex, VkCommandBuffer cmdBuf);
 
         VkAccelerationStructureInstanceKHR blasToAsInstance(uint32_t index, uint32_t sbtOffset, const glm::mat4 &transform, const As &blas);
-        BlasInput gltfNodesToBlasInput(const Scene &scene, const std::vector<uint32_t> &orderedNodesIndices, uint32_t startIdx, uint32_t count, const std::unique_ptr<vulB::VulBuffer> &transformsBuffer);
-        BlasInput aabbsToBlasInput(vulB::VulBuffer &aabbBuf, VkDeviceSize maxAabbCount, VkDeviceSize aabbOffset);
-        std::unique_ptr<vulB::VulBuffer> createTransformsBuffer(const Scene &scene, const std::vector<uint32_t> &orderedNodesIndices);
+        BlasInput gltfNodesToBlasInput(const Scene &scene, const std::vector<uint32_t> &orderedNodesIndices, uint32_t startIdx, uint32_t count, const std::unique_ptr<VulBuffer> &transformsBuffer);
+        BlasInput aabbsToBlasInput(VulBuffer &aabbBuf, VkDeviceSize maxAabbCount, VkDeviceSize aabbOffset);
+        std::unique_ptr<VulBuffer> createTransformsBuffer(const Scene &scene, const std::vector<uint32_t> &orderedNodesIndices);
 
         As createAs(VkAccelerationStructureCreateInfoKHR &createInfo, bool deviceLocal);
 
@@ -77,7 +77,7 @@ class VulAs {
 
         std::vector<VkAccelerationStructureInstanceKHR> m_instances;
 
-        const vulB::VulDevice &m_vulDevice;
+        const VulDevice &m_vulDevice;
 };
 
 }

@@ -2,7 +2,7 @@
 #include <GLFW/glfw3.h>
 #include<stdexcept>
 
-namespace vulB{
+namespace vul{
 
 VulWindow::VulWindow(int width, int height, std::string name) : width{width}, height{height}, windowName{name}
 {

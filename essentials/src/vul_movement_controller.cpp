@@ -1,8 +1,8 @@
 #include <vul_debug_tools.hpp>
 #include<vul_movement_controller.hpp>
 
-using namespace vul;
-namespace vulB{
+
+namespace vul{
 
 MovementController::MovementController()
 {

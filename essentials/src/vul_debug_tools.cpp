@@ -134,7 +134,7 @@ ScopedTimer::~ScopedTimer()
 
 }
 
-namespace vulB {
+namespace vul {
 
 namespace DebugNamer {
 

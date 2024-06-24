@@ -16,7 +16,7 @@
 
 #include<tiny_gltf.h>
 
-namespace vulB
+namespace vul
 {
 
 class GltfLoader
@@ -102,7 +102,7 @@ class GltfLoader
         std::vector<GltfNode> nodes;
         std::vector<GltfPrimMesh> primMeshes;
         std::vector<Material> materials;
-        std::vector<std::shared_ptr<vul::VulImage>> images;
+        std::vector<std::shared_ptr<VulImage>> images;
 
         void importMaterials(const tinygltf::Model &model);
         void importTextures(const tinygltf::Model &model, const std::string &textureDirectory, VulDevice &device);

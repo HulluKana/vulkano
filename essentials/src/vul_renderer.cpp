@@ -15,7 +15,7 @@
 #include<iostream>
 #include <vulkan/vulkan_core.h>
 
-namespace vulB{
+namespace vul{
 
 VulRenderer::VulRenderer(VulWindow &window, VulDevice &device) : vulWindow{window}, vulDevice{device}
 {

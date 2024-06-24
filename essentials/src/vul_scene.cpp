@@ -15,16 +15,16 @@
 
 #include<tiny_gltf.h>
 
-using namespace vulB;
+
 namespace vul
 {
 
-Scene::Scene(vulB::VulDevice &vulDevice) : m_vulDevice{vulDevice}
+Scene::Scene(vul::VulDevice &vulDevice) : m_vulDevice{vulDevice}
 {
 
 }
 
-void Scene::loadCubes(const std::vector<Cube> &cubes, const std::vector<vulB::GltfLoader::Material> &mats, WantedBuffers wantedBuffers)
+void Scene::loadCubes(const std::vector<Cube> &cubes, const std::vector<vul::GltfLoader::Material> &mats, WantedBuffers wantedBuffers)
 {
     const uint32_t oldIdxCount = indexBuffer.get() ? indexBuffer->getBufferSize() / sizeof(uint32_t) : 0;
     const uint32_t oldVertexCount = vertexBuffer.get() ? vertexBuffer->getBufferSize() / sizeof(glm::vec3) : 0;
@@ -127,7 +127,7 @@ void Scene::loadCubes(const std::vector<Cube> &cubes, const std::vector<vulB::Gl
     createBuffers(indices, vertices, normals, uselessTangents, uselessUvs, mats, nods, wantedBuffers);
 }
 
-void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vulB::GltfLoader::Material> &mats, WantedBuffers wantedBuffers)
+void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vul::GltfLoader::Material> &mats, WantedBuffers wantedBuffers)
 {
     const size_t oldIdxCount = indexBuffer.get() ? indexBuffer->getBufferSize() / sizeof(uint32_t) : 0;
     const size_t oldVertexCount = vertexBuffer.get() ? vertexBuffer->getBufferSize() / sizeof(glm::vec3) : 0;
@@ -273,7 +273,7 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory,
 
 void Scene::createBuffers(const std::vector<uint32_t> &indices, const std::vector<glm::vec3> &vertices,
                 const std::vector<glm::vec3> &normals, const std::vector<glm::vec4> &tangents, const std::vector<glm::vec2> &uvs,
-                const std::vector<vulB::GltfLoader::Material> &mats, const std::vector<vulB::GltfLoader::GltfNode> &nods, WantedBuffers wantedBuffers)
+                const std::vector<vul::GltfLoader::Material> &mats, const std::vector<vul::GltfLoader::GltfNode> &nods, WantedBuffers wantedBuffers)
 {
     std::vector<PackedMaterial> packedMaterials;
     for (const GltfLoader::Material &mat : mats) {
@@ -310,7 +310,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &indices, const std::vecto
 
     if (indices.size() > 0 && wantedBuffers.index) {
         if (indexBuffer.get() == nullptr) {
-            indexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            indexBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
             indexBuffer->loadVector(indices);
             indexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_indexBuffer |
                         VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo | rtFlags));
@@ -319,7 +319,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &indices, const std::vecto
     }
     if (vertices.size() > 0 && wantedBuffers.vertex) {
         if (vertexBuffer.get() == nullptr) {
-            vertexBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            vertexBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
             vertexBuffer->loadVector(vertices);
             vertexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
                         VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo | rtFlags));
@@ -328,7 +328,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &indices, const std::vecto
     }
     if (normals.size() > 0 && wantedBuffers.normal) {
         if (normalBuffer.get() == nullptr) {
-            normalBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            normalBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
             normalBuffer->loadVector(normals);
             normalBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
                         VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo));
@@ -337,7 +337,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &indices, const std::vecto
     }
     if (tangents.size() > 0 && wantedBuffers.tangent) {
         if (tangentBuffer.get() == nullptr) {
-            tangentBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            tangentBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
             tangentBuffer->loadVector(tangents);
             tangentBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
                         VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo));
@@ -346,7 +346,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &indices, const std::vecto
     }
     if (uvs.size() > 0 && wantedBuffers.uv) {
         if (uvBuffer.get() == nullptr) {
-            uvBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            uvBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
             uvBuffer->loadVector(uvs);
             uvBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
                         VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo));
@@ -355,7 +355,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &indices, const std::vecto
     }
     if (packedMaterials.size() > 0 && wantedBuffers.material) {
         if (materialBuffer.get() == nullptr) {
-            materialBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            materialBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
             materialBuffer->loadVector(packedMaterials);
             materialBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo |
                         VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc));
@@ -364,7 +364,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &indices, const std::vecto
     }
     if (primInfos.size() > 0 && wantedBuffers.primInfo) {
         if (primInfoBuffer.get() == nullptr) {
-            primInfoBuffer = std::make_unique<vulB::VulBuffer>(m_vulDevice);
+            primInfoBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
             primInfoBuffer->loadVector(primInfos);
             primInfoBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo |
                         VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc));

@@ -9,7 +9,7 @@ namespace vul
 class VulCompPipeline
 {
     public:
-        VulCompPipeline(const std::string &shaderName, const std::vector<VkDescriptorSetLayout> &setLayouts, vulB::VulDevice &device, uint32_t maxFramesInFlight);
+        VulCompPipeline(const std::string &shaderName, const std::vector<VkDescriptorSetLayout> &setLayouts, VulDevice &device, uint32_t maxFramesInFlight);
         ~VulCompPipeline();
 
         VulCompPipeline(const VulCompPipeline &) = delete;
@@ -27,14 +27,13 @@ class VulCompPipeline
     private:
         VkPipeline m_pipeline;
         VkPipelineLayout m_layout;
-        VkShaderModule m_shader;
 
         std::vector<VkCommandBuffer> m_cmdBufs;
         std::vector<VkFence> m_fences;
         uint32_t m_frame = 0;
         uint32_t m_maxFramesInFlight;
 
-        vulB::VulDevice &m_vulDevice;
+        VulDevice &m_vulDevice;
 };
 
 }

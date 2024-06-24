@@ -24,8 +24,8 @@ namespace vul{
 
 class Vulkano{
     private:
-        vulB::VulWindow m_vulWindow;
-        vulB::VulDevice m_vulDevice{m_vulWindow}; // vulDevice has to be at the top to prevent some vulkan validation layer errors
+        vul::VulWindow m_vulWindow;
+        vul::VulDevice m_vulDevice{m_vulWindow}; // vulDevice has to be at the top to prevent some vulkan validation layer errors
 
     public:
         Vulkano(uint32_t width, uint32_t height, std::string name);
@@ -59,7 +59,7 @@ class Vulkano{
             hasScene = true;
         }
         
-        const vulB::VulDevice &getVulDevice() const {return m_vulDevice;}
+        const vul::VulDevice &getVulDevice() const {return m_vulDevice;}
         VkExtent2D getSwapChainExtent() const {return vulRenderer.getSwapChainExtent();}
 
         enum class DescriptorType{
@@ -88,19 +88,19 @@ class Vulkano{
             uint32_t count = 1;
         };
 
-        std::unique_ptr<vulB::VulDescriptorSet> createDescriptorSet(const std::vector<Descriptor> &descriptors) const;
+        std::unique_ptr<vul::VulDescriptorSet> createDescriptorSet(const std::vector<Descriptor> &descriptors) const;
         VulCompPipeline createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight);        
 
         struct RenderData {
             bool enable = true;
             bool is3d;
-            std::shared_ptr<vulB::VulPipeline> pipeline;
-            std::vector<vulB::VulPipeline::DrawData> drawDatas;
-            std::vector<std::shared_ptr<vulB::VulBuffer>> additionalVertexBuffers;
-            std::array<std::vector<std::shared_ptr<vulB::VulDescriptorSet>>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descriptorSets;
-            std::array<std::vector<std::shared_ptr<VulImage>>, vulB::VulSwapChain::MAX_FRAMES_IN_FLIGHT> attachmentImages;
-            vulB::VulRenderer::SwapChainImageMode swapChainImageMode;
-            vulB::VulRenderer::DepthImageMode depthImageMode;
+            std::shared_ptr<vul::VulPipeline> pipeline;
+            std::vector<vul::VulPipeline::DrawData> drawDatas;
+            std::vector<std::shared_ptr<vul::VulBuffer>> additionalVertexBuffers;
+            std::array<std::vector<std::shared_ptr<vul::VulDescriptorSet>>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descriptorSets;
+            std::array<std::vector<std::shared_ptr<VulImage>>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> attachmentImages;
+            vul::VulRenderer::SwapChainImageMode swapChainImageMode;
+            vul::VulRenderer::DepthImageMode depthImageMode;
             bool sampleFromDepth;
         };
         std::vector<RenderData> renderDatas;
@@ -108,20 +108,20 @@ class Vulkano{
         Scene scene{m_vulDevice};
         bool hasScene = false;
 
-        std::vector<std::unique_ptr<vulB::VulBuffer>> buffers;
+        std::vector<std::unique_ptr<vul::VulBuffer>> buffers;
         std::vector<Object2D> object2Ds;
 
-        vulB::VulRenderer vulRenderer{m_vulWindow, m_vulDevice};
-        vulB::VulCamera camera{};
+        vul::VulRenderer vulRenderer{m_vulWindow, m_vulDevice};
+        vul::VulCamera camera{};
         transform3D cameraTransform;
-        vulB::MovementController cameraController;
+        vul::MovementController cameraController;
     private:
         double m_currentTime;
         double m_frameTime;
         double m_idleTime;
 
         VkExtent2D m_prevWindowSize;
-        vulB::VulGUI m_vulGUI;
-        std::unique_ptr<vulB::VulDescriptorPool> m_globalPool{};
+        vul::VulGUI m_vulGUI;
+        std::unique_ptr<vul::VulDescriptorPool> m_globalPool{};
    };
 }

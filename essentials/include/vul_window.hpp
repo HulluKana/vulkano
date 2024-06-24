@@ -5,7 +5,7 @@
 
 #include<string>
 
-namespace vulB {
+namespace vul {
 
 class VulWindow{
     public:
