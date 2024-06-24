@@ -30,7 +30,9 @@ VulPipeline::VulPipeline(const VulDevice& device, const std::string& vertFile, c
     shaderStages[1].pNext = nullptr;
     shaderStages[1].pSpecializationInfo = nullptr;
 
-    PipelineContents pipelineContents = createPipelineContents(device, shaderStages, configInfo);
+    PipelineContents pipelineContents = createPipelineContents(device, shaderStages, configInfo.attributeDescriptions, configInfo.bindingDescriptions,
+            configInfo.setLayouts, configInfo.colorAttachmentFormats, configInfo.depthAttachmentFormat, configInfo.cullMode, configInfo.enableColorBlending,
+            configInfo.blendOp, configInfo.blendSrcFactor, configInfo.blendDstFactor);
     m_pipeline = pipelineContents.pipeline;
     m_layout = pipelineContents.layout;
 
@@ -70,21 +72,23 @@ void VulPipeline::draw( VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSe
     }
 }
 
-VulPipeline::PipelineContents VulPipeline::createPipelineContents(const VulDevice &vulDevice,
-        const std::vector<VkPipelineShaderStageCreateInfo> &shaderStageCreateInfos, const PipelineConfigInfo &configInfo)
+VulPipeline::PipelineContents VulPipeline::createPipelineContents(const VulDevice &vulDevice, const std::vector<VkPipelineShaderStageCreateInfo> &shaderStageCreateInfos,
+            const std::vector<VkVertexInputAttributeDescription> &attributeDescriptions, const std::vector<VkVertexInputBindingDescription> &bindingDescriptions,
+            const std::vector<VkDescriptorSetLayout> &setLayouts, const std::vector<VkFormat> &colorAttachmentFormats, VkFormat depthAttachmentFormat,
+            VkCullModeFlagBits cullMode, bool enableColorBlending, VkBlendOp blendOp, VkBlendFactor blendSrcFactor, VkBlendFactor blendDstFactor)
 {
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(configInfo.attributeDescriptions.size());
-    vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(configInfo.bindingDescriptions.size());
-    vertexInputInfo.pVertexAttributeDescriptions = configInfo.attributeDescriptions.data();
-    vertexInputInfo.pVertexBindingDescriptions = configInfo.bindingDescriptions.data();
+    vertexInputInfo.vertexAttributeDescriptionCount = static_cast<uint32_t>(attributeDescriptions.size());
+    vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(bindingDescriptions.size());
+    vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions.data();
+    vertexInputInfo.pVertexBindingDescriptions = bindingDescriptions.data();
 
     VkPipelineRenderingCreateInfo pipelineRenderingInfo{};
     pipelineRenderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-    pipelineRenderingInfo.colorAttachmentCount = static_cast<uint32_t>(configInfo.colorAttachmentFormats.size());
-    pipelineRenderingInfo.pColorAttachmentFormats = configInfo.colorAttachmentFormats.data();
-    pipelineRenderingInfo.depthAttachmentFormat = configInfo.depthAttachmentFormat;
+    pipelineRenderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachmentFormats.size());
+    pipelineRenderingInfo.pColorAttachmentFormats = colorAttachmentFormats.data();
+    pipelineRenderingInfo.depthAttachmentFormat = depthAttachmentFormat;
 
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{};
     inputAssemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -104,7 +108,7 @@ VulPipeline::PipelineContents VulPipeline::createPipelineContents(const VulDevic
     rasterizationInfo.rasterizerDiscardEnable = VK_FALSE;
     rasterizationInfo.polygonMode = VK_POLYGON_MODE_FILL;
     rasterizationInfo.lineWidth = 1.0f;
-    rasterizationInfo.cullMode = configInfo.cullMode;
+    rasterizationInfo.cullMode = cullMode;
     rasterizationInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterizationInfo.depthBiasEnable = VK_FALSE;
     rasterizationInfo.depthBiasConstantFactor = 0.0f;  // Optional
@@ -124,16 +128,16 @@ VulPipeline::PipelineContents VulPipeline::createPipelineContents(const VulDevic
     colorBlendAttachment.colorWriteMask =
         VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT |
         VK_COLOR_COMPONENT_A_BIT;
-    colorBlendAttachment.blendEnable = configInfo.enableColorBlending;
-    colorBlendAttachment.srcColorBlendFactor = configInfo.blendSrcFactor;
-    colorBlendAttachment.dstColorBlendFactor = configInfo.blendDstFactor;
-    colorBlendAttachment.colorBlendOp = configInfo.blendOp;
+    colorBlendAttachment.blendEnable = enableColorBlending ? VK_TRUE : VK_FALSE;
+    colorBlendAttachment.srcColorBlendFactor = blendSrcFactor;
+    colorBlendAttachment.dstColorBlendFactor = blendDstFactor;
+    colorBlendAttachment.colorBlendOp = blendOp;
     colorBlendAttachment.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE;   // Optional
     colorBlendAttachment.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO;  // Optional
     colorBlendAttachment.alphaBlendOp = VK_BLEND_OP_ADD;              // Optional
     
-    std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments(configInfo.colorAttachmentFormats.size());
-    for (size_t i = 0; i < configInfo.colorAttachmentFormats.size(); i++) colorBlendAttachments[i] = colorBlendAttachment;
+    std::vector<VkPipelineColorBlendAttachmentState> colorBlendAttachments(colorAttachmentFormats.size());
+    for (size_t i = 0; i < colorAttachmentFormats.size(); i++) colorBlendAttachments[i] = colorBlendAttachment;
     VkPipelineColorBlendStateCreateInfo colorBlendInfo{};
     colorBlendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
     colorBlendInfo.logicOpEnable = VK_FALSE;
@@ -171,8 +175,8 @@ VulPipeline::PipelineContents VulPipeline::createPipelineContents(const VulDevic
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(configInfo.setLayouts.size());
-    pipelineLayoutInfo.pSetLayouts = configInfo.setLayouts.data();
+    pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(setLayouts.size());
+    pipelineLayoutInfo.pSetLayouts = setLayouts.data();
     pipelineLayoutInfo.pushConstantRangeCount = 1;
     pipelineLayoutInfo.pPushConstantRanges = &pushConstantRange;
     VkPipelineLayout layout;

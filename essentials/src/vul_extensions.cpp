@@ -2,6 +2,35 @@
 
 using namespace vul::extensions;
 
+static PFN_vkBuildAccelerationStructuresKHR pfn_vkBuildAccelerationStructuresKHR= 0;
+static PFN_vkCmdBuildAccelerationStructuresIndirectKHR pfn_vkCmdBuildAccelerationStructuresIndirectKHR= 0;
+static PFN_vkCmdBuildAccelerationStructuresKHR pfn_vkCmdBuildAccelerationStructuresKHR= 0;
+static PFN_vkCmdCopyAccelerationStructureKHR pfn_vkCmdCopyAccelerationStructureKHR= 0;
+static PFN_vkCmdCopyAccelerationStructureToMemoryKHR pfn_vkCmdCopyAccelerationStructureToMemoryKHR= 0;
+static PFN_vkCmdCopyMemoryToAccelerationStructureKHR pfn_vkCmdCopyMemoryToAccelerationStructureKHR= 0;
+static PFN_vkCmdWriteAccelerationStructuresPropertiesKHR pfn_vkCmdWriteAccelerationStructuresPropertiesKHR= 0;
+static PFN_vkCopyAccelerationStructureKHR pfn_vkCopyAccelerationStructureKHR= 0;
+static PFN_vkCopyAccelerationStructureToMemoryKHR pfn_vkCopyAccelerationStructureToMemoryKHR= 0;
+static PFN_vkCopyMemoryToAccelerationStructureKHR pfn_vkCopyMemoryToAccelerationStructureKHR= 0;
+static PFN_vkCreateAccelerationStructureKHR pfn_vkCreateAccelerationStructureKHR= 0;
+static PFN_vkDestroyAccelerationStructureKHR pfn_vkDestroyAccelerationStructureKHR= 0;
+static PFN_vkGetAccelerationStructureBuildSizesKHR pfn_vkGetAccelerationStructureBuildSizesKHR= 0;
+static PFN_vkGetAccelerationStructureDeviceAddressKHR pfn_vkGetAccelerationStructureDeviceAddressKHR= 0;
+static PFN_vkGetDeviceAccelerationStructureCompatibilityKHR pfn_vkGetDeviceAccelerationStructureCompatibilityKHR= 0;
+static PFN_vkWriteAccelerationStructuresPropertiesKHR pfn_vkWriteAccelerationStructuresPropertiesKHR= 0;
+
+static PFN_vkCmdSetRayTracingPipelineStackSizeKHR pfn_vkCmdSetRayTracingPipelineStackSizeKHR= 0;
+static PFN_vkCmdTraceRaysIndirectKHR pfn_vkCmdTraceRaysIndirectKHR= 0;
+static PFN_vkCmdTraceRaysKHR pfn_vkCmdTraceRaysKHR= 0;
+static PFN_vkCreateRayTracingPipelinesKHR pfn_vkCreateRayTracingPipelinesKHR= 0;
+static PFN_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR pfn_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR= 0;
+static PFN_vkGetRayTracingShaderGroupHandlesKHR pfn_vkGetRayTracingShaderGroupHandlesKHR= 0;
+static PFN_vkGetRayTracingShaderGroupStackSizeKHR pfn_vkGetRayTracingShaderGroupStackSizeKHR= 0;
+
+static PFN_vkCmdDrawMeshTasksEXT pfn_vkCmdDrawMeshTasksEXT= 0;
+static PFN_vkCmdDrawMeshTasksIndirectCountEXT pfn_vkCmdDrawMeshTasksIndirectCountEXT= 0;
+static PFN_vkCmdDrawMeshTasksIndirectEXT pfn_vkCmdDrawMeshTasksIndirectEXT= 0;
+
 // Acceleration structure functions start here
 //----------------------------------------------------------------------------------------------------------------------
 VkResult vkBuildAccelerationStructuresKHR(
@@ -193,7 +222,36 @@ VkDeviceSize vkGetRayTracingShaderGroupStackSizeKHR(
   return pfn_vkGetRayTracingShaderGroupStackSizeKHR(device, pipeline, group, groupShader); 
 }
 //----------------------------------------------------------------------------------------------------------------------
-// Ray tracing pipeline functions end here
+// Ray tracing pipeline functions end here and mesh shading functions begin here
+//----------------------------------------------------------------------------------------------------------------------
+void vkCmdDrawMeshTasksEXT(
+	VkCommandBuffer commandBuffer, 
+	uint32_t groupCountX, 
+	uint32_t groupCountY, 
+	uint32_t groupCountZ) 
+{ 
+    pfn_vkCmdDrawMeshTasksEXT(commandBuffer, groupCountX, groupCountY, groupCountZ); 
+}
+void vkCmdDrawMeshTasksIndirectCountEXT(
+	VkCommandBuffer commandBuffer, 
+	VkBuffer buffer, 
+	VkDeviceSize offset, 
+	VkBuffer countBuffer, 
+	VkDeviceSize countBufferOffset, 
+	uint32_t maxDrawCount, 
+	uint32_t stride) 
+{ 
+    pfn_vkCmdDrawMeshTasksIndirectCountEXT(commandBuffer, buffer, offset, countBuffer, countBufferOffset, maxDrawCount, stride); 
+}
+void vkCmdDrawMeshTasksIndirectEXT(
+	VkCommandBuffer commandBuffer, 
+	VkBuffer buffer, 
+	VkDeviceSize offset, 
+	uint32_t drawCount, 
+	uint32_t stride) 
+{ 
+    pfn_vkCmdDrawMeshTasksIndirectEXT(commandBuffer, buffer, offset, drawCount, stride); 
+}
 
 namespace vul {
 
@@ -228,6 +286,13 @@ void addRayTracingPipeline(VkDevice device, PFN_vkGetDeviceProcAddr getDevicePro
 	pfn_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR = (PFN_vkGetRayTracingCaptureReplayShaderGroupHandlesKHR)getDeviceProcAddr(device, "vkGetRayTracingCaptureReplayShaderGroupHandlesKHR");
 	pfn_vkGetRayTracingShaderGroupHandlesKHR = (PFN_vkGetRayTracingShaderGroupHandlesKHR)getDeviceProcAddr(device, "vkGetRayTracingShaderGroupHandlesKHR");
 	pfn_vkGetRayTracingShaderGroupStackSizeKHR = (PFN_vkGetRayTracingShaderGroupStackSizeKHR)getDeviceProcAddr(device, "vkGetRayTracingShaderGroupStackSizeKHR");
+}
+
+void addMeshShader(VkDevice device, PFN_vkGetDeviceProcAddr getDeviceProcAddr)
+{
+    pfn_vkCmdDrawMeshTasksEXT = (PFN_vkCmdDrawMeshTasksEXT)getDeviceProcAddr(device, "vkCmdDrawMeshTasksEXT");
+    pfn_vkCmdDrawMeshTasksIndirectCountEXT = (PFN_vkCmdDrawMeshTasksIndirectCountEXT)getDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectCountEXT");
+    pfn_vkCmdDrawMeshTasksIndirectEXT = (PFN_vkCmdDrawMeshTasksIndirectEXT)getDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectEXT");
 }
 
 }

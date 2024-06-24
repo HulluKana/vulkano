@@ -5,7 +5,8 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
 
 add_custom_target(shaders)
 
-file(GLOB_RECURSE SHADERS_SRC "../Shaders/*.vert" "../Shaders/*.frag" "../Shaders/*.comp" "../Shaders/*.rgen" "../Shaders/*.rchit" "../Shaders/*.rmiss" "../Shaders/*.rint" )
+file(GLOB_RECURSE SHADERS_SRC "../Shaders/*.vert" "../Shaders/*.frag" "../Shaders/*.comp" "../Shaders/*.rgen" "../Shaders/*.rchit" "../Shaders/*.rmiss"
+    "../Shaders/*.rint" "../Shaders/*.task" "../Shaders/*.mesh")
 foreach(FILE ${SHADERS_SRC})
     get_filename_component(FILE_NAME ${FILE} NAME)
     set(COMPILED_FILE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${FILE_NAME}.spv")

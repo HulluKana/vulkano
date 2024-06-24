@@ -195,10 +195,23 @@ void VulDevice::createLogicalDevice() {
       scalarBlockFeatures.pNext = &reset;
   }
 
+  VkPhysicalDeviceMaintenance4Features maintanance4features{};
+  maintanance4features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES;
+  maintanance4features.pNext = &scalarBlockFeatures;
+
+  VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures{};
+  meshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
+  meshShaderFeatures.pNext = &maintanance4features;
+
   VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures{};
   descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
   descriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
   descriptorIndexingFeatures.pNext = &scalarBlockFeatures;
+
+  if (vul::settings::deviceInitConfig.enableMeshShaderSupport) {
+      deviceExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+      descriptorIndexingFeatures.pNext = &meshShaderFeatures;
+  }
 
   VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddresFeature{};
   bufferDeviceAddresFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
@@ -252,6 +265,7 @@ void VulDevice::createLogicalDevice() {
       extensions::addAccelerationStructure(device_, vkGetDeviceProcAddr);
       extensions::addRayTracingPipeline(device_, vkGetDeviceProcAddr);
   }
+  if (vul::settings::deviceInitConfig.enableMeshShaderSupport) extensions::addMeshShader(device_, vkGetDeviceProcAddr);
 }
 
 void VulDevice::createCommandPools() {

@@ -48,8 +48,10 @@ class VulPipeline{
             VkPipeline pipeline;
             VkPipelineLayout layout;
         };
-        static PipelineContents createPipelineContents(const VulDevice &vulDevice,
-                const std::vector<VkPipelineShaderStageCreateInfo> &shaderStageCreateInfos, const PipelineConfigInfo &configInfo);
+        static PipelineContents createPipelineContents(const VulDevice &vulDevice, const std::vector<VkPipelineShaderStageCreateInfo> &shaderStageCreateInfos,
+            const std::vector<VkVertexInputAttributeDescription> &attributeDescriptions, const std::vector<VkVertexInputBindingDescription> &bindingDescriptions,
+            const std::vector<VkDescriptorSetLayout> &setLayouts, const std::vector<VkFormat> &colorAttachmentFormats, VkFormat depthAttachmentFormat,
+            VkCullModeFlagBits cullMode, bool enableColorBlending, VkBlendOp blendOp, VkBlendFactor blendSrcFactor, VkBlendFactor blendDstFactor);
         static VkShaderModule createShaderModule(const VulDevice &vulDevice, const std::string &filePath);
 
         VkPipeline getPipeline() const {return m_pipeline;}

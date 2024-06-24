@@ -11,8 +11,9 @@ public:
     struct DeviceInitConfig {
         bool preferSeparateComputeQueue = false;
         bool enableRaytracingSupport = false;
+        bool enableMeshShaderSupport = false;
     };
-    static inline DeviceInitConfig deviceInitConfig{false, false};
+    static inline DeviceInitConfig deviceInitConfig{false, false, false};
 
     static inline uint32_t renderWidth{0};
     static inline uint32_t renderHeight{0};
