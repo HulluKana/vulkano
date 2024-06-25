@@ -12,7 +12,7 @@ using vec4 = glm::vec4;
 using mat4 = glm::mat4;
 #endif
 
-#define VOLUME_LEN 16
+#define VOLUME_LEN 175
 #define VOLUME_VOLUME (VOLUME_LEN * VOLUME_LEN * VOLUME_LEN)
 
 struct ObjData {

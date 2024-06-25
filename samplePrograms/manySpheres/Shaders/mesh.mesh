@@ -8,17 +8,20 @@
 layout(binding = 0, set = 0) readonly buffer CubeBuf {ObjData cubes[];};
 layout(binding = 1, set = 0) uniform Ubo {MeshUbo ubo;};
 
-layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
-layout(triangles, max_vertices = 8, max_primitives = 12) out;
+layout(local_size_x = 16, local_size_y = 1, local_size_z = 1) in;
+layout(triangles, max_vertices = 16 * 8, max_primitives = 16 * 12) out;
+
+layout (location = 0) out vec3 vertColors[16 * 8];
 
 void main()
 {
-    uint vertexCount = 8;
-    uint triangleCount = 12;
-    SetMeshOutputsEXT(vertexCount, triangleCount);
+    if (gl_LocalInvocationIndex.x == 0) SetMeshOutputsEXT(16 * 8, 16 * 12);
 
     const mat4 projViewMat = ubo.projectionMatrix * ubo.viewMatrix;
     const vec4 cube = cubes[gl_GlobalInvocationID.x].pos;
+    const vec3 color = cubes[gl_GlobalInvocationID.x].color.xyz;
+    const uint vertexArrOffset = gl_LocalInvocationIndex.x * 8;
+    const uint primArrOffset = gl_LocalInvocationIndex.x * 12;
 
     /*
         An illustration of a cube
@@ -31,31 +34,40 @@ void main()
         7---6
     */
 
-    gl_MeshVerticesEXT[0].gl_Position = projViewMat * vec4(cube.xyz + vec3(-0.5,  0.5,  0.5) * cube.w, 1.0);
-    gl_MeshVerticesEXT[1].gl_Position = projViewMat * vec4(cube.xyz + vec3( 0.5,  0.5,  0.5) * cube.w, 1.0);
-    gl_MeshVerticesEXT[2].gl_Position = projViewMat * vec4(cube.xyz + vec3( 0.5,  0.5, -0.5) * cube.w, 1.0);
-    gl_MeshVerticesEXT[3].gl_Position = projViewMat * vec4(cube.xyz + vec3(-0.5,  0.5, -0.5) * cube.w, 1.0);
-    gl_MeshVerticesEXT[4].gl_Position = projViewMat * vec4(cube.xyz + vec3(-0.5, -0.5,  0.5) * cube.w, 1.0);
-    gl_MeshVerticesEXT[5].gl_Position = projViewMat * vec4(cube.xyz + vec3( 0.5, -0.5,  0.5) * cube.w, 1.0);
-    gl_MeshVerticesEXT[6].gl_Position = projViewMat * vec4(cube.xyz + vec3( 0.5, -0.5, -0.5) * cube.w, 1.0);
-    gl_MeshVerticesEXT[7].gl_Position = projViewMat * vec4(cube.xyz + vec3(-0.5, -0.5, -0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[vertexArrOffset].gl_Position = projViewMat * vec4(cube.xyz + vec3(-0.5,  0.5,  0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[vertexArrOffset + 1].gl_Position = projViewMat * vec4(cube.xyz + vec3( 0.5,  0.5,  0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[vertexArrOffset + 2].gl_Position = projViewMat * vec4(cube.xyz + vec3( 0.5,  0.5, -0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[vertexArrOffset + 3].gl_Position = projViewMat * vec4(cube.xyz + vec3(-0.5,  0.5, -0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[vertexArrOffset + 4].gl_Position = projViewMat * vec4(cube.xyz + vec3(-0.5, -0.5,  0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[vertexArrOffset + 5].gl_Position = projViewMat * vec4(cube.xyz + vec3( 0.5, -0.5,  0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[vertexArrOffset + 6].gl_Position = projViewMat * vec4(cube.xyz + vec3( 0.5, -0.5, -0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[vertexArrOffset + 7].gl_Position = projViewMat * vec4(cube.xyz + vec3(-0.5, -0.5, -0.5) * cube.w, 1.0);
+
+    vertColors[vertexArrOffset] = color;
+    vertColors[vertexArrOffset + 1] = color;
+    vertColors[vertexArrOffset + 2] = color;
+    vertColors[vertexArrOffset + 3] = color;
+    vertColors[vertexArrOffset + 4] = color;
+    vertColors[vertexArrOffset + 5] = color;
+    vertColors[vertexArrOffset + 6] = color;
+    vertColors[vertexArrOffset + 7] = color;
 
     // right
-    gl_PrimitiveTriangleIndicesEXT[0] = uvec3(1, 5, 6);
-    gl_PrimitiveTriangleIndicesEXT[1] = uvec3(6, 2, 1);
+    gl_PrimitiveTriangleIndicesEXT[primArrOffset] = uvec3(1, 5, 6) + uvec3(vertexArrOffset);
+    gl_PrimitiveTriangleIndicesEXT[primArrOffset + 1] = uvec3(6, 2, 1) + uvec3(vertexArrOffset);
     // left
-    gl_PrimitiveTriangleIndicesEXT[2] = uvec3(0, 4, 7);
-    gl_PrimitiveTriangleIndicesEXT[3] = uvec3(7, 3, 0);
+    gl_PrimitiveTriangleIndicesEXT[primArrOffset + 2] = uvec3(0, 4, 7) + uvec3(vertexArrOffset);
+    gl_PrimitiveTriangleIndicesEXT[primArrOffset + 3] = uvec3(7, 3, 0) + uvec3(vertexArrOffset);
     // top
-    gl_PrimitiveTriangleIndicesEXT[4] = uvec3(0, 1, 2);
-    gl_PrimitiveTriangleIndicesEXT[5] = uvec3(2, 3, 0);
+    gl_PrimitiveTriangleIndicesEXT[primArrOffset + 4] = uvec3(0, 1, 2) + uvec3(vertexArrOffset);
+    gl_PrimitiveTriangleIndicesEXT[primArrOffset + 5] = uvec3(2, 3, 0) + uvec3(vertexArrOffset);
     // bottom
-    gl_PrimitiveTriangleIndicesEXT[6] = uvec3(4, 5, 6);
-    gl_PrimitiveTriangleIndicesEXT[7] = uvec3(6, 7, 4);
+    gl_PrimitiveTriangleIndicesEXT[primArrOffset + 6] = uvec3(4, 5, 6) + uvec3(vertexArrOffset);
+    gl_PrimitiveTriangleIndicesEXT[primArrOffset + 7] = uvec3(6, 7, 4) + uvec3(vertexArrOffset);
     // front
-    gl_PrimitiveTriangleIndicesEXT[8] = uvec3(0, 1, 5);
-    gl_PrimitiveTriangleIndicesEXT[9] = uvec3(5, 4, 0);
+    gl_PrimitiveTriangleIndicesEXT[primArrOffset + 8] = uvec3(0, 1, 5) + uvec3(vertexArrOffset);
+    gl_PrimitiveTriangleIndicesEXT[primArrOffset + 9] = uvec3(5, 4, 0) + uvec3(vertexArrOffset);
     // back
-    gl_PrimitiveTriangleIndicesEXT[10] = uvec3(3, 2, 6);
-    gl_PrimitiveTriangleIndicesEXT[11] = uvec3(6, 7, 3);
+    gl_PrimitiveTriangleIndicesEXT[primArrOffset + 10] = uvec3(3, 2, 6) + uvec3(vertexArrOffset);
+    gl_PrimitiveTriangleIndicesEXT[primArrOffset + 11] = uvec3(6, 7, 3) + uvec3(vertexArrOffset);
 }
