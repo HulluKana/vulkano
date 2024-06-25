@@ -17,14 +17,14 @@ class VulMeshPipeline {
             VkBlendFactor blendDstFactor = VK_BLEND_FACTOR_ZERO;
         };
 
-        VulMeshPipeline(const VulDevice &vulDevice, const std::string &meshShaderFile, const std::string &fragShaderFile, const PipelineConfigInfo &configInfo);
+        VulMeshPipeline(const VulDevice &vulDevice, const std::string &taskShaderFile, const std::string &meshShaderFile, const std::string &fragShaderFile, const PipelineConfigInfo &configInfo);
         ~VulMeshPipeline();
 
         VulMeshPipeline(const VulMeshPipeline &) = delete;
         VulMeshPipeline &operator=(const VulMeshPipeline &) = delete;
         VulMeshPipeline(VulMeshPipeline &&) = default;
 
-        void meshShade(uint32_t x, uint32_t y, uint32_t z, VkCommandBuffer cmdBuf);
+        void meshShade(uint32_t x, uint32_t y, uint32_t z, void *pushData, uint32_t pushDataSize, const std::vector<VkDescriptorSet> &descSets, VkCommandBuffer cmdBuf);
 
     private:
         VkPipeline m_pipeline;

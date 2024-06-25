@@ -6,13 +6,15 @@
 
 namespace vul {
 
-VulMeshPipeline::VulMeshPipeline(const VulDevice &vulDevice, const std::string &meshShaderFile, const std::string &fragShaderFile, const PipelineConfigInfo &configInfo)
+VulMeshPipeline::VulMeshPipeline(const VulDevice &vulDevice, const std::string &taskShaderFile, const std::string &meshShaderFile, const std::string &fragShaderFile, const PipelineConfigInfo &configInfo)
     : m_vulDevice{vulDevice}
 {
+    VkShaderModule taskShader = VK_NULL_HANDLE;
+    if (taskShaderFile.length() > 0) taskShader = VulPipeline::createShaderModule(vulDevice, taskShaderFile);
     VkShaderModule meshShader = VulPipeline::createShaderModule(vulDevice, meshShaderFile);
     VkShaderModule fragShader = VulPipeline::createShaderModule(vulDevice, fragShaderFile);
 
-    std::vector<VkPipelineShaderStageCreateInfo> shaderStages(2);
+    std::vector<VkPipelineShaderStageCreateInfo> shaderStages(2 + (taskShader != VK_NULL_HANDLE));
     shaderStages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     shaderStages[0].stage = VK_SHADER_STAGE_MESH_BIT_EXT;
     shaderStages[0].module = meshShader;
@@ -29,6 +31,16 @@ VulMeshPipeline::VulMeshPipeline(const VulDevice &vulDevice, const std::string &
     shaderStages[1].pNext = nullptr;
     shaderStages[1].pSpecializationInfo = nullptr;
 
+    if (taskShader != VK_NULL_HANDLE) {
+        shaderStages[2].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        shaderStages[2].stage = VK_SHADER_STAGE_TASK_BIT_EXT;
+        shaderStages[2].module = taskShader;
+        shaderStages[2].pName = "main";
+        shaderStages[2].flags = 0;
+        shaderStages[2].pNext = nullptr;
+        shaderStages[2].pSpecializationInfo = nullptr;
+    }
+
     VulPipeline::PipelineContents pipelineContents = VulPipeline::createPipelineContents(vulDevice, shaderStages, {}, {}, configInfo.setLayouts,
             configInfo.colorAttachmentFormats, configInfo.depthAttachmentFormat, configInfo.cullMode, configInfo.enableColorBlending, configInfo.blendOp,
             configInfo.blendSrcFactor, configInfo.blendDstFactor);
@@ -36,6 +48,7 @@ VulMeshPipeline::VulMeshPipeline(const VulDevice &vulDevice, const std::string &
     m_pipeline = pipelineContents.pipeline;
     m_layout = pipelineContents.layout;
 
+    if (VK_NULL_HANDLE != taskShader) vkDestroyShaderModule(vulDevice.device(), taskShader, nullptr);
     vkDestroyShaderModule(vulDevice.device(), meshShader, nullptr);
     vkDestroyShaderModule(vulDevice.device(), fragShader, nullptr);
 
@@ -49,9 +62,11 @@ VulMeshPipeline::~VulMeshPipeline()
     vkDestroyPipeline(m_vulDevice.device(), m_pipeline, nullptr);
 }
 
-void VulMeshPipeline::meshShade(uint32_t x, uint32_t y, uint32_t z, VkCommandBuffer cmdBuf)
+void VulMeshPipeline::meshShade(uint32_t x, uint32_t y, uint32_t z, void *pushData, uint32_t pushDataSize, const std::vector<VkDescriptorSet> &descSets, VkCommandBuffer cmdBuf)
 {
     vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    if (descSets.size() > 0) vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout, 0, static_cast<uint32_t>(descSets.size()), descSets.data(), 0, nullptr);
+    if (pushDataSize > 0) vkCmdPushConstants(cmdBuf, m_layout, VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushDataSize, pushData);
     vkCmdDrawMeshTasksEXT(cmdBuf, x, y, z);
 }
 

@@ -19,7 +19,6 @@ void GuiStuff(vul::Vulkano &vulkano) {
 }
 
 int main() {
-    vul::settings::deviceInitConfig.enableRaytracingSupport = true;
     vul::settings::deviceInitConfig.enableMeshShaderSupport = true;
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
     vul::settings::maxFps = 60.0f;
@@ -36,10 +35,8 @@ int main() {
 
         if (vulkano.shouldShowGUI()) GuiStuff(vulkano);
 
-        vulkano.vulRenderer.beginRendering(commandBuffer, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent,
-                vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent, 0, 0);
+        updateMeshUbo(vulkano, meshRes);
         meshShade(vulkano, meshRes, commandBuffer);
-        vulkano.vulRenderer.stopRendering(commandBuffer);
 
         stop = vulkano.endFrame(commandBuffer);
     }

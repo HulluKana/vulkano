@@ -1,16 +1,61 @@
 #version 460
-#extension GL_EXT_mesh_shader : require
 
-layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
-layout(triangles, max_vertices = 3, max_primitives = 1) out;
+#extension GL_EXT_mesh_shader : require
+#extension GL_GOOGLE_include_directive : enable
+
+#include "../include/host_device.hpp"
+
+layout(binding = 0, set = 0) readonly buffer CubeBuf {ObjData cubes[];};
+layout(binding = 1, set = 0) uniform Ubo {MeshUbo ubo;};
+
+layout(local_size_x = 32, local_size_y = 1, local_size_z = 1) in;
+layout(triangles, max_vertices = 8, max_primitives = 12) out;
 
 void main()
 {
-    uint vertexCount = 3;
-    uint triangleCount = 1;
+    uint vertexCount = 8;
+    uint triangleCount = 12;
     SetMeshOutputsEXT(vertexCount, triangleCount);
-    gl_MeshVerticesEXT[0].gl_Position = vec4(0.5,-0.5, 0, 1);
-    gl_MeshVerticesEXT[1].gl_Position = vec4(0.5, 0.5, 0, 1);
-    gl_MeshVerticesEXT[2].gl_Position = vec4(-0.5, 0.5, 0, 1);
-    gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, 2);
+
+    const mat4 projViewMat = ubo.projectionMatrix * ubo.viewMatrix;
+    const vec4 cube = cubes[gl_GlobalInvocationID.x].pos;
+
+    /*
+        An illustration of a cube
+          0---1
+         /|  /|
+        3---2 |
+        | | | |
+        | 4-|-5
+        |/  |/
+        7---6
+    */
+
+    gl_MeshVerticesEXT[0].gl_Position = projViewMat * vec4(cube.xyz + vec3(-0.5,  0.5,  0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[1].gl_Position = projViewMat * vec4(cube.xyz + vec3( 0.5,  0.5,  0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[2].gl_Position = projViewMat * vec4(cube.xyz + vec3( 0.5,  0.5, -0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[3].gl_Position = projViewMat * vec4(cube.xyz + vec3(-0.5,  0.5, -0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[4].gl_Position = projViewMat * vec4(cube.xyz + vec3(-0.5, -0.5,  0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[5].gl_Position = projViewMat * vec4(cube.xyz + vec3( 0.5, -0.5,  0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[6].gl_Position = projViewMat * vec4(cube.xyz + vec3( 0.5, -0.5, -0.5) * cube.w, 1.0);
+    gl_MeshVerticesEXT[7].gl_Position = projViewMat * vec4(cube.xyz + vec3(-0.5, -0.5, -0.5) * cube.w, 1.0);
+
+    // right
+    gl_PrimitiveTriangleIndicesEXT[0] = uvec3(1, 5, 6);
+    gl_PrimitiveTriangleIndicesEXT[1] = uvec3(6, 2, 1);
+    // left
+    gl_PrimitiveTriangleIndicesEXT[2] = uvec3(0, 4, 7);
+    gl_PrimitiveTriangleIndicesEXT[3] = uvec3(7, 3, 0);
+    // top
+    gl_PrimitiveTriangleIndicesEXT[4] = uvec3(0, 1, 2);
+    gl_PrimitiveTriangleIndicesEXT[5] = uvec3(2, 3, 0);
+    // bottom
+    gl_PrimitiveTriangleIndicesEXT[6] = uvec3(4, 5, 6);
+    gl_PrimitiveTriangleIndicesEXT[7] = uvec3(6, 7, 4);
+    // front
+    gl_PrimitiveTriangleIndicesEXT[8] = uvec3(0, 1, 5);
+    gl_PrimitiveTriangleIndicesEXT[9] = uvec3(5, 4, 0);
+    // back
+    gl_PrimitiveTriangleIndicesEXT[10] = uvec3(3, 2, 6);
+    gl_PrimitiveTriangleIndicesEXT[11] = uvec3(6, 7, 3);
 }

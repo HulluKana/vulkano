@@ -137,7 +137,7 @@ void VulRenderer::endFrame()
     currentFrameIndex = (currentFrameIndex + 1) % VulSwapChain::MAX_FRAMES_IN_FLIGHT;
 }
 
-void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<vul::VulImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, uint32_t renderWidth, uint32_t renderHeight)
+void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<vul::VulImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, uint32_t renderWidth, uint32_t renderHeight) const
 {
     VUL_PROFILE_FUNC()
     assert(isFrameStarted && "Can't call beginRendering if the frame hasn't been started either");
@@ -183,7 +183,7 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vecto
     vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 }
 
-void VulRenderer::stopRendering(VkCommandBuffer commandBuffer)
+void VulRenderer::stopRendering(VkCommandBuffer commandBuffer) const
 {
     VUL_PROFILE_FUNC()
     assert(isFrameStarted && "Can't call stopRendering if the frame hasn't been started either");

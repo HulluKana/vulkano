@@ -53,8 +53,8 @@ class VulRenderer{
             clearPreviousDiscardCurrent,
             noDepthImage
         };
-        void beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, uint32_t renderWidth, uint32_t renderHeight);
-        void stopRendering(VkCommandBuffer commandBuffer);
+        void beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, uint32_t renderWidth, uint32_t renderHeight) const;
+        void stopRendering(VkCommandBuffer commandBuffer) const;
         
     private:
         void createCommandBuffers();

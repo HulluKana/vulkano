@@ -12,7 +12,8 @@ using vec4 = glm::vec4;
 using mat4 = glm::mat4;
 #endif
 
-#define VOLUME_LEN 1024
+#define VOLUME_LEN 16
+#define VOLUME_VOLUME (VOLUME_LEN * VOLUME_LEN * VOLUME_LEN)
 
 struct ObjData {
     vec4 pos;
@@ -20,6 +21,11 @@ struct ObjData {
 };
 
 struct RasUbo {
+    mat4 viewMatrix;
+    mat4 projectionMatrix;
+};
+
+struct MeshUbo {
     mat4 viewMatrix;
     mat4 projectionMatrix;
 };

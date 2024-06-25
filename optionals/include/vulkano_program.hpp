@@ -79,7 +79,9 @@ class Vulkano{
             rmiss = VK_SHADER_STAGE_MISS_BIT_KHR,
             rchit = VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
             rahit = VK_SHADER_STAGE_ANY_HIT_BIT_KHR,
-            rint = VK_SHADER_STAGE_INTERSECTION_BIT_KHR
+            rint = VK_SHADER_STAGE_INTERSECTION_BIT_KHR,
+            mesh = VK_SHADER_STAGE_MESH_BIT_EXT,
+            task = VK_SHADER_STAGE_TASK_BIT_EXT
         };
         struct Descriptor{
             DescriptorType type;
