@@ -34,13 +34,13 @@ MeshResources createMeshShadingResources(const vul::Vulkano &vulkano)
         std::vector<vul::Vulkano::Descriptor> descs;
         vul::Vulkano::Descriptor desc;
         desc.type = vul::Vulkano::DescriptorType::ssbo;
-        desc.stages = {vul::Vulkano::ShaderStage::mesh, vul::Vulkano::ShaderStage::frag};
+        desc.stages = {vul::Vulkano::ShaderStage::mesh, vul::Vulkano::ShaderStage::task, vul::Vulkano::ShaderStage::frag};
         desc.count = 1;
         desc.content = meshResources.cubeBuf.get();
         descs.push_back(desc);
 
         desc.type = vul::Vulkano::DescriptorType::ubo;
-        desc.stages = {vul::Vulkano::ShaderStage::mesh};
+        desc.stages = {vul::Vulkano::ShaderStage::mesh, vul::Vulkano::ShaderStage::task};
         desc.content = meshResources.ubos[i].get();
         descs.push_back(desc);
 
@@ -70,6 +70,6 @@ void meshShade(const vul::Vulkano &vulkano, const MeshResources &res, VkCommandB
 {
     vulkano.vulRenderer.beginRendering(cmdBuf, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent,
             vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent, 0, 0);
-    res.pipeline->meshShade(1, 1, 1, nullptr, 0, {res.descSets[vulkano.getFrameIdx()]->getSet()}, cmdBuf);
+    res.pipeline->meshShade(VOLUME_VOLUME / CUBES_PER_MESH / MESH_PER_TASK, 1, 1, nullptr, 0, {res.descSets[vulkano.getFrameIdx()]->getSet()}, cmdBuf);
     vulkano.vulRenderer.stopRendering(cmdBuf);
 }
