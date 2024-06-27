@@ -1,26 +1,52 @@
 #version 460
 
 #extension GL_EXT_mesh_shader : require
+#extension GL_EXT_scalar_block_layout : enable
 #extension GL_GOOGLE_include_directive : enable
 
 #include "../include/host_device.hpp"
 
 layout(binding = 0, set = 0) readonly buffer CubeBuf {ObjData cubes[];};
-layout(binding = 1, set = 0) uniform Ubo {MeshUbo ubo;};
+layout(binding = 1, set = 0, scalar) readonly buffer ChunksBuf {ChunkData chunks[];};
+layout(binding = 2, set = 0) uniform Ubo {MeshUbo ubo;};
 
 layout (local_size_x = MESH_PER_TASK, local_size_y = 1, local_size_z = 1) in;
 
 taskPayloadSharedEXT uint cubeBuffOffsets[MESH_PER_TASK];
 shared bool meshPassed[MESH_PER_TASK];
-/*
-
-*/
 
 void main()
 {
-    vec4 proj = ubo.projectionMatrix * ubo.viewMatrix * vec4(cubes[gl_GlobalInvocationID.x * CUBES_PER_MESH].pos.xyz, 1.0);
-    proj /= proj.w;
-    if (proj.x < -1.0 || proj.x > 1.0 || proj.y < -1.0 || proj.y > 1.0 || proj.z < 0.0 || proj.z > 1.0) meshPassed[gl_LocalInvocationID.x] = false;
+    const mat4 projView = ubo.projectionMatrix * ubo.viewMatrix;
+    const ChunkData chunk = chunks[gl_GlobalInvocationID.x];
+    const vec4 corners[8] = {
+        vec4(chunk.minPos.x, chunk.maxPos.y, chunk.maxPos.z, 1.0),
+        vec4(chunk.maxPos.x, chunk.maxPos.y, chunk.maxPos.z, 1.0),
+        vec4(chunk.maxPos.x, chunk.maxPos.y, chunk.minPos.z, 1.0),
+        vec4(chunk.minPos.x, chunk.maxPos.y, chunk.minPos.z, 1.0),
+
+        vec4(chunk.minPos.x, chunk.minPos.y, chunk.maxPos.z, 1.0),
+        vec4(chunk.maxPos.x, chunk.minPos.y, chunk.maxPos.z, 1.0),
+        vec4(chunk.maxPos.x, chunk.minPos.y, chunk.minPos.z, 1.0),
+        vec4(chunk.minPos.x, chunk.minPos.y, chunk.minPos.z, 1.0)
+    };
+
+    bool allAhead = true;
+    bool allBehind = true;
+    bool allLeft = true;
+    bool allRight = true;
+    bool allUp = true;
+    bool allDown = true;
+    for (uint i = 0; i < 8; i++) {
+        const vec4 corner = projView * corners[i];
+        allAhead = allAhead && corner.z > corner.w;
+        allBehind = allBehind && corner.z < 0.0;
+        allRight = allRight && corner.x > corner.w;
+        allLeft = allLeft && corner.x < -corner.w;
+        allUp = allUp && corner.y > corner.w;
+        allDown = allDown && corner.y < -corner.w;
+    }
+    if (allAhead || allBehind || allRight || allLeft || allUp || allDown) meshPassed[gl_LocalInvocationID.x] = false;
     else {
         meshPassed[gl_LocalInvocationID.x] = true;
         cubeBuffOffsets[gl_LocalInvocationID.x] = gl_GlobalInvocationID.x * CUBES_PER_MESH * MESH_PER_CUBE;
