@@ -9,7 +9,7 @@
 namespace vul
 {
 
-VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vector<VkDescriptorSetLayout> &setLayouts, VulDevice &device, uint32_t maxFramesInFlight) : m_vulDevice{device}
+VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vector<VkDescriptorSetLayout> &setLayouts, const VulDevice &device, uint32_t maxFramesInFlight) : m_vulDevice{device}
 {
     if (maxFramesInFlight == 0) throw std::runtime_error("Max frames in flight for compute pipelines must be at least 1");
     m_maxFramesInFlight = maxFramesInFlight;

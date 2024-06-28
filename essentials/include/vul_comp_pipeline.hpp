@@ -9,7 +9,7 @@ namespace vul
 class VulCompPipeline
 {
     public:
-        VulCompPipeline(const std::string &shaderName, const std::vector<VkDescriptorSetLayout> &setLayouts, VulDevice &device, uint32_t maxFramesInFlight);
+        VulCompPipeline(const std::string &shaderName, const std::vector<VkDescriptorSetLayout> &setLayouts, const VulDevice &device, uint32_t maxFramesInFlight);
         ~VulCompPipeline();
 
         VulCompPipeline(const VulCompPipeline &) = delete;
@@ -33,7 +33,7 @@ class VulCompPipeline
         uint32_t m_frame = 0;
         uint32_t m_maxFramesInFlight;
 
-        VulDevice &m_vulDevice;
+        const VulDevice &m_vulDevice;
 };
 
 }

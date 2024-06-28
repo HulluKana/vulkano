@@ -1,4 +1,5 @@
 #include "vul_image.hpp"
+#include "vul_settings.hpp"
 #include <vul_debug_tools.hpp>
 #include <cstddef>
 #include <cstdlib>
@@ -52,14 +53,16 @@ void VulRenderer::recreateSwapChain()
     VkCommandBuffer cmdBuf = vulDevice.beginSingleTimeCommands();
     m_depthFormat = vulDevice.findSupportedFormat({  VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT}, 
                                                             VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
+    VkImageUsageFlags depthUsage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+    if (settings::rendererConfig.enableSamplingDepthImages) depthUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
     m_depthImages.resize(vulSwapChain->imageCount());
-    std::shared_ptr<vul::VulSampler> depthSampler = vul::VulSampler::createCustomSampler(vulDevice, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, 0.0f, VK_BORDER_COLOR_INT_OPAQUE_BLACK, VK_SAMPLER_MIPMAP_MODE_NEAREST, 0.0f, 0.0f, 1.0f);
     for (size_t i = 0; i < vulSwapChain->imageCount(); i++) {
         m_depthImages[i] = std::make_unique<vul::VulImage>(vulDevice);
-        m_depthImages[i]->keepEmpty(vulSwapChain->getSwapChainExtent().width, vulSwapChain->getSwapChainExtent().height, 1, 1, 1, m_depthFormat, 0, 0);
-        m_depthImages[i]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
-                | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, cmdBuf);
-        m_depthImages[i]->vulSampler = depthSampler;
+        m_depthImages[i]->keepEmpty(vulSwapChain->getSwapChainExtent().width, vulSwapChain->getSwapChainExtent().height, 1, settings::rendererConfig.depthImageMipLevels, 1, m_depthFormat, 0, 0);
+        m_depthImages[i]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, depthUsage,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, cmdBuf);
+        if (settings::rendererConfig.createImageViewsForMipMaps) m_depthImages[i]->createImageViewsForMipMaps();
+        if (settings::rendererConfig.enableSamplingDepthImages) m_depthImages[i]->vulSampler = settings::rendererConfig.depthImageSampler;
     }
     vulDevice.endSingleTimeCommands(cmdBuf);
 }

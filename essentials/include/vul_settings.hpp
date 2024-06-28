@@ -1,7 +1,9 @@
 #pragma once
 
+#include "vul_image.hpp"
 #include <cmath>
 #include <inttypes.h>
+#include <memory>
 
 namespace vul{
 
@@ -15,8 +17,15 @@ public:
     };
     static inline DeviceInitConfig deviceInitConfig{false, false, false};
 
-    static inline uint32_t renderWidth{0};
-    static inline uint32_t renderHeight{0};
+    struct RendererConfig {
+        uint32_t renderWidth = 0;
+        uint32_t renderHeight = 0;
+        bool enableSamplingDepthImages = false;
+        std::shared_ptr<VulSampler> depthImageSampler = nullptr;
+        uint32_t depthImageMipLevels = 1;
+        bool createImageViewsForMipMaps = false;
+    };
+    static inline RendererConfig rendererConfig{0, 0, false, nullptr, 1, false};
 
     static inline float maxFps{60.0f};
 

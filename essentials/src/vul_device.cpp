@@ -184,50 +184,39 @@ void VulDevice::createLogicalDevice() {
   reset.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
   reset.pNext = &rtPipelineFeatures;
 
-  VkPhysicalDeviceScalarBlockLayoutFeatures scalarBlockFeatures{};
-  scalarBlockFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SCALAR_BLOCK_LAYOUT_FEATURES;
-  scalarBlockFeatures.scalarBlockLayout = VK_TRUE;
-
-  if (vul::settings::deviceInitConfig.enableRaytracingSupport) {
-      deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
-      deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
-      deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-      scalarBlockFeatures.pNext = &reset;
-  }
-
   VkPhysicalDeviceMaintenance4Features maintanance4features{};
   maintanance4features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES;
-  maintanance4features.pNext = &scalarBlockFeatures;
 
   VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures{};
   meshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
   meshShaderFeatures.pNext = &maintanance4features;
 
-  VkPhysicalDeviceDescriptorIndexingFeatures descriptorIndexingFeatures{};
-  descriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES;
-  descriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
-  descriptorIndexingFeatures.pNext = &scalarBlockFeatures;
-
-  if (vul::settings::deviceInitConfig.enableMeshShaderSupport) {
-      deviceExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-      descriptorIndexingFeatures.pNext = &meshShaderFeatures;
-  }
-
-  VkPhysicalDeviceBufferDeviceAddressFeatures bufferDeviceAddresFeature{};
-  bufferDeviceAddresFeature.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_BUFFER_DEVICE_ADDRESS_FEATURES;
-  bufferDeviceAddresFeature.bufferDeviceAddress = VK_TRUE;
-  bufferDeviceAddresFeature.pNext = &descriptorIndexingFeatures;
-
   VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature{};
   dynamic_rendering_feature.sType =
       VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
   dynamic_rendering_feature.dynamicRendering = VK_TRUE;
-  dynamic_rendering_feature.pNext = &bufferDeviceAddresFeature;
+
+  if (vul::settings::deviceInitConfig.enableRaytracingSupport) {
+      deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
+      deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
+      deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
+      if (!vul::settings::deviceInitConfig.enableMeshShaderSupport) dynamic_rendering_feature.pNext = &reset;
+      else maintanance4features.pNext = &reset;
+  }
+
+  if (vul::settings::deviceInitConfig.enableMeshShaderSupport) {
+      deviceExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
+      dynamic_rendering_feature.pNext = &meshShaderFeatures;
+  }
+
+  VkPhysicalDeviceVulkan12Features physicalFeaturesVulkan12{};
+  physicalFeaturesVulkan12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  physicalFeaturesVulkan12.pNext = &dynamic_rendering_feature;
 
   VkPhysicalDeviceFeatures2 physicalFeatures2{};
   physicalFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
   physicalFeatures2.features.samplerAnisotropy = VK_TRUE;
-  physicalFeatures2.pNext = &dynamic_rendering_feature;
+  physicalFeatures2.pNext = &physicalFeaturesVulkan12;
   vkGetPhysicalDeviceFeatures2(physicalDevice, &physicalFeatures2);
 
   VkDeviceCreateInfo createInfo = {};

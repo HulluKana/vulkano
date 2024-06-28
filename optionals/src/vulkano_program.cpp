@@ -94,7 +94,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
                 if (!firstPass) vulRenderer.stopRendering(commandBuffer);
                 if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, commandBuffer);
                 if (renderData.sampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionImageLayout(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
-                vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::renderWidth, settings::renderHeight);
+                vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::rendererConfig.renderWidth, settings::rendererConfig.renderHeight);
                 prevSwapChainMode = renderData.swapChainImageMode;
                 prevDepthImageMode = renderData.depthImageMode;
                 prevAttachmentImageCount = renderData.attachmentImages[vulRenderer.getFrameIndex()].size();
@@ -119,7 +119,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
             if (firstPass || renderData.swapChainImageMode != prevSwapChainMode || renderData.depthImageMode != prevDepthImageMode || renderData.attachmentImages[vulRenderer.getFrameIndex()].size() > 0) {
                 if (!firstPass) vulRenderer.stopRendering(commandBuffer);
                 if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, commandBuffer);
-                vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::renderWidth, settings::renderHeight);
+                vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::rendererConfig.renderWidth, settings::rendererConfig.renderHeight);
                 prevSwapChainMode = renderData.swapChainImageMode;
                 prevDepthImageMode = renderData.depthImageMode;
                 prevAttachmentImageCount = renderData.attachmentImages[vulRenderer.getFrameIndex()].size();
@@ -139,7 +139,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 
     if (firstPass || VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent != prevSwapChainMode || VulRenderer::DepthImageMode::noDepthImage != prevDepthImageMode || prevAttachmentImageCount > 0) {
         if (!firstPass) vulRenderer.stopRendering(commandBuffer);
-        vulRenderer.beginRendering(commandBuffer, {}, VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent, VulRenderer::DepthImageMode::noDepthImage, settings::renderWidth, settings::renderHeight);
+        vulRenderer.beginRendering(commandBuffer, {}, VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent, VulRenderer::DepthImageMode::noDepthImage, settings::rendererConfig.renderWidth, settings::rendererConfig.renderHeight);
     }
     if (!cameraController.hideGUI) m_vulGUI.endFrame(commandBuffer);
     vulRenderer.stopRendering(commandBuffer);
@@ -175,6 +175,7 @@ std::unique_ptr<VulDescriptorSet> Vulkano::createDescriptorSet(const std::vector
         else if (descriptors[i].type == DescriptorType::combinedImgSampler ||
             descriptors[i].type == DescriptorType::spCombinedImgSampler || descriptors[i].type == DescriptorType::upCombinedImgSampler)
             type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        else if (descriptors[i].type == DescriptorType::rawImageInfo) type = static_cast<const RawImageDescriptorInfo *>(descriptors[i].content)->descriptorType;
         else if (descriptors[i].type == DescriptorType::storageImage) type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         else if (descriptors[i].type == DescriptorType::accelerationStructure) type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
         layoutBuilder.addBinding(i, type, stageFlags, descriptors[i].count);
@@ -224,6 +225,15 @@ std::unique_ptr<VulDescriptorSet> Vulkano::createDescriptorSet(const std::vector
                 imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
                 imageInfos[j].imageView = image[j]->getImageView();
                 imageInfos[j].sampler = image[j]->vulSampler->getSampler();
+            }
+            imageInfosStorage.push_back(imageInfos);
+            set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
+        }
+        if (desc.type == DescriptorType::rawImageInfo) {
+            const RawImageDescriptorInfo *info = static_cast<const RawImageDescriptorInfo *>(desc.content);
+            std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++) {
+                imageInfos[j] = info[j].descriptorInfo;
             }
             imageInfosStorage.push_back(imageInfos);
             set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);

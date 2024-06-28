@@ -68,6 +68,7 @@ class Vulkano{
             combinedImgSampler,
             spCombinedImgSampler,
             upCombinedImgSampler,
+            rawImageInfo,
             storageImage,
             accelerationStructure 
         };
@@ -82,6 +83,10 @@ class Vulkano{
             rint = VK_SHADER_STAGE_INTERSECTION_BIT_KHR,
             mesh = VK_SHADER_STAGE_MESH_BIT_EXT,
             task = VK_SHADER_STAGE_TASK_BIT_EXT
+        };
+        struct RawImageDescriptorInfo {
+            VkDescriptorType descriptorType;
+            VkDescriptorImageInfo descriptorInfo;
         };
         struct Descriptor{
             DescriptorType type;

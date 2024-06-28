@@ -24,11 +24,17 @@
 namespace vul {
 
 VulSampler::VulSampler(const VulDevice &vulDevice, VkFilter filter, VkSamplerAddressMode addressMode, float maxAnisotropy,
-        VkBorderColor borderColor, VkSamplerMipmapMode mipMapMode, float mipLodBias, float mipMinLod, float mipMaxLod)
+                VkBorderColor borderColor, VkSamplerMipmapMode mipMapMode, bool enableSamplerReduction,
+                VkSamplerReductionMode samplerReductionMode, float mipLodBias, float mipMinLod, float mipMaxLod)
     : m_vulDevice{vulDevice}
 {
+    VkSamplerReductionModeCreateInfo reductionModeInfo{};
+    reductionModeInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO;
+    reductionModeInfo.reductionMode = samplerReductionMode;
+
     VkSamplerCreateInfo samplerInfo{};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    if (enableSamplerReduction) samplerInfo.pNext = &reductionModeInfo;
     samplerInfo.magFilter = filter;
     samplerInfo.minFilter = filter;
     samplerInfo.addressModeU = addressMode;
@@ -63,17 +69,19 @@ std::shared_ptr<VulSampler> VulSampler::createDefaultTexSampler(const vul::VulDe
     std::shared_ptr<VulSampler> sampler;
     sampler.reset(new VulSampler{vulDevice, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
             vulDevice.properties.limits.maxSamplerAnisotropy, VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-            VK_SAMPLER_MIPMAP_MODE_LINEAR, 0.0f, 0.0f, static_cast<float>(mipLevels)});
+            VK_SAMPLER_MIPMAP_MODE_LINEAR, false, VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE,
+            0.0f, 0.0f, static_cast<float>(mipLevels)});
     return sampler;
 }
 
-std::shared_ptr<VulSampler> VulSampler::createCustomSampler(const vul::VulDevice &vulDevice, VkFilter filter,
-        VkSamplerAddressMode addressMode, float maxAnisotropy, VkBorderColor borderColor,
-        VkSamplerMipmapMode mipMapMode, float mipLodBias, float mipMinLod, float mipMaxLod)
+std::shared_ptr<VulSampler> VulSampler::createCustomSampler(const VulDevice &vulDevice, VkFilter filter,
+                VkSamplerAddressMode addressMode, float maxAnisotropy, VkBorderColor borderColor, VkSamplerMipmapMode mipMapMode,
+                bool enableSamplerReduction, VkSamplerReductionMode samplerReductionMode,
+                float mipLodBias, float mipMinLod, float mipMaxLod)
 {
     std::shared_ptr<VulSampler> sampler;
-    sampler.reset(new VulSampler{vulDevice, filter, addressMode, maxAnisotropy,
-            borderColor, mipMapMode, mipLodBias, mipMinLod, mipMaxLod});
+    sampler.reset(new VulSampler{vulDevice, filter, addressMode, maxAnisotropy, borderColor,
+            mipMapMode, enableSamplerReduction, samplerReductionMode, mipLodBias, mipMinLod, mipMaxLod});
     return sampler;
 }
 
@@ -91,6 +99,7 @@ VulImage::~VulImage()
     if (m_imageView != VK_NULL_HANDLE) vkDestroyImageView(m_vulDevice.device(), m_imageView, nullptr);
     if (m_image != VK_NULL_HANDLE && m_ownsImage) vkDestroyImage(m_vulDevice.device(), m_image, nullptr);
     if (m_imageMemory != VK_NULL_HANDLE) vkFreeMemory(m_vulDevice.device(), m_imageMemory, nullptr);
+    for (VkImageView imageView : m_mipImageViews) vkDestroyImageView(m_vulDevice.device(), imageView, nullptr);
 }
 
 void VulImage::loadCompressedKtxFromFile(const std::string &fileName, KtxCompressionFormat compressionFormat,
@@ -319,14 +328,15 @@ void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkI
     m_memoryProperties = memoryProperties;
     m_tiling = tiling;
     m_aspect = aspect;
-    m_mipLevelsCount = m_mipLevels.size();
     m_arrayLayersCount = m_mipLevels[0].layers.size();
     for (uint32_t i = 1; i < m_mipLevelsCount; i++) assert(m_arrayLayersCount == m_mipLevels[i].layers.size());
     assert(m_arrayLayersCount >= 1);
     assert(!(m_arrayLayersCount > 1 && type == VK_IMAGE_VIEW_TYPE_3D));
+    const uint32_t minSize = std::min(m_mipLevels[0].width, m_mipLevels[0].height);
+    m_mipLevelsCount = std::min(static_cast<uint32_t>(m_mipLevels.size()), static_cast<uint32_t>(std::log2(minSize)));
 
     createVkImage();
-    createImageView();
+    m_imageView = createImageView(0, m_mipLevelsCount);
 
     const bool isDeviceLocal = memoryProperties & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     bool containsData = false;
@@ -358,7 +368,15 @@ void VulImage::createFromVkImage(VkImage image, VkImageViewType type, VkFormat f
     m_mipLevelsCount = mipLevelCount;
     m_arrayLayersCount = arrayLayerCount;
     m_aspect = aspect;
-    createImageView();
+    m_imageView = createImageView(0, m_mipLevelsCount);
+}
+
+void VulImage::createImageViewsForMipMaps()
+{
+    m_mipImageViews.resize(m_mipLevelsCount);
+    for (uint32_t i = 0; i < m_mipLevelsCount; i++) {
+        m_mipImageViews[i] = createImageView(i, 1);
+    }
 }
 
 VkRenderingAttachmentInfo VulImage::getAttachmentInfo(VkClearValue clearValue) const
@@ -374,6 +392,28 @@ VkRenderingAttachmentInfo VulImage::getAttachmentInfo(VkClearValue clearValue) c
     attachmentInfo.storeOp = storeOp;
     attachmentInfo.clearValue = clearValue;
     return attachmentInfo;
+}
+
+VkDescriptorImageInfo VulImage::getDescriptorInfo() const
+{
+    assert(m_imageView != VK_NULL_HANDLE);
+    VkDescriptorImageInfo descInfo;
+    descInfo.imageView = m_imageView;
+    descInfo.imageLayout = m_layout;
+    if (vulSampler != nullptr) descInfo.sampler = vulSampler->getSampler();
+    else descInfo.sampler = VK_NULL_HANDLE;
+    return descInfo;
+}
+
+VkDescriptorImageInfo VulImage::getMipDescriptorInfo(uint32_t mipLevel) const
+{
+    assert(m_mipImageViews.size() > mipLevel);
+    VkDescriptorImageInfo descInfo;
+    descInfo.imageView = m_mipImageViews[mipLevel];
+    descInfo.imageLayout = m_layout;
+    if (vulSampler != nullptr) descInfo.sampler = vulSampler->getSampler();
+    else descInfo.sampler = VK_NULL_HANDLE;
+    return descInfo;
 }
 
 void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf)
@@ -654,7 +694,7 @@ void VulImage::createVkImage()
     VUL_NAME_VK(m_imageMemory)
 }
 
-void VulImage::createImageView()
+VkImageView VulImage::createImageView(uint32_t baseMipLevel, uint32_t mipLevelCount)
 {
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -662,15 +702,17 @@ void VulImage::createImageView()
     viewInfo.viewType = m_imageViewType;
     viewInfo.format = m_format;
     viewInfo.subresourceRange.aspectMask = m_aspect;
-    viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = m_mipLevelsCount;
+    viewInfo.subresourceRange.baseMipLevel = baseMipLevel;
+    viewInfo.subresourceRange.levelCount = mipLevelCount;
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = m_arrayLayersCount;
 
-    if (vkCreateImageView(m_vulDevice.device(), &viewInfo, nullptr, &m_imageView) != VK_SUCCESS)
+    VkImageView imageView;
+    if (vkCreateImageView(m_vulDevice.device(), &viewInfo, nullptr, &imageView) != VK_SUCCESS)
         throw std::runtime_error("failed to create image view");
 
-    VUL_NAME_VK(m_imageView);
+    VUL_NAME_VK(imageView);
+    return imageView;
 }
 
 void VulImage::copyBufferToImage(VkBuffer buffer, uint32_t mipLevel, VkCommandBuffer cmdBuf) 

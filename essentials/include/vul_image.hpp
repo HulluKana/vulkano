@@ -1,6 +1,7 @@
 #pragma once
 
 #include "vul_device.hpp"
+#include <cassert>
 #include <ktx.h>
 #include <variant>
 #include <vul_buffer.hpp>
@@ -19,12 +20,14 @@ class VulSampler {
         static std::shared_ptr<VulSampler> createDefaultTexSampler(const VulDevice &vulDevice, uint32_t mipLevels);
         static std::shared_ptr<VulSampler> createCustomSampler(const VulDevice &vulDevice, VkFilter filter,
                 VkSamplerAddressMode addressMode, float maxAnisotropy, VkBorderColor borderColor,
-                VkSamplerMipmapMode mipMapMode,float mipLodBias, float mipMinLod, float mipMaxLod);
+                VkSamplerMipmapMode mipMapMode, bool enableSamplerReduction, VkSamplerReductionMode samplerReductionMode,
+                float mipLodBias, float mipMinLod, float mipMaxLod);
 
         VkSampler getSampler() const {return m_sampler;}
     private:
         VulSampler(const VulDevice &vulDevice, VkFilter filter, VkSamplerAddressMode addressMode, float maxAnisotropy,
-                VkBorderColor borderColor, VkSamplerMipmapMode mipMapMode, float mipLodBias, float mipMinLod, float mipMaxLod);
+                VkBorderColor borderColor, VkSamplerMipmapMode mipMapMode, bool enableSamplerReduction,
+                VkSamplerReductionMode samplerReductionMode, float mipLodBias, float mipMinLod, float mipMaxLod);
         const VulDevice &m_vulDevice;
         VkSampler m_sampler = VK_NULL_HANDLE;
 };
@@ -140,9 +143,6 @@ class VulImage {
         void keepEmpty(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth, uint32_t mipCount, uint32_t arrayCount,
                 VkFormat format, uint32_t baseOutputMipLevel, uint32_t baseOutputArrayLayer);
 
-        void createMipMapsSingleTime();
-        void createMipMaps(VkCommandBuffer cmdBuf);
-
         void createDefaultImageSingleTime(ImageType type);
         void createDefaultImage(ImageType type, VkCommandBuffer cmdBuf);
         void createCustomImageSingleTime(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
@@ -152,6 +152,10 @@ class VulImage {
 
         void createFromVkImage(VkImage image, VkImageViewType type, VkFormat format, VkImageAspectFlags aspect,
                 uint32_t mipLevelCount, uint32_t arrayLayerCount);
+
+        void createMipMapsSingleTime();
+        void createMipMaps(VkCommandBuffer cmdBuf);
+        void createImageViewsForMipMaps();
 
         void modifyImageSingleTime(const std::vector<DataSection> &modificationSections);
         void modifyImage(const std::vector<DataSection> &modificationSections, VkCommandBuffer cmdBuf);
@@ -165,6 +169,8 @@ class VulImage {
         void deleteCpuData() {delete m_data.release(); m_dataSize = 0;}
 
         VkRenderingAttachmentInfo getAttachmentInfo(VkClearValue clearValue) const;
+        VkDescriptorImageInfo getDescriptorInfo() const;
+        VkDescriptorImageInfo getMipDescriptorInfo(uint32_t mipLevel) const;
 
         uint32_t getBaseWidth() const {return m_baseWidth;}
         uint32_t getBaseHeight() const {return m_baseHeight;}
@@ -186,6 +192,7 @@ class VulImage {
 
         VkImage getImage() const {return m_image;}
         VkImageView getImageView() const {return m_imageView;}
+        VkImageView getImageViewForMipLevel(uint32_t mipLevel) const {assert(m_mipImageViews.size() > mipLevel); return m_mipImageViews[mipLevel];}
         VkDeviceMemory getMemory() const {return m_imageMemory;}
         
         std::shared_ptr<VulSampler> vulSampler = nullptr;
@@ -210,7 +217,7 @@ class VulImage {
         };
 
         void createVkImage();
-        void createImageView();
+        VkImageView createImageView(uint32_t baseMipLevel, uint32_t mipLevelCount);
         void copyBufferToImage(VkBuffer buffer, uint32_t mipLevel, VkCommandBuffer cmdBuf);
 
         uint32_t alignUp(uint32_t alignee, uint32_t aligner);
@@ -241,6 +248,7 @@ class VulImage {
 
         VkImage m_image = VK_NULL_HANDLE;
         VkImageView m_imageView = VK_NULL_HANDLE;
+        std::vector<VkImageView> m_mipImageViews;
         VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
 
         const VulDevice &m_vulDevice;
