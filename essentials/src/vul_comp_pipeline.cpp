@@ -1,26 +1,18 @@
 #include "vul_debug_tools.hpp"
+#include <cassert>
 #include<vul_comp_pipeline.hpp>
 #include<vul_pipeline.hpp>
-#include<vul_swap_chain.hpp>
 #include <stdexcept>
+#include <iostream>
 #include <vulkan/vulkan_core.h>
-
 
 namespace vul
 {
 
-VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vector<VkDescriptorSetLayout> &setLayouts, const VulDevice &device, uint32_t maxFramesInFlight) : m_vulDevice{device}
+VulCompPipeline::VulCompPipeline(const std::vector<std::string> &shaderNames, const std::vector<VkDescriptorSetLayout> &setLayouts, const vul::VulDevice &device, uint32_t maxFramesInFlight) : m_vulDevice{device}
 {
     if (maxFramesInFlight == 0) throw std::runtime_error("Max frames in flight for compute pipelines must be at least 1");
     m_maxFramesInFlight = maxFramesInFlight;
-
-    VkShaderModule shader = VulPipeline::createShaderModule(m_vulDevice, shaderName);
-
-    VkPipelineShaderStageCreateInfo stageInfo{};
-    stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-    stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
-    stageInfo.module = shader;
-    stageInfo.pName = "main";
 
     VkPushConstantRange pushConstant{};
     pushConstant.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
@@ -35,13 +27,26 @@ VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vecto
     layoutInfo.pPushConstantRanges = &pushConstant;
     if (vkCreatePipelineLayout(m_vulDevice.device(), &layoutInfo, nullptr, &m_layout) != VK_SUCCESS)
         throw std::runtime_error("Failed to create compute pipeline layout");
-    
-    VkComputePipelineCreateInfo pipelineInfo{};
-    pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
-    pipelineInfo.layout = m_layout;
-    pipelineInfo.stage = stageInfo;
-    if (vkCreateComputePipelines(m_vulDevice.device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline) != VK_SUCCESS)
-        throw std::runtime_error("Failed to create compute pipeline");
+
+    m_pipelines.resize(shaderNames.size());
+    for (size_t i = 0; i < shaderNames.size(); i++) {
+        VkShaderModule shader = VulPipeline::createShaderModule(m_vulDevice, shaderNames[i]);
+
+        VkPipelineShaderStageCreateInfo stageInfo{};
+        stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
+        stageInfo.module = shader;
+        stageInfo.pName = "main";
+
+        VkComputePipelineCreateInfo pipelineInfo{};
+        pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
+        pipelineInfo.layout = m_layout;
+        pipelineInfo.stage = stageInfo;
+        if (vkCreateComputePipelines(m_vulDevice.device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipelines[i]) != VK_SUCCESS)
+            throw std::runtime_error("Failed to create compute pipeline");
+
+        vkDestroyShaderModule(m_vulDevice.device(), shader, nullptr);
+    }
 
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -53,7 +58,6 @@ VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vecto
     if (vkAllocateCommandBuffers(m_vulDevice.device(), &allocInfo, m_cmdBufs.data()) != VK_SUCCESS)
         throw std::runtime_error("Failed to allocate command buffer while creating compute pipeline");
 
-
     VkFenceCreateInfo fenceInfo{};
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
@@ -64,16 +68,14 @@ VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vecto
     }
 
     VUL_NAME_VK(m_layout)
-    VUL_NAME_VK(m_pipeline)
+    for (VkPipeline compPipeline : m_pipelines) VUL_NAME_VK(compPipeline)
     for (VkCommandBuffer cmdBuf : m_cmdBufs) VUL_NAME_VK(cmdBuf)
     for (VkFence fence : m_fences) VUL_NAME_VK(fence)
-
-    vkDestroyShaderModule(m_vulDevice.device(), shader, nullptr);
 }
 
 VulCompPipeline::~VulCompPipeline()
 {
-    vkDestroyPipeline(m_vulDevice.device(), m_pipeline, nullptr);
+    for (VkPipeline pipeline : m_pipelines) vkDestroyPipeline(m_vulDevice.device(), pipeline, nullptr);
     vkDestroyPipelineLayout(m_vulDevice.device(), m_layout, nullptr);
     vkFreeCommandBuffers(m_vulDevice.device(), m_vulDevice.getComputeCommandPool(), m_maxFramesInFlight, m_cmdBufs.data());
     for (uint32_t i = 0; i < m_maxFramesInFlight; i++)
@@ -92,13 +94,23 @@ void VulCompPipeline::begin(const std::vector<VkDescriptorSet> &sets)
     }
     vkResetFences(m_vulDevice.device(), 1, &m_fences[m_frame]);
 
-    vkCmdBindPipeline(m_cmdBufs[m_frame], VK_PIPELINE_BIND_POINT_COMPUTE, m_pipeline);
-    vkCmdBindDescriptorSets(m_cmdBufs[m_frame], VK_PIPELINE_BIND_POINT_COMPUTE, m_layout, 0, static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
+    if (sets.size() > 0) vkCmdBindDescriptorSets(m_cmdBufs[m_frame], VK_PIPELINE_BIND_POINT_COMPUTE, m_layout, 0, static_cast<uint32_t>(sets.size()), sets.data(), 0, nullptr);
 }
 
-void VulCompPipeline::dispatch(uint32_t x, uint32_t y, uint32_t z)
+void VulCompPipeline::dispatchAll(uint32_t x, uint32_t y, uint32_t z)
 {
-    vkCmdPushConstants(m_cmdBufs[m_frame], m_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, pushSize, pPushData);
+    if (pushSize > 0) vkCmdPushConstants(m_cmdBufs[m_frame], m_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, pushSize, pPushData);
+    for (VkPipeline pipeline : m_pipelines) {
+        vkCmdBindPipeline(m_cmdBufs[m_frame], VK_PIPELINE_BIND_POINT_COMPUTE, pipeline);
+        vkCmdDispatch(m_cmdBufs[m_frame], x, y, z);
+    }
+}
+
+void VulCompPipeline::dispatchOne(uint32_t index, uint32_t x, uint32_t y, uint32_t z)
+{
+    assert(m_pipelines.size() > index);
+    if (pushSize > 0) vkCmdPushConstants(m_cmdBufs[m_frame], m_layout, VK_SHADER_STAGE_COMPUTE_BIT, 0, pushSize, pPushData);
+    vkCmdBindPipeline(m_cmdBufs[m_frame], VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelines[index]);
     vkCmdDispatch(m_cmdBufs[m_frame], x, y, z);
 }
 

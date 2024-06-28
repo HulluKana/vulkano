@@ -163,7 +163,8 @@ class VulImage {
         void readImageSingleTime(std::vector<DataSection> &readSections);
         void readImage(std::vector<DataSection> &readSections, VkCommandBuffer cmdBuf);
 
-        void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf);
+        void transitionWholeImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf);
+        void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t mipLevelCount, VkCommandBuffer cmdBuf);
 
         void deleteStagingResources() {m_stagingBuffers.clear();}
         void deleteCpuData() {delete m_data.release(); m_dataSize = 0;}

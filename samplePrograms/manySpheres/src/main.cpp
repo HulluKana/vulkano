@@ -20,15 +20,15 @@ void GuiStuff(vul::Vulkano &vulkano) {
 
 int main() {
     vul::settings::deviceInitConfig.enableMeshShaderSupport = true;
-    vul::settings::rendererConfig.depthImageMipLevels = 12;
-    vul::settings::rendererConfig.createImageViewsForMipMaps = true;
     vul::settings::rendererConfig.enableSamplingDepthImages = true;
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
 
+    vul::settings::rendererConfig.depthImageSampler = vul::VulSampler::createCustomSampler(vulkano.getVulDevice(), VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
+                0.0f, VK_BORDER_COLOR_INT_OPAQUE_BLACK, VK_SAMPLER_MIPMAP_MODE_NEAREST, true, VK_SAMPLER_REDUCTION_MODE_MIN, 0.0f, 0.0f, 12.0f);
+    for (const std::unique_ptr<vul::VulImage> &depthImg : vulkano.vulRenderer.getDepthImages()) depthImg->vulSampler = vul::settings::rendererConfig.depthImageSampler;
+
     vul::settings::maxFps = 60.0f;
     vul::settings::cameraProperties.farPlane = 500.0f;
-    vul::settings::rendererConfig.depthImageSampler = vul::VulSampler::createCustomSampler(vulkano.getVulDevice(), VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT, 0.0f, VK_BORDER_COLOR_INT_OPAQUE_BLACK, VK_SAMPLER_MIPMAP_MODE_NEAREST, true, VK_SAMPLER_REDUCTION_MODE_MIN, 0.0f, 0.0f, 12.0f);
-    for (const std::unique_ptr<vul::VulImage> &depthImg : vulkano.vulRenderer.getDepthImages()) depthImg->vulSampler = vul::settings::rendererConfig.depthImageSampler;
 
     vulkano.cameraController.baseMoveSpeed *= 2.5f;
     vulkano.cameraController.speedChanger *= 5.0f;

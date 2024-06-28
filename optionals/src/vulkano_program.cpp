@@ -92,8 +92,8 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 
             if (firstPass || renderData.swapChainImageMode != prevSwapChainMode || renderData.depthImageMode != prevDepthImageMode || renderData.attachmentImages[vulRenderer.getFrameIndex()].size() > 0) {
                 if (!firstPass) vulRenderer.stopRendering(commandBuffer);
-                if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, commandBuffer);
-                if (renderData.sampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionImageLayout(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+                if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionWholeImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, commandBuffer);
+                if (renderData.sampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionWholeImageLayout(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
                 vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::rendererConfig.renderWidth, settings::rendererConfig.renderHeight);
                 prevSwapChainMode = renderData.swapChainImageMode;
                 prevDepthImageMode = renderData.depthImageMode;
@@ -118,7 +118,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
 
             if (firstPass || renderData.swapChainImageMode != prevSwapChainMode || renderData.depthImageMode != prevDepthImageMode || renderData.attachmentImages[vulRenderer.getFrameIndex()].size() > 0) {
                 if (!firstPass) vulRenderer.stopRendering(commandBuffer);
-                if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, commandBuffer);
+                if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionWholeImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, commandBuffer);
                 vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::rendererConfig.renderWidth, settings::rendererConfig.renderHeight);
                 prevSwapChainMode = renderData.swapChainImageMode;
                 prevDepthImageMode = renderData.depthImageMode;
@@ -265,10 +265,4 @@ std::unique_ptr<VulDescriptorSet> Vulkano::createDescriptorSet(const std::vector
     return set;
 }
         
-VulCompPipeline Vulkano::createNewComputePipeline(const std::vector<VkDescriptorSetLayout> &setLayouts, const std::string &compShaderName, uint32_t maxSubmitsInFlight)
-{
-    VulCompPipeline compPipeline(compShaderName, setLayouts, m_vulDevice, maxSubmitsInFlight);
-    return compPipeline;
-}
-
 }

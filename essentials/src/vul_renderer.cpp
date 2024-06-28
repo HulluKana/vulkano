@@ -169,7 +169,7 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vecto
     renderingInfo.pColorAttachments = colorAttachmentInfos.data();
     if (depthImageMode != DepthImageMode::noDepthImage) renderingInfo.pDepthAttachment = &depthAttachmentInfo;
 
-    vulSwapChain->getImage(currentImageIndex)->transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, commandBuffer);
+    vulSwapChain->getImage(currentImageIndex)->transitionWholeImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, commandBuffer);
     vkCmdBeginRendering(commandBuffer, &renderingInfo);
 
     VkViewport viewport{};
@@ -193,7 +193,7 @@ void VulRenderer::stopRendering(VkCommandBuffer commandBuffer) const
     assert(commandBuffer == getCurrentCommandBuffer() && "Can't end a render pass on a command buffer from a different frame");
 
     vkCmdEndRendering(commandBuffer);
-    vulSwapChain->getImage(currentImageIndex)->transitionImageLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, commandBuffer);
+    vulSwapChain->getImage(currentImageIndex)->transitionWholeImageLayout(VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, commandBuffer);
 }
 
 }

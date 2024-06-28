@@ -9,6 +9,7 @@
 
 using vec3 = glm::vec3;
 using vec4 = glm::vec4;
+using uvec2 = glm::vec<2, uint32_t>;
 using mat4 = glm::mat4;
 #endif
 
@@ -42,6 +43,11 @@ struct RtUbo {
     vec4 cameraPosition;
     mat4 inverseViewMatrix;
     mat4 inverseProjectionMatrix;
+};
+
+struct MeshPc {
+    uvec2 mipSize;
+    uint mipIndex;
 };
 
 #endif

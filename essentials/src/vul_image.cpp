@@ -343,7 +343,7 @@ void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkI
     for (uint32_t i = 0; i < m_mipLevelsCount; i++) for (size_t j = 0; j < m_mipLevels[i].containsData.size(); j++)
         containsData = containsData || m_mipLevels[i].containsData[j];
     if (containsData && isDeviceLocal) {
-        transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
+        transitionWholeImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
         for (size_t i = 0; i < m_mipLevelsCount; i++) {
             m_stagingBuffers.push_back(std::make_unique<vul::VulBuffer>(m_vulDevice));
             const size_t stgIdx = m_stagingBuffers.size() - 1;
@@ -353,9 +353,9 @@ void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkI
 
             VUL_NAME_VK(m_stagingBuffers[stgIdx]->getBuffer())
         }
-        transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout, cmdBuf);
+        transitionWholeImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout, cmdBuf);
     }
-    else transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, layout, cmdBuf);
+    else transitionWholeImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, layout, cmdBuf);
 }
 
 void VulImage::createFromVkImage(VkImage image, VkImageViewType type, VkFormat format, VkImageAspectFlags aspect,
@@ -416,7 +416,12 @@ VkDescriptorImageInfo VulImage::getMipDescriptorInfo(uint32_t mipLevel) const
     return descInfo;
 }
 
-void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf)
+void VulImage::transitionWholeImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf)
+{
+    transitionImageLayout(oldLayout, newLayout, 0, m_mipLevelsCount, cmdBuf);
+}
+
+void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, uint32_t baseMipLevel, uint32_t mipLevelCount, VkCommandBuffer cmdBuf)
 {
     VkImageMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
@@ -426,8 +431,8 @@ void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newL
     barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
     barrier.image = m_image;
     barrier.subresourceRange.aspectMask = m_aspect;
-    barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = m_mipLevelsCount;
+    barrier.subresourceRange.baseMipLevel = baseMipLevel;
+    barrier.subresourceRange.levelCount = mipLevelCount;
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = m_arrayLayersCount;
 
@@ -875,6 +880,10 @@ VulImage::VkFormatProperties VulImage::getVkFormatProperties(VkFormat format)
             properties.sideLengthAlignment = 1;
             break;
         case VK_FORMAT_R32_UINT:
+            properties.bitsPerTexel = 32;
+            properties.sideLengthAlignment = 1;
+            break;
+        case VK_FORMAT_R32_SFLOAT:
             properties.bitsPerTexel = 32;
             properties.sideLengthAlignment = 1;
             break;
