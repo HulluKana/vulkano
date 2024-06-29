@@ -2,13 +2,17 @@
 
 #extension GL_EXT_mesh_shader : require
 #extension GL_EXT_scalar_block_layout : enable
+#extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_GOOGLE_include_directive : enable
+
+
 
 #include "../include/host_device.hpp"
 
-layout(binding = 0, set = 0) readonly buffer CubeBuf {ObjData cubes[];};
-layout(binding = 1, set = 0, scalar) readonly buffer ChunksBuf {ChunkData chunks[];};
-layout(binding = 2, set = 0) uniform Ubo {MeshUbo ubo;};
+layout(binding = 0, set = 0) uniform sampler2D depthImgs[];
+layout(binding = 1, set = 0) readonly buffer CubeBuf {ObjData cubes[];};
+layout(binding = 2, set = 0, scalar) readonly buffer ChunksBuf {ChunkData chunks[];};
+layout(binding = 3, set = 0) uniform Ubo {MeshUbo ubo;};
 
 layout (local_size_x = MESH_PER_TASK, local_size_y = 1, local_size_z = 1) in;
 
@@ -37,16 +41,39 @@ void main()
     bool allRight = true;
     bool allUp = true;
     bool allDown = true;
+    float minX = 69420.0;
+    float maxX = -69420.0;
+    float minY = 69420.0;
+    float maxY = -69420.0;
+    float minZ = 69420.0;
     for (uint i = 0; i < 8; i++) {
-        const vec4 corner = projView * corners[i];
-        allAhead = allAhead && corner.z > corner.w;
+        vec4 corner = projView * corners[i];
+        corner /= corner.w;
+        allAhead = allAhead && corner.z > 1.0;
         allBehind = allBehind && corner.z < 0.0;
-        allRight = allRight && corner.x > corner.w;
-        allLeft = allLeft && corner.x < -corner.w;
-        allUp = allUp && corner.y > corner.w;
-        allDown = allDown && corner.y < -corner.w;
+        allRight = allRight && corner.x > 1.0;
+        allLeft = allLeft && corner.x < -1.0;
+        allUp = allUp && corner.y > 1.0;
+        allDown = allDown && corner.y < -1.0;
+
+        minX = min(minX, corner.x);
+        maxX = max(maxX, corner.x);
+        minY = min(minY, corner.y);
+        maxY = max(maxY, corner.y);
+        minZ = min(minZ, corner.z);
     }
-    if (allAhead || allBehind || allRight || allLeft || allUp || allDown) meshPassed[gl_LocalInvocationID.x] = false;
+
+    maxX = min(maxX, 1.0);
+    minX = max(minX, -1.0);
+    maxY = min(maxY, 1.0);
+    minY = max(minY, -1.0);
+    const float cubeScreenWidth = (maxX - minX) * (float(ubo.screenDims.x) / 2.0);
+    const float cubeScreenHeight = (maxY - minY) * (float(ubo.screenDims.y) / 2.0);
+    const float depthImgLevel = floor(log2(max(cubeScreenWidth, cubeScreenHeight)));
+    const float depth = textureLod(depthImgs[ubo.depthImgIndex], vec2(minX + maxX, minY + maxY) / 2.0, depthImgLevel).x;
+    const bool isOccluded = minZ > depth;
+
+    if (allAhead || allBehind || allRight || allLeft || allUp || allDown || isOccluded) meshPassed[gl_LocalInvocationID.x] = false;
     else {
         meshPassed[gl_LocalInvocationID.x] = true;
         cubeBuffOffsets[gl_LocalInvocationID.x] = gl_GlobalInvocationID.x * CUBES_PER_MESH * MESH_PER_CUBE;

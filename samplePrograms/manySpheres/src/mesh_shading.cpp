@@ -12,6 +12,46 @@ MeshResources createMeshShadingResources(const vul::Vulkano &vulkano)
 {
     MeshResources meshResources;
 
+    meshResources.usableDepthImgs.resize(vulkano.vulRenderer.getDepthImages().size());
+    meshResources.mipCreationDescSets.resize(vulkano.vulRenderer.getDepthImages().size());
+    for (size_t i = 0; i < meshResources.usableDepthImgs.size(); i++) {
+        meshResources.usableDepthImgs[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());
+        meshResources.usableDepthImgs[i]->keepEmpty(vulkano.getSwapChainExtent().width / 2, vulkano.getSwapChainExtent().height / 2, 1, 12, 1, VK_FORMAT_R32_SFLOAT, 0, 0);
+        meshResources.usableDepthImgs[i]->createCustomImageSingleTime(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+        meshResources.usableDepthImgs[i]->createImageViewsForMipMaps();
+        meshResources.usableDepthImgs[i]->vulSampler = vulkano.vulRenderer.getDepthImages()[0]->vulSampler;
+
+        for (uint32_t j = 0; j < meshResources.usableDepthImgs[i]->getMipCount(); j++) {
+            std::vector<vul::Vulkano::Descriptor> descs;
+            vul::Vulkano::Descriptor desc;
+            desc.type = vul::Vulkano::DescriptorType::rawImageInfo;
+            desc.stages = {vul::Vulkano::ShaderStage::comp};
+            desc.count = 1;
+
+            vul::Vulkano::RawImageDescriptorInfo inputDescInfo;
+            if (j > 0) inputDescInfo.descriptorInfo = meshResources.usableDepthImgs[i]->getMipDescriptorInfo(j - 1);
+            else inputDescInfo.descriptorInfo = vulkano.vulRenderer.getDepthImages()[i]->getDescriptorInfo();
+            inputDescInfo.descriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            inputDescInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            desc.content = &inputDescInfo;
+            descs.push_back(desc);
+
+            vul::Vulkano::RawImageDescriptorInfo outputDescInfo;
+            outputDescInfo.descriptorInfo = meshResources.usableDepthImgs[i]->getMipDescriptorInfo(j);
+            outputDescInfo.descriptorInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+            outputDescInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+            desc.content = &outputDescInfo;
+            descs.push_back(desc);
+
+            meshResources.mipCreationDescSets[i].push_back(vulkano.createDescriptorSet(descs));
+        }
+    }
+
+    meshResources.mipCreationPipeline = std::make_unique<vul::VulCompPipeline>(std::vector<std::string>{"mipCreator.comp.spv"},
+            std::vector<VkDescriptorSetLayout>{meshResources.mipCreationDescSets[0][0]->getLayout()->getDescriptorSetLayout()},
+            vulkano.getVulDevice(), 1);
+
     std::vector<ObjData> objDatas;
     std::vector<ChunkData> chunkDatas;
     uint32_t inChunkIdx = 0;
@@ -55,6 +95,12 @@ MeshResources createMeshShadingResources(const vul::Vulkano &vulkano)
 
         std::vector<vul::Vulkano::Descriptor> descs;
         vul::Vulkano::Descriptor desc;
+        desc.type = vul::Vulkano::DescriptorType::upCombinedImgSampler;
+        desc.stages = {vul::Vulkano::ShaderStage::task};
+        desc.count = meshResources.usableDepthImgs.size();;
+        desc.content = meshResources.usableDepthImgs.data();
+        descs.push_back(desc);
+
         desc.type = vul::Vulkano::DescriptorType::ssbo;
         desc.stages = {vul::Vulkano::ShaderStage::mesh, vul::Vulkano::ShaderStage::task};
         desc.count = 1;
@@ -81,83 +127,83 @@ MeshResources createMeshShadingResources(const vul::Vulkano &vulkano)
 
     meshResources.renderPipeline = std::make_unique<vul::VulMeshPipeline>(vulkano.getVulDevice(), "mesh.task.spv", "mesh.mesh.spv", "mesh.frag.spv", configInfo);
 
-    meshResources.usableDepthImages.resize(vulkano.vulRenderer.getDepthImages().size());
-    for (size_t i = 0; i < meshResources.usableDepthImages.size(); i++) {
-        meshResources.usableDepthImages[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());
-        meshResources.usableDepthImages[i]->keepEmpty(vulkano.getSwapChainExtent().width / 2, vulkano.getSwapChainExtent().height / 2, 1, 12, 1, VK_FORMAT_R32_SFLOAT, 0, 0);
-        meshResources.usableDepthImages[i]->createCustomImageSingleTime(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
-        meshResources.usableDepthImages[i]->createImageViewsForMipMaps();
-        meshResources.usableDepthImages[i]->vulSampler = vulkano.vulRenderer.getDepthImages()[0]->vulSampler;
-
-        std::vector<vul::Vulkano::RawImageDescriptorInfo> inputDescriptorInfos;
-        std::vector<vul::Vulkano::RawImageDescriptorInfo> outputDescriptorInfos;
-        for (uint32_t j = 0; j < meshResources.usableDepthImages[i]->getMipCount() - 1; j++) {
-            vul::Vulkano::RawImageDescriptorInfo descInfo;
-            if (j > 0) descInfo.descriptorInfo = meshResources.usableDepthImages[i]->getMipDescriptorInfo(j - 1);
-            else descInfo.descriptorInfo = vulkano.vulRenderer.getDepthImages()[i]->getDescriptorInfo();
-            descInfo.descriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            descInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            inputDescriptorInfos.push_back(descInfo);
-
-            descInfo.descriptorInfo = meshResources.usableDepthImages[i]->getMipDescriptorInfo(j);
-            descInfo.descriptorInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            descInfo.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-            outputDescriptorInfos.push_back(descInfo);
-        }
-
-        std::vector<vul::Vulkano::Descriptor> descs;
-        vul::Vulkano::Descriptor desc;
-        desc.type = vul::Vulkano::DescriptorType::rawImageInfo;
-        desc.stages = {vul::Vulkano::ShaderStage::comp};
-        desc.content = inputDescriptorInfos.data();
-        desc.count = inputDescriptorInfos.size();
-        descs.push_back(desc);
-        desc.content = outputDescriptorInfos.data();
-        descs.push_back(desc);
-        meshResources.mipCreationDescSets.push_back(vulkano.createDescriptorSet(descs));
-    }
-
-    meshResources.mipCreationPipeline = std::make_unique<vul::VulCompPipeline>(std::vector<std::string>{"mipCreator.comp.spv"},
-            std::vector<VkDescriptorSetLayout>{meshResources.mipCreationDescSets[0]->getLayout()->getDescriptorSetLayout()},
-            vulkano.getVulDevice(), 1);
-
     return meshResources;
 }
 
-void updateMeshUbo(const vul::Vulkano &vulkano, const MeshResources &res)
+void updateMeshUbo(const vul::Vulkano &vulkano, const MeshResources &res, uint32_t prevImgIdx)
 {
     MeshUbo ubo;
     ubo.projectionMatrix = vulkano.camera.getProjection();
     ubo.viewMatrix = vulkano.camera.getView();
+    ubo.screenDims = glm::vec<2, uint32_t>(vulkano.getSwapChainExtent().width, vulkano.getSwapChainExtent().height);
+    ubo.depthImgIndex = prevImgIdx;
 
     res.ubos[vulkano.getFrameIdx()]->writeData(&ubo, sizeof(ubo), 0);
 }
 
 void meshShade(const vul::Vulkano &vulkano, const MeshResources &res, VkCommandBuffer cmdBuf)
 {
-    res.mipCreationPipeline->begin({res.mipCreationDescSets[vulkano.vulRenderer.getImageIndex()]->getSet()});
-    const std::unique_ptr<vul::VulImage> &depthImg = res.usableDepthImages[vulkano.vulRenderer.getImageIndex()];
+    const std::unique_ptr<vul::VulImage> &depthImg = res.usableDepthImgs[vulkano.vulRenderer.getImageIndex()];
 
-    vulkano.vulRenderer.getDepthImages()[vulkano.vulRenderer.getImageIndex()]->transitionWholeImageLayout(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmdBuf);
-    depthImg->transitionWholeImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, cmdBuf);
-    for (uint32_t i = 0; i < depthImg->getMipCount() - 1; i++) {
-        if (i > 0) depthImg->transitionImageLayout(VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, i - 1, 1, cmdBuf);
+    VkCommandBuffer cmdBuf2 = vulkano.getVulDevice().beginSingleTimeCommands();
+    vulkano.vulRenderer.getDepthImages()[vulkano.vulRenderer.getImageIndex()]->transitionWholeImageLayout(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmdBuf2);
+    depthImg->transitionWholeImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_GENERAL, cmdBuf2);
+    vulkano.getVulDevice().endSingleTimeCommands(cmdBuf2);
+    for (uint32_t i = 0; i < depthImg->getMipCount(); i++) {
+        if (i > 0) {
+            cmdBuf2 = vulkano.getVulDevice().beginSingleTimeCommands();
+            depthImg->transitionImageLayout(VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, i - 1, 1, cmdBuf2);
+            vulkano.getVulDevice().endSingleTimeCommands(cmdBuf2);
+        }
 
         MeshPc meshPc;
-        meshPc.mipIndex = i;
-        meshPc.mipSize = i > 0 ? glm::vec<2, uint32_t>(depthImg->getMipSize(i).width, depthImg->getMipSize(i).height) : glm::vec<2, uint32_t>(vulkano.vulRenderer.getDepthImages()[vulkano.vulRenderer.getImageIndex()]->getMipSize(i).width, vulkano.vulRenderer.getDepthImages()[vulkano.vulRenderer.getImageIndex()]->getMipSize(i).height);
+        meshPc.mipSize = i > 0 ? glm::vec<2, uint32_t>(depthImg->getMipSize(i - 1).width, depthImg->getMipSize(i - 1).height) : glm::vec<2, uint32_t>(vulkano.vulRenderer.getDepthImages()[vulkano.vulRenderer.getImageIndex()]->getBaseWidth(), vulkano.vulRenderer.getDepthImages()[vulkano.vulRenderer.getImageIndex()]->getBaseHeight());
         res.mipCreationPipeline->pPushData = &meshPc;
         res.mipCreationPipeline->pushSize = sizeof(meshPc);
+        res.mipCreationPipeline->begin({res.mipCreationDescSets[vulkano.vulRenderer.getImageIndex()][i]->getSet()});
         res.mipCreationPipeline->dispatchAll((meshPc.mipSize.x - 1) / 8 + 1, (meshPc.mipSize.y - 1) / 8 + 1, 1);
+        res.mipCreationPipeline->end(false);
     }
-    res.mipCreationPipeline->end(false);
-    depthImg->transitionImageLayout(VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, depthImg->getMipCount() - 1, 1, cmdBuf);
-    vulkano.vulRenderer.getDepthImages()[vulkano.vulRenderer.getImageIndex()]->transitionWholeImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, cmdBuf);
-    exit(0);
+    cmdBuf2 = vulkano.getVulDevice().beginSingleTimeCommands();
+    depthImg->transitionImageLayout(VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, depthImg->getMipCount() - 1, 1, cmdBuf2);
+    vulkano.vulRenderer.getDepthImages()[vulkano.vulRenderer.getImageIndex()]->transitionWholeImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, cmdBuf2);
+    vulkano.getVulDevice().endSingleTimeCommands(cmdBuf2);
 
     vulkano.vulRenderer.beginRendering(cmdBuf, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent,
             vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent, 0, 0);
     res.renderPipeline->meshShade(VOLUME_VOLUME / CUBES_PER_MESH / MESH_PER_TASK, 1, 1, nullptr, 0, {res.renderDescSets[vulkano.getFrameIdx()]->getSet()}, cmdBuf);
     vulkano.vulRenderer.stopRendering(cmdBuf);
+}
+
+void resizeUsableDepthImgs(const vul::Vulkano &vulkano, MeshResources &res)
+{
+    VkCommandBuffer cmdBuf = vulkano.getVulDevice().beginSingleTimeCommands();
+    std::vector<vul::VulImage *> oldDepthImgs(res.usableDepthImgs.size());
+    for (size_t i = 0; i < res.usableDepthImgs.size(); i++) {
+        oldDepthImgs[i] = res.usableDepthImgs[i].release();
+        res.usableDepthImgs[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());
+        res.usableDepthImgs[i]->keepEmpty(vulkano.getSwapChainExtent().width / 2, vulkano.getSwapChainExtent().height / 2, 1, 12, 1, VK_FORMAT_R32_SFLOAT, 0, 0);
+        res.usableDepthImgs[i]->createCustomImageSingleTime(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT);
+        res.usableDepthImgs[i]->createImageViewsForMipMaps();
+        res.usableDepthImgs[i]->vulSampler = vulkano.vulRenderer.getDepthImages()[0]->vulSampler;
+    }
+    vulkano.getVulDevice().endSingleTimeCommands(cmdBuf);
+
+    for (size_t i = 0; i < res.renderDescSets.size(); i++) {
+        for (size_t j = 0; j < res.usableDepthImgs.size(); j++) {
+            res.renderDescSets[i]->descriptorInfos[0].imageInfos[j].imageView = res.usableDepthImgs[j]->getImageView();
+        }
+        res.renderDescSets[i]->update();
+    }
+
+    for (size_t i = 0; i < res.mipCreationDescSets.size(); i++) {
+        for (uint32_t j = 0; j < res.usableDepthImgs[i]->getMipCount(); j++) {
+            if (j > 0) res.mipCreationDescSets[i][j]->descriptorInfos[0].imageInfos[0].imageView = res.usableDepthImgs[i]->getImageViewForMipLevel(j - 1);
+            else res.mipCreationDescSets[i][j]->descriptorInfos[0].imageInfos[0].imageView = vulkano.vulRenderer.getDepthImages()[i]->getImageView();
+            res.mipCreationDescSets[i][j]->descriptorInfos[1].imageInfos[0].imageView = res.usableDepthImgs[i]->getImageViewForMipLevel(j);
+            res.mipCreationDescSets[i][j]->update();
+        }
+    }
+    for (size_t i = 0; i < oldDepthImgs.size(); i++) delete oldDepthImgs[i];
 }

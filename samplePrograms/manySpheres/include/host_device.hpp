@@ -37,6 +37,8 @@ struct RasUbo {
 struct MeshUbo {
     mat4 viewMatrix;
     mat4 projectionMatrix;
+    uvec2 screenDims;
+    uint depthImgIndex;
 };
 
 struct RtUbo {
@@ -47,7 +49,6 @@ struct RtUbo {
 
 struct MeshPc {
     uvec2 mipSize;
-    uint mipIndex;
 };
 
 #endif

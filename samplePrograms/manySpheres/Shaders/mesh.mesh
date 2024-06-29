@@ -1,12 +1,14 @@
 #version 460
 
 #extension GL_EXT_mesh_shader : require
+#extension GL_EXT_nonuniform_qualifier : enable
 #extension GL_GOOGLE_include_directive : enable
 
 #include "../include/host_device.hpp"
 
-layout(binding = 0, set = 0) readonly buffer CubeBuf {ObjData cubes[];};
-layout(binding = 2, set = 0) uniform Ubo {MeshUbo ubo;};
+layout(binding = 0, set = 0) uniform sampler2D depthImgs[];
+layout(binding = 1, set = 0) readonly buffer CubeBuf {ObjData cubes[];};
+layout(binding = 3, set = 0) uniform Ubo {MeshUbo ubo;};
 
 layout(local_size_x = MESH_PER_CUBE * CUBES_PER_MESH, local_size_y = 1, local_size_z = 1) in;
 layout(triangles, max_vertices = CUBES_PER_MESH * 8, max_primitives = CUBES_PER_MESH * 12) out;

@@ -23,6 +23,7 @@ class VulRenderer{
 
         float getAspectRatio() const {return vulSwapChain->extentAspectRatio();}
         VkExtent2D getSwapChainExtent() const {return vulSwapChain->getSwapChainExtent();}
+        uint32_t getSwapChainImageCount() const {return vulSwapChain->imageCount();}
         VkFormat getSwapChainColorFormat() const {return vulSwapChain->getSwapChainImageFormat();}
         bool wasSwapChainRecreated() const {return m_swapchainRecreated;}
         VkFormat getDepthFormat() const {return m_depthFormat;}

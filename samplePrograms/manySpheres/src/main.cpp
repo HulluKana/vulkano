@@ -24,7 +24,7 @@ int main() {
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
 
     vul::settings::rendererConfig.depthImageSampler = vul::VulSampler::createCustomSampler(vulkano.getVulDevice(), VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
-                0.0f, VK_BORDER_COLOR_INT_OPAQUE_BLACK, VK_SAMPLER_MIPMAP_MODE_NEAREST, true, VK_SAMPLER_REDUCTION_MODE_MIN, 0.0f, 0.0f, 12.0f);
+                0.0f, VK_BORDER_COLOR_INT_OPAQUE_BLACK, VK_SAMPLER_MIPMAP_MODE_NEAREST, true, VK_SAMPLER_REDUCTION_MODE_MAX, 0.0f, 0.0f, 12.0f);
     for (const std::unique_ptr<vul::VulImage> &depthImg : vulkano.vulRenderer.getDepthImages()) depthImg->vulSampler = vul::settings::rendererConfig.depthImageSampler;
 
     vul::settings::maxFps = 60.0f;
@@ -36,16 +36,19 @@ int main() {
     MeshResources meshRes = createMeshShadingResources(vulkano);
 
     bool stop = false;
+    uint32_t prevImgIdx = vulkano.vulRenderer.getImageIndex();
     while (!stop) {
         VkCommandBuffer commandBuffer = vulkano.startFrame();
         if (commandBuffer == nullptr) continue;
 
         if (vulkano.shouldShowGUI()) GuiStuff(vulkano);
 
-        updateMeshUbo(vulkano, meshRes);
+        updateMeshUbo(vulkano, meshRes, prevImgIdx);
         meshShade(vulkano, meshRes, commandBuffer);
+        prevImgIdx = vulkano.vulRenderer.getImageIndex();
 
         stop = vulkano.endFrame(commandBuffer);
+        if (vulkano.vulRenderer.wasSwapChainRecreated()) resizeUsableDepthImgs(vulkano, meshRes);
     }
     vul::settings::rendererConfig.depthImageSampler = nullptr;
     vulkano.letVulkanoFinish();

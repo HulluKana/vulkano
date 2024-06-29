@@ -1,3 +1,4 @@
+#include "vulkano_program.hpp"
 #include <vul_debug_tools.hpp>
 #include<vul_device.hpp>
 #include<vul_settings.hpp>
@@ -184,39 +185,43 @@ void VulDevice::createLogicalDevice() {
   reset.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
   reset.pNext = &rtPipelineFeatures;
 
-  VkPhysicalDeviceMaintenance4Features maintanance4features{};
-  maintanance4features.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MAINTENANCE_4_FEATURES;
+  VkPhysicalDeviceFragmentShadingRateFeaturesKHR fragmentShadingRateFeatures{};
+  fragmentShadingRateFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR;
 
   VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures{};
   meshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
-  meshShaderFeatures.pNext = &maintanance4features;
+  meshShaderFeatures.pNext = &fragmentShadingRateFeatures;
 
-  VkPhysicalDeviceDynamicRenderingFeaturesKHR dynamic_rendering_feature{};
-  dynamic_rendering_feature.sType =
-      VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DYNAMIC_RENDERING_FEATURES_KHR;
-  dynamic_rendering_feature.dynamicRendering = VK_TRUE;
+  VkPhysicalDeviceVulkan11Features physicalFeaturesVulkan11{};
+  physicalFeaturesVulkan11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+
+  VkPhysicalDeviceVulkan12Features physicalFeaturesVulkan12{};
+  physicalFeaturesVulkan12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+  physicalFeaturesVulkan12.pNext = &physicalFeaturesVulkan11;
+
+  VkPhysicalDeviceVulkan13Features physicalFeaturesVulkan13{};
+  physicalFeaturesVulkan13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+  physicalFeaturesVulkan13.pNext = &physicalFeaturesVulkan12;
+
+  VkPhysicalDeviceFeatures2 physicalFeatures2{};
+  physicalFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+  physicalFeatures2.features.samplerAnisotropy = VK_TRUE;
+  physicalFeatures2.pNext = &physicalFeaturesVulkan13;
 
   if (vul::settings::deviceInitConfig.enableRaytracingSupport) {
       deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
       deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
       deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-      if (!vul::settings::deviceInitConfig.enableMeshShaderSupport) dynamic_rendering_feature.pNext = &reset;
-      else maintanance4features.pNext = &reset;
+      if (!vul::settings::deviceInitConfig.enableMeshShaderSupport) physicalFeaturesVulkan11.pNext = &reset;
+      else fragmentShadingRateFeatures.pNext = &reset;
   }
 
   if (vul::settings::deviceInitConfig.enableMeshShaderSupport) {
       deviceExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
-      dynamic_rendering_feature.pNext = &meshShaderFeatures;
+      deviceExtensions.push_back(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
+      physicalFeaturesVulkan11.pNext = &meshShaderFeatures;
   }
 
-  VkPhysicalDeviceVulkan12Features physicalFeaturesVulkan12{};
-  physicalFeaturesVulkan12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-  physicalFeaturesVulkan12.pNext = &dynamic_rendering_feature;
-
-  VkPhysicalDeviceFeatures2 physicalFeatures2{};
-  physicalFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  physicalFeatures2.features.samplerAnisotropy = VK_TRUE;
-  physicalFeatures2.pNext = &physicalFeaturesVulkan12;
   vkGetPhysicalDeviceFeatures2(physicalDevice, &physicalFeatures2);
 
   VkDeviceCreateInfo createInfo = {};
