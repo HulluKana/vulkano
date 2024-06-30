@@ -24,7 +24,7 @@ namespace vul{
 Vulkano::Vulkano(uint32_t width, uint32_t height, std::string name) : m_vulWindow{(int)width, (int)height, name}
 {
     m_globalPool = VulDescriptorPool::Builder(m_vulDevice)
-        .setMaxSets(m_vulDevice.properties.limits.maxBoundDescriptorSets)
+        .setMaxSets(128)
         .setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT)
         .build();
 

@@ -13,6 +13,8 @@ struct MeshResources {
     std::array<std::unique_ptr<vul::VulDescriptorSet>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> renderDescSets;
     std::unique_ptr<vul::VulCompPipeline> mipCreationPipeline;
     std::vector<std::vector<std::unique_ptr<vul::VulDescriptorSet>>> mipCreationDescSets;
+    std::unique_ptr<vul::VulCompPipeline> imageConverterPipeline;
+    std::vector<std::unique_ptr<vul::VulDescriptorSet>> imageConverterDescSets;
     std::unique_ptr<vul::VulBuffer> cubeBuf;
     std::unique_ptr<vul::VulBuffer> chunksBuf;
     std::array<std::unique_ptr<vul::VulBuffer>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> ubos;

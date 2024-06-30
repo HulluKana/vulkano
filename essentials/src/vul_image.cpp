@@ -332,8 +332,8 @@ void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkI
     for (uint32_t i = 1; i < m_mipLevelsCount; i++) assert(m_arrayLayersCount == m_mipLevels[i].layers.size());
     assert(m_arrayLayersCount >= 1);
     assert(!(m_arrayLayersCount > 1 && type == VK_IMAGE_VIEW_TYPE_3D));
-    const uint32_t minSize = std::min(m_mipLevels[0].width, m_mipLevels[0].height);
-    m_mipLevelsCount = std::min(static_cast<uint32_t>(m_mipLevels.size()), static_cast<uint32_t>(std::log2(minSize)));
+    const uint32_t maxSize = std::max(m_mipLevels[0].width, m_mipLevels[0].height);
+    m_mipLevelsCount = std::min(static_cast<uint32_t>(m_mipLevels.size()), static_cast<uint32_t>(std::log2(maxSize) + 1));
 
     createVkImage();
     m_imageView = createImageView(0, m_mipLevelsCount);
@@ -693,7 +693,8 @@ void VulImage::createVkImage()
 
     if (vkAllocateMemory(m_vulDevice.device(), &allocInfo, nullptr, &m_imageMemory) != VK_SUCCESS)
         throw std::runtime_error("failed to allocate image memory in VulImage");
-    vkBindImageMemory(m_vulDevice.device(), m_image, m_imageMemory, 0);
+    if (vkBindImageMemory(m_vulDevice.device(), m_image, m_imageMemory, 0) != VK_SUCCESS)
+        throw std::runtime_error("failed to bind image memory in VulImage");
 
     VUL_NAME_VK(m_image)
     VUL_NAME_VK(m_imageMemory)
