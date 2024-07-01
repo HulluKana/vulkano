@@ -1,5 +1,6 @@
 #include "vul_comp_pipeline.hpp"
 #include "vul_image.hpp"
+#include "vulkano_program.hpp"
 #include <cstring>
 #include <iostream>
 #include <limits>
@@ -59,6 +60,10 @@ MeshResources createMeshShadingResources(const vul::Vulkano &vulkano)
 
     meshResources.imageConverterDescSets.resize(meshResources.usableDepthImgs.size());
     for (size_t i = 0; i < meshResources.usableDepthImgs.size(); i++) {
+        meshResources.debugImgs[i] = std::make_unique<vul::VulImage>(vulkano.getVulDevice());
+        meshResources.debugImgs[i]->keepRegularRaw2d32bitRgbaEmpty(2560, 1440);
+        meshResources.debugImgs[i]->createDefaultImageSingleTime(vul::VulImage::ImageType::storage2d);
+
         std::vector<vul::Vulkano::Descriptor> descs;
         vul::Vulkano::Descriptor desc;
         desc.type = vul::Vulkano::DescriptorType::rawImageInfo;
@@ -79,6 +84,10 @@ MeshResources createMeshShadingResources(const vul::Vulkano &vulkano)
         desc.content = &outputDescInfo;
         descs.push_back(desc);
 
+        desc.type = vul::Vulkano::DescriptorType::storageImage;
+        desc.content = meshResources.debugImgs[i].get();
+        descs.push_back(desc);
+
         meshResources.imageConverterDescSets[i] = vulkano.createDescriptorSet(descs);
     }
 
@@ -90,7 +99,7 @@ MeshResources createMeshShadingResources(const vul::Vulkano &vulkano)
     std::vector<ChunkData> chunkDatas;
     uint32_t inChunkIdx = 0;
     glm::vec3 minChunkPos = glm::vec3(std::numeric_limits<float>::max());
-    glm::vec3 maxChunkPos = glm::vec3(std::numeric_limits<float>::min());
+    glm::vec3 maxChunkPos = -glm::vec3(std::numeric_limits<float>::max());
     for (int x = -VOLUME_LEN / 2; x < VOLUME_LEN / 2; x++) {
         for (int y = -VOLUME_LEN / 2; y < VOLUME_LEN / 2; y++) {
             for (int z = -VOLUME_LEN / 2; z < VOLUME_LEN / 2; z++) {
@@ -107,7 +116,7 @@ MeshResources createMeshShadingResources(const vul::Vulkano &vulkano)
                 if (inChunkIdx >= CUBES_PER_MESH) {
                     chunkDatas.emplace_back(ChunkData{.minPos = minChunkPos - glm::vec3(SIDE_LENGTH / 2.0f), .maxPos = maxChunkPos + glm::vec3(SIDE_LENGTH / 2.0)}); 
                     minChunkPos = glm::vec3(std::numeric_limits<float>::max());
-                    maxChunkPos = glm::vec3(std::numeric_limits<float>::min());
+                    maxChunkPos = -glm::vec3(std::numeric_limits<float>::max());
                     inChunkIdx = 0;
                 }
             }
@@ -148,6 +157,11 @@ MeshResources createMeshShadingResources(const vul::Vulkano &vulkano)
         desc.type = vul::Vulkano::DescriptorType::ubo;
         desc.stages = {vul::Vulkano::ShaderStage::mesh, vul::Vulkano::ShaderStage::task};
         desc.content = meshResources.ubos[i].get();
+        descs.push_back(desc);
+
+        desc.type = vul::Vulkano::DescriptorType::storageImage;
+        desc.stages = {vul::Vulkano::ShaderStage::task};
+        desc.content = meshResources.debugImgs[i].get();
         descs.push_back(desc);
 
         meshResources.renderDescSets[i] = vulkano.createDescriptorSet(descs);
@@ -206,7 +220,7 @@ void meshShade(const vul::Vulkano &vulkano, const MeshResources &res, VkCommandB
         res.mipCreationPipeline->pPushData = &meshPc;
         res.mipCreationPipeline->pushSize = sizeof(meshPc);
         res.mipCreationPipeline->begin({res.mipCreationDescSets[vulkano.vulRenderer.getImageIndex()][i]->getSet()});
-        res.mipCreationPipeline->dispatchAll(std::ceil(static_cast<float>(meshPc.mipSize.x) / 2.0f), std::ceil(static_cast<float>(meshPc.mipSize.y) / 2.0f), 1);
+        res.mipCreationPipeline->dispatchAll(std::ceil(static_cast<float>(meshPc.mipSize.x) / 2.0f / 8.0f), std::ceil(static_cast<float>(meshPc.mipSize.y) / 2.0f / 8.0f), 1);
         res.mipCreationPipeline->end(true);
     }
     cmdBuf2 = vulkano.getVulDevice().beginSingleTimeCommands();

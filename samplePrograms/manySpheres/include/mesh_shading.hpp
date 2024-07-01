@@ -18,6 +18,7 @@ struct MeshResources {
     std::unique_ptr<vul::VulBuffer> cubeBuf;
     std::unique_ptr<vul::VulBuffer> chunksBuf;
     std::array<std::unique_ptr<vul::VulBuffer>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> ubos;
+    std::array<std::unique_ptr<vul::VulImage>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> debugImgs;
     std::vector<std::unique_ptr<vul::VulImage>> usableDepthImgs;
 };
 MeshResources createMeshShadingResources(const vul::Vulkano &vulkano);

@@ -6,6 +6,7 @@
 
 layout(binding = 0, set = 0) uniform sampler2D inputMip;
 layout(binding = 1, set = 0) writeonly uniform image2D outputMip;
+layout(binding = 2, set = 0) writeonly uniform image2D debugImg;
 
 layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 
@@ -17,4 +18,5 @@ void main()
     if (pos.x >= push.mipSize.x || pos.y >= push.mipSize.y) return;
     const float depth = texture(inputMip, vec2(pos) / vec2(push.mipSize)).x;
     imageStore(outputMip, pos, vec4(depth));
+    imageStore(debugImg, pos, vec4(0.0));
 }
