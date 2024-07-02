@@ -29,7 +29,6 @@ void main()
     const uint cubeHalf = gl_LocalInvocationIndex.x % MESH_PER_CUBE; // 1 is bottom, 0 is top
 
     /*
-    left, back
         An illustration of a cube
           0---1
          /|  /|

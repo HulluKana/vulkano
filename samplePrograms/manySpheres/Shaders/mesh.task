@@ -64,25 +64,30 @@ void main()
         minZ = min(minZ, corner.z);
     }
 
-    maxX = min(maxX, 1.0);
-    minX = max(minX, -1.0);
-    maxY = min(maxY, 1.0);
-    minY = max(minY, -1.0);
-    const float cubeScreenWidth = (maxX - minX) * (float(ubo.screenDims.x) / 2.0);
-    const float cubeScreenHeight = (maxY - minY) * (float(ubo.screenDims.y) / 2.0);
-    const float depthImgLevel = floor(log2(max(cubeScreenWidth, cubeScreenHeight)));
-    const float depth = textureLod(depthImgs[ubo.depthImgIndex], vec2(minX + maxX, minY + maxY) / 2.0, depthImgLevel).x;
-    const bool isOccluded = minZ > depth;
+    bool isOccluded = false;
+    if (minX >= -1.0 && maxX <= 1.0 && minY >= -1.0 && maxY <= 1.0) {
+        const float cubeScreenWidth = (maxX - minX) * (float(ubo.screenDims.x) / 2.0);
+        const float cubeScreenHeight = (maxY - minY) * (float(ubo.screenDims.y) / 2.0);
+        const float depthImgLevel = floor(log2(max(cubeScreenWidth, cubeScreenHeight)));
+        float depth = textureLod(depthImgs[ubo.depthImgIndex], (vec2(minX, minY) + vec2(1.0)) / 2.0, depthImgLevel).x;
+        depth = max(textureLod(depthImgs[ubo.depthImgIndex], (vec2(minX, maxY) + vec2(1.0)) / 2.0, depthImgLevel).x, depth);
+        depth = max(textureLod(depthImgs[ubo.depthImgIndex], (vec2(maxX, maxY) + vec2(1.0)) / 2.0, depthImgLevel).x, depth);
+        depth = max(textureLod(depthImgs[ubo.depthImgIndex], (vec2(maxX, minY) + vec2(1.0)) / 2.0, depthImgLevel).x, depth);
+        isOccluded = minZ > depth + 0.01;
+
+/*
+        for (int y = max(int((minY / 2.0 + 0.5) * float(ubo.screenDims.y)), 0); y < min(int((maxY / 2.0 + 0.5) * float(ubo.screenDims.y)), ubo.screenDims.y); y++) {
+            for (int x = max(int((minX / 2.0 + 0.5) * float(ubo.screenDims.x)), 0); x < min(int((maxX / 2.0 + 0.5) * float(ubo.screenDims.x)), ubo.screenDims.x); x++) {
+                imageStore(debugImg, ivec2(x, y), vec4(depth, depthImgLevel, ((minX + maxX) / 2.0 + 1.0) / 2.0, ((minY + maxY) / 2.0 + 1.0) / 2.0));
+            }
+        }
+        */
+    }
 
     if (allAhead || allBehind || allRight || allLeft || allUp || allDown || isOccluded) meshPassed[gl_LocalInvocationID.x] = false;
     else {
         meshPassed[gl_LocalInvocationID.x] = true;
         cubeBuffOffsets[gl_LocalInvocationID.x] = gl_GlobalInvocationID.x * CUBES_PER_MESH * MESH_PER_CUBE;
-    }
-    for (int y = max(int((minY / 2.0 + 0.5) * float(ubo.screenDims.y)), 0); y < min(int((maxY / 2.0 + 0.5) * float(ubo.screenDims.y)), ubo.screenDims.y); y++) {
-        for (int x = max(int((minX / 2.0 + 0.5) * float(ubo.screenDims.x)), 0); x < min(int((maxX / 2.0 + 0.5) * float(ubo.screenDims.x)), ubo.screenDims.x); x++) {
-            imageStore(debugImg, ivec2(x, y), vec4(cubeScreenWidth, cubeScreenHeight, depthImgLevel, depth));
-        }
     }
     if (gl_LocalInvocationIndex.x == 0) {
         uint index = 0;
