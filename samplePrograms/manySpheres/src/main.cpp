@@ -1,22 +1,21 @@
 #include "mesh_shading.hpp"
-#include "rasterizing.hpp"
 #include "vul_settings.hpp"
-#include "vul_transform.hpp"
 #include <vulkan/vulkan_core.h>
 #include<vulkano_program.hpp>
 #include <host_device.hpp>
 #include <raytracing.hpp>
 
 #include<imgui.h>
-#include <iostream>
 
-void GuiStuff(vul::Vulkano &vulkano) {
+void GuiStuff(vul::Vulkano &vulkano, uint32_t cullCount) {
     ImGui::Begin("Performance");
     ImGui::DragFloat("Max FPS", &vul::settings::maxFps, vul::settings::maxFps / 30.0f, 3.0f, 10'000.0f);
     ImGui::Text("Fps: %f\nTotal frame time: %fms\nIdle time %fms",
             1.0f / vulkano.getFrameTime(), vulkano.getFrameTime() * 1000.0f,
             vulkano.getIdleTime() * 1000.0f);
+    ImGui::Text("Cull count: %u\nTotal count: %d\nCull ratio: %f", cullCount, VOLUME_VOLUME, static_cast<float>(cullCount) / static_cast<float>(VOLUME_VOLUME));
     ImGui::End();
+
 }
 
 int main() {
@@ -43,11 +42,15 @@ int main() {
         VkCommandBuffer commandBuffer = vulkano.startFrame();
         if (commandBuffer == nullptr) continue;
 
-        if (vulkano.shouldShowGUI()) GuiStuff(vulkano);
-
         updateMeshUbo(vulkano, meshRes, prevImgIdx);
         meshShade(vulkano, meshRes, commandBuffer);
         prevImgIdx = vulkano.vulRenderer.getImageIndex();
+
+        uint32_t cullCount;
+        meshRes.cullCounters[vulkano.vulRenderer.getFrameIndex()]->readData(&cullCount, sizeof(cullCount), 0);
+        meshRes.cullCounters[vulkano.vulRenderer.getFrameIndex()]->writeVector(std::vector<uint32_t>{0}, 0);
+        cullCount *= CUBES_PER_MESH;
+        if (vulkano.shouldShowGUI()) GuiStuff(vulkano, cullCount);
 
         stop = vulkano.endFrame(commandBuffer);
         if (vulkano.vulRenderer.wasSwapChainRecreated()) resizeUsableDepthImgs(vulkano, meshRes);

@@ -18,6 +18,7 @@ class VulCompPipeline
         VulCompPipeline &operator=(VulCompPipeline &&) = default;
 
         void begin(const std::vector<VkDescriptorSet> &sets);
+        void bindDescSets(const std::vector<VkDescriptorSet> &sets) {vkCmdBindDescriptorSets(m_cmdBufs[m_frame], VK_PIPELINE_BIND_POINT_COMPUTE, m_layout, 0, sets.size(), sets.data(), 0, nullptr);};
         void dispatchAll(uint32_t x, uint32_t y, uint32_t z);
         void dispatchOne(uint32_t index, uint32_t x, uint32_t y, uint32_t z);
         void end(bool waitForSubmitToFinish);
