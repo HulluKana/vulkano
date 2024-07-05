@@ -5,6 +5,7 @@
 // std lib headers
 #include <string>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 namespace vul {
 

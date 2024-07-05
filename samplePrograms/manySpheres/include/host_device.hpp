@@ -7,6 +7,7 @@
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include<glm/glm.hpp>
 
+using vec2 = glm::vec2;
 using vec3 = glm::vec3;
 using vec4 = glm::vec4;
 using uvec2 = glm::vec<2, uint32_t>;
@@ -48,6 +49,9 @@ struct RtUbo {
 };
 
 struct MeshPc {
+    mat4 projViewMat;
+    mat4 inverseViewMat;
+    mat4 inverseProjMat;
     uvec2 mipSize;
 };
 

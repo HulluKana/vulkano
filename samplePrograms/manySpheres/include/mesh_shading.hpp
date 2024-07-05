@@ -21,8 +21,10 @@ struct MeshResources {
     std::array<std::unique_ptr<vul::VulImage>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> debugImgs;
     std::array<std::unique_ptr<vul::VulBuffer>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> cullCounters;
     std::vector<std::unique_ptr<vul::VulImage>> usableDepthImgs;
+    std::vector<glm::mat4> inverseViewMats;
+    std::vector<glm::mat4> inverseProjMats;
 };
 MeshResources createMeshShadingResources(const vul::Vulkano &vulkano);
-void updateMeshUbo(const vul::Vulkano &vulkano, const MeshResources &res, uint32_t prevImgIdx);
+void updateMeshUbo(const vul::Vulkano &vulkano, MeshResources &res, uint32_t depthImgIdx);
 void meshShade(const vul::Vulkano &vulkano, const MeshResources &res, VkCommandBuffer cmdBuf);
 void resizeUsableDepthImgs(const vul::Vulkano &vulkano, MeshResources &res);

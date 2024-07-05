@@ -1,0 +1,28 @@
+#version 460
+
+#extension GL_GOOGLE_include_directive : enable
+
+#include"../include/host_device.hpp"
+
+layout(binding = 0, set = 0) uniform sampler2D inputMip;
+layout(binding = 1, set = 0) writeonly uniform image2D outputMip;
+layout(binding = 2, set = 0) writeonly uniform image2D debugImg;
+
+layout (local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
+
+layout(push_constant) uniform Push{MeshPc push;};
+
+void main()
+{
+    const ivec2 pos = ivec2(gl_GlobalInvocationID.xy);
+    if (pos.x >= push.mipSize.x || pos.y >= push.mipSize.y) return;
+    const vec2 uv = vec2(pos) / vec2(push.mipSize);
+    const float depth = texture(inputMip, uv).x;
+    vec4 worldPos = push.inverseViewMat * push.inverseProjMat * vec4(uv, depth, 1.0);
+    worldPos = vec4(worldPos.xyz / worldPos.w, 1.0);
+    vec4 clipPos = push.projViewMat * worldPos;
+    clipPos /= clipPos.w;
+    imageStore(outputMip, ivec2(clipPos.xy * vec2(push.mipSize) + vec2(0.5)), vec4(clipPos.z));
+    //imageStore(outputMip, pos, vec4(depth));
+    //imageStore(debugImg, pos, vec4(clipPos.xy * vec2(push.mipSize) + vec2(0.5), clipPos.zw));
+}

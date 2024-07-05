@@ -185,12 +185,12 @@ void VulDevice::createLogicalDevice() {
   reset.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
   reset.pNext = &rtPipelineFeatures;
 
-  VkPhysicalDeviceFragmentShadingRateFeaturesKHR fragmentShadingRateFeatures{};
-  fragmentShadingRateFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR;
+  VkPhysicalDeviceFragmentShadingRateFeaturesKHR fragShadingRateFeaturesKHR{};
+  fragShadingRateFeaturesKHR.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR;
 
   VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures{};
   meshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
-  meshShaderFeatures.pNext = &fragmentShadingRateFeatures;
+  meshShaderFeatures.pNext = &fragShadingRateFeaturesKHR;
 
   VkPhysicalDeviceVulkan11Features physicalFeaturesVulkan11{};
   physicalFeaturesVulkan11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
@@ -205,7 +205,6 @@ void VulDevice::createLogicalDevice() {
 
   VkPhysicalDeviceFeatures2 physicalFeatures2{};
   physicalFeatures2.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-  physicalFeatures2.features.samplerAnisotropy = VK_TRUE;
   physicalFeatures2.pNext = &physicalFeaturesVulkan13;
 
   if (vul::settings::deviceInitConfig.enableRaytracingSupport) {
@@ -213,7 +212,7 @@ void VulDevice::createLogicalDevice() {
       deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
       deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
       if (!vul::settings::deviceInitConfig.enableMeshShaderSupport) physicalFeaturesVulkan11.pNext = &reset;
-      else fragmentShadingRateFeatures.pNext = &reset;
+      else fragShadingRateFeaturesKHR.pNext = &reset;
   }
 
   if (vul::settings::deviceInitConfig.enableMeshShaderSupport) {
