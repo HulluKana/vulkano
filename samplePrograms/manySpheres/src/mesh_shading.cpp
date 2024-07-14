@@ -81,29 +81,6 @@ MeshResources createMeshShadingResources(const vul::Vulkano &vulkano)
 
     meshResources.renderPipeline = std::make_unique<vul::VulMeshPipeline>(vulkano.getVulDevice(), "mesh.task.spv", "mesh.mesh.spv", "mesh.frag.spv", configInfo);
 
-    for (const std::unique_ptr<vul::VulImage> &depthImg : vulkano.vulRenderer.getDepthImages()) {
-        std::vector<vul::Vulkano::RawImageDescriptorInfo> descriptorInfos;
-        for (uint32_t i = 0; i < depthImg->getMipCount(); i++) {
-            vul::Vulkano::RawImageDescriptorInfo descInfo;
-            descInfo.descriptorInfo = depthImg->getMipDescriptorInfo(i);
-            descInfo.descriptorInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            descInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            descriptorInfos.push_back(descInfo);
-        }
-        vul::Vulkano::Descriptor desc;
-        desc.type = vul::Vulkano::DescriptorType::rawImageInfo;
-        desc.stages = {vul::Vulkano::ShaderStage::comp};
-        desc.content = descriptorInfos.data();
-        desc.count = descriptorInfos.size();
-        meshResources.mipCreationDescSets.push_back(vulkano.createDescriptorSet({desc}));
-    }
-
-    /*
-    meshResources.mipCreationPipeline = std::make_unique<vul::VulCompPipeline>("mipCreator.comp.spv",
-            std::vector<VkDescriptorSetLayout>{meshResources.mipCreationDescSets[0]->getLayout()->getDescriptorSetLayout()},
-            vulkano.getVulDevice(), meshResources.mipCreationDescSets.size());
-    */
-
     return meshResources;
 }
 

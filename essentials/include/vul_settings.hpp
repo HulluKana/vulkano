@@ -22,10 +22,8 @@ public:
         uint32_t renderHeight = 0;
         bool enableSamplingDepthImages = false;
         std::shared_ptr<VulSampler> depthImageSampler = nullptr;
-        uint32_t depthImageMipLevels = 1;
-        bool createImageViewsForMipMaps = false;
     };
-    static inline RendererConfig rendererConfig{0, 0, false, nullptr, 1, false};
+    static inline RendererConfig rendererConfig{0, 0, false, nullptr};
 
     static inline float maxFps{60.0f};
 
