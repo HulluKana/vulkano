@@ -61,6 +61,8 @@ class VulBuffer {
         template<typename T> VkResult resizeBufferWithVector(const std::vector<T> &vector) {return resizeBufferWithData(vector.data(), sizeof(T), static_cast<uint32_t>(vector.size()));}
         VkResult resizeBufferAsEmpty(uint32_t elementSize, uint32_t elementCount) {return resizeBufferWithData(nullptr, elementSize, elementCount);}
 
+        VkResult reallocElsewhere(bool isLocal);
+
         VkResult appendData(const void *data, uint32_t elementCount);
         template<typename T> VkResult appendVector(const std::vector<T> &vector) {return appendData(vector.data(), static_cast<uint32_t>(vector.size()));}
         VkResult appendEmpty(uint32_t elementCount) {return appendData(nullptr, elementCount);}

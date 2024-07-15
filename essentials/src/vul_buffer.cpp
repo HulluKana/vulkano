@@ -115,7 +115,8 @@ VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize 
             VkResult result = map(size, offset);
             if (result != VK_SUCCESS) return result;
         }
-        memcpy(reinterpret_cast<char *>(m_mapped), data, size);
+        VkDeviceSize neededOffset = (m_mapped == nullptr) ? 0 : offset;
+        memcpy(reinterpret_cast<char *>(m_mapped) + neededOffset, data, size);
         if (needUnmapping) unmap();
     }
     return VK_SUCCESS;
@@ -208,6 +209,16 @@ VkResult VulBuffer::resizeBufferWithData(const void *data, uint32_t elementSize,
     if (result != VK_SUCCESS) return result;
     if (hasStaging) return addStagingBuffer();
     return VK_SUCCESS;
+}
+
+VkResult VulBuffer::reallocElsewhere(bool isLocal)
+{
+    VUL_PROFILE_FUNC()
+
+    std::unique_ptr<uint8_t> data = std::unique_ptr<uint8_t>(new uint8_t[m_bufferSize]);
+    readData(data.get(), m_bufferSize, 0);
+    m_isDeviceLocal = isLocal;
+    return resizeBufferWithData(data.get(), m_elementSize, m_elementCount);
 }
 
 VkResult VulBuffer::appendData(const void *data, uint32_t elementCount)

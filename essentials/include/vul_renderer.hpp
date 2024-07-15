@@ -5,6 +5,7 @@
 #include"vul_window.hpp"
 #include <vul_image.hpp>
 
+#include <glm/glm.hpp>
 #include<cassert>
 #include<memory>
 
@@ -53,7 +54,7 @@ class VulRenderer{
             clearPreviousDiscardCurrent,
             noDepthImage
         };
-        void beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, uint32_t renderWidth, uint32_t renderHeight) const;
+        void beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, const glm::vec4 &swapChainClearColor, float depthClearColor, uint32_t renderWidth, uint32_t renderHeight) const;
         void stopRendering(VkCommandBuffer commandBuffer) const;
         
     private:

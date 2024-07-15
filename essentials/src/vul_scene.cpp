@@ -29,9 +29,9 @@ void Scene::loadCubes(const std::vector<Cube> &cubes, const std::vector<vul::Glt
     const uint32_t oldIdxCount = indexBuffer.get() ? indexBuffer->getBufferSize() / sizeof(uint32_t) : 0;
     const uint32_t oldVertexCount = vertexBuffer.get() ? vertexBuffer->getBufferSize() / sizeof(glm::vec3) : 0;
 
-    std::vector<glm::vec3> vertices;
-    std::vector<glm::vec3> normals;
-    std::vector<uint32_t> indices;
+    std::vector<glm::vec3> lVertices;
+    std::vector<glm::vec3> lNormals;
+    std::vector<uint32_t> lIndices;
     std::vector<GltfLoader::GltfNode> nods;
     for (size_t i = 0; i < cubes.size(); i++) {
         constexpr uint32_t FACES_PER_CUBE = 6;
@@ -43,55 +43,55 @@ void Scene::loadCubes(const std::vector<Cube> &cubes, const std::vector<vul::Glt
         const glm::vec3 halfDims = cubes[i].dimensions / 2.0f;
 
         // Top face
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y, -halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y, -halfDims.z});
-        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) normals.emplace_back(glm::vec3{0.0f, 1.0f, 0.0f});
+        lVertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y,  halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y,  halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y, -halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y, -halfDims.z});
+        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) lNormals.emplace_back(glm::vec3{0.0f, 1.0f, 0.0f});
 
         // Bottom face
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y, -halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y, -halfDims.z});
-        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) normals.emplace_back(glm::vec3{0.0f, -1.0f, 0.0f});
+        lVertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y, -halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y,  halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y,  halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y, -halfDims.z});
+        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) lNormals.emplace_back(glm::vec3{0.0f, -1.0f, 0.0f});
 
         // Front face
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y,  halfDims.z});
-        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) normals.emplace_back(glm::vec3{0.0f, 0.0f, 1.0f});
+        lVertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y,  halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y,  halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y,  halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y,  halfDims.z});
+        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) lNormals.emplace_back(glm::vec3{0.0f, 0.0f, 1.0f});
 
         // Back face
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y, -halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y, -halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y, -halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y, -halfDims.z});
-        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) normals.emplace_back(glm::vec3{0.0f, -1.0f, -1.0f});
+        lVertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y, -halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y, -halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y, -halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y, -halfDims.z});
+        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) lNormals.emplace_back(glm::vec3{0.0f, -1.0f, -1.0f});
 
         // Right face
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y, -halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y, -halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y,  halfDims.z});
-        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) normals.emplace_back(glm::vec3{1.0f, 0.0f, 0.0f});
+        lVertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y,  halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{ halfDims.x,  halfDims.y, -halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y, -halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{ halfDims.x, -halfDims.y,  halfDims.z});
+        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) lNormals.emplace_back(glm::vec3{1.0f, 0.0f, 0.0f});
 
         // Left face
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y, -halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y,  halfDims.z});
-        vertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y, -halfDims.z});
-        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) normals.emplace_back(glm::vec3{-1.0f, 0.0f, 0.0f});
+        lVertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y, -halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{-halfDims.x,  halfDims.y,  halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y,  halfDims.z});
+        lVertices.emplace_back(pos + glm::vec3{-halfDims.x, -halfDims.y, -halfDims.z});
+        for (uint32_t j = 0; j < VERTS_PER_FACE; j++) lNormals.emplace_back(glm::vec3{-1.0f, 0.0f, 0.0f});
 
         for (uint32_t j = 0; j < FACES_PER_CUBE; j++) {
             const uint32_t vertOffset = i * VERTS_PER_CUBE + j * VERTS_PER_FACE;
-            indices.push_back(vertOffset);
-            indices.push_back(vertOffset + 1);
-            indices.push_back(vertOffset + 2);
-            indices.push_back(vertOffset + 2);
-            indices.push_back(vertOffset + 3);
-            indices.push_back(vertOffset);
+            lIndices.push_back(vertOffset);
+            lIndices.push_back(vertOffset + 1);
+            lIndices.push_back(vertOffset + 2);
+            lIndices.push_back(vertOffset + 2);
+            lIndices.push_back(vertOffset + 3);
+            lIndices.push_back(vertOffset);
         }
 
         GltfLoader::GltfPrimMesh mesh;
@@ -121,10 +121,10 @@ void Scene::loadCubes(const std::vector<Cube> &cubes, const std::vector<vul::Glt
     nodes.insert(nodes.end(), nods.begin(), nods.end());
     materials.insert(materials.end(), mats.begin(), mats.end());
     
-    std::vector<glm::vec4> uselessTangents(vertices.size());
-    std::vector<glm::vec2> uselessUvs(vertices.size());
+    std::vector<glm::vec4> uselessTangents(lVertices.size());
+    std::vector<glm::vec2> uselessUvs(lVertices.size());
 
-    createBuffers(indices, vertices, normals, uselessTangents, uselessUvs, mats, nods, wantedBuffers);
+    createBuffers(lIndices, lVertices, lNormals, uselessTangents, uselessUvs, mats, nods, wantedBuffers);
 }
 
 void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vul::GltfLoader::Material> &mats, WantedBuffers wantedBuffers)
@@ -132,14 +132,14 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vu
     const size_t oldIdxCount = indexBuffer.get() ? indexBuffer->getBufferSize() / sizeof(uint32_t) : 0;
     const size_t oldVertexCount = vertexBuffer.get() ? vertexBuffer->getBufferSize() / sizeof(glm::vec3) : 0;
 
-    std::vector<glm::vec3> vertices;
-    std::vector<uint32_t> indices;
+    std::vector<glm::vec3> lVertices;
+    std::vector<uint32_t> lIndices;
     std::vector<GltfLoader::GltfNode> nods;
 
     for (size_t i = 0; i < spheres.size(); i++) {
         std::vector<glm::vec3> unitVertices;
-        const uint32_t lastVertCount = vertices.size();
-        const uint32_t lastIdxCount = indices.size();
+        const uint32_t lastVertCount = lVertices.size();
+        const uint32_t lastIdxCount = lIndices.size();
         const glm::vec3 pos = spheres[i].centerPos;
         const float rad = spheres[i].radius;
         const uint32_t vertsPerRow = std::pow(2, spheres[i].subdivisionCount) + 1;
@@ -161,14 +161,14 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vu
             uint32_t currIdx = j * vertsPerRow;
             uint32_t nextIdx = currIdx + vertsPerRow;
             for (uint32_t k = 0; k < vertsPerRow; k++, currIdx++, nextIdx++) {
-                vertices.emplace_back(unitVertices[j * vertsPerRow + k]);
+                lVertices.emplace_back(unitVertices[j * vertsPerRow + k]);
                 if (j < vertsPerRow - 1 && k < vertsPerRow - 1) {
-                    indices.push_back(nextIdx);
-                    indices.push_back(currIdx);
-                    indices.push_back(currIdx + 1);
-                    indices.push_back(currIdx + 1);
-                    indices.push_back(nextIdx + 1);
-                    indices.push_back(nextIdx);
+                    lIndices.push_back(nextIdx);
+                    lIndices.push_back(currIdx);
+                    lIndices.push_back(currIdx + 1);
+                    lIndices.push_back(currIdx + 1);
+                    lIndices.push_back(nextIdx + 1);
+                    lIndices.push_back(nextIdx);
                     idxCount += 6;
                 }
             }
@@ -176,33 +176,33 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vu
 
         // -X face
         uint32_t startIdx = vertCount;
-        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) vertices.emplace_back(glm::vec3(-vertices[j].x, vertices[j].y, -vertices[j].z));
-        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) indices.push_back(startIdx + indices[j]);
+        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) lVertices.emplace_back(glm::vec3(-lVertices[j].x, lVertices[j].y, -lVertices[j].z));
+        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) lIndices.push_back(startIdx + lIndices[j]);
         // +Y face
         startIdx += vertCount;
-        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) vertices.emplace_back(glm::vec3(-vertices[j].z, vertices[j].x, -vertices[j].y));
-        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) indices.push_back(startIdx + indices[j]);
+        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) lVertices.emplace_back(glm::vec3(-lVertices[j].z, lVertices[j].x, -lVertices[j].y));
+        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) lIndices.push_back(startIdx + lIndices[j]);
         // -Y face
         startIdx += vertCount;
-        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) vertices.emplace_back(glm::vec3(-vertices[j].z, -vertices[j].x, vertices[j].y));
-        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) indices.push_back(startIdx + indices[j]);
+        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) lVertices.emplace_back(glm::vec3(-lVertices[j].z, -lVertices[j].x, lVertices[j].y));
+        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) lIndices.push_back(startIdx + lIndices[j]);
         // +Z face
         startIdx += vertCount;
-        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) vertices.emplace_back(glm::vec3(-vertices[j].z, vertices[j].y, vertices[j].x));
-        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) indices.push_back(startIdx + indices[j]);
+        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) lVertices.emplace_back(glm::vec3(-lVertices[j].z, lVertices[j].y, lVertices[j].x));
+        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) lIndices.push_back(startIdx + lIndices[j]);
         // -Z face
         startIdx += vertCount;
-        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) vertices.emplace_back(glm::vec3(vertices[j].z, vertices[j].y, -vertices[j].x));
-        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) indices.push_back(startIdx + indices[j]);
+        for (uint32_t j = lastVertCount; j < vertCount + lastVertCount; j++) lVertices.emplace_back(glm::vec3(lVertices[j].z, lVertices[j].y, -lVertices[j].x));
+        for (uint32_t j = lastIdxCount; j < idxCount + lastIdxCount; j++) lIndices.push_back(startIdx + lIndices[j]);
 
         GltfLoader::GltfPrimMesh mesh;
         mesh.name = "Procedural sphere mesh " + std::to_string(i);
         mesh.posMin = pos - glm::vec3(rad);
         mesh.posMax = pos + glm::vec3(rad);
         mesh.indexCount = idxCount * 6;
-        mesh.firstIndex = indices.size() - mesh.indexCount + oldIdxCount;
+        mesh.firstIndex = lIndices.size() - mesh.indexCount + oldIdxCount;
         mesh.vertexCount = vertCount * 6;
-        mesh.vertexOffset = vertices.size() - mesh.vertexCount + oldVertexCount;
+        mesh.vertexOffset = lVertices.size() - mesh.vertexCount + oldVertexCount;
         mesh.materialIndex = spheres[i].matIdx + materials.size();
         meshes.push_back(mesh);
 
@@ -222,10 +222,10 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vu
     nodes.insert(nodes.end(), nods.begin(), nods.end());
     materials.insert(materials.end(), mats.begin(), mats.end());
 
-    std::vector<glm::vec4> uselessTangents(vertices.size());
-    std::vector<glm::vec2> uselessUvs(vertices.size());
+    std::vector<glm::vec4> uselessTangents(lVertices.size());
+    std::vector<glm::vec2> uselessUvs(lVertices.size());
 
-    createBuffers(indices, vertices, vertices, uselessTangents, uselessUvs, mats, nods, wantedBuffers);
+    createBuffers(lIndices, lVertices, lVertices, uselessTangents, uselessUvs, mats, nods, wantedBuffers);
 }
 
 void Scene::loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers)
@@ -271,8 +271,8 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory,
     createBuffers(gltfLoader.indices, gltfLoader.positions, gltfLoader.normals, gltfLoader.tangents, gltfLoader.uvCoords, gltfLoader.materials, gltfLoader.nodes, wantedBuffers);
 }
 
-void Scene::createBuffers(const std::vector<uint32_t> &indices, const std::vector<glm::vec3> &vertices,
-                const std::vector<glm::vec3> &normals, const std::vector<glm::vec4> &tangents, const std::vector<glm::vec2> &uvs,
+void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vector<glm::vec3> &lVertices,
+                const std::vector<glm::vec3> &lNormals, const std::vector<glm::vec4> &lTangents, const std::vector<glm::vec2> &lUvs,
                 const std::vector<vul::GltfLoader::Material> &mats, const std::vector<vul::GltfLoader::GltfNode> &nods, WantedBuffers wantedBuffers)
 {
     std::vector<PackedMaterial> packedMaterials;
@@ -308,49 +308,54 @@ void Scene::createBuffers(const std::vector<uint32_t> &indices, const std::vecto
     if (settings::deviceInitConfig.enableRaytracingSupport)
         rtFlags = static_cast<VulBuffer::Usage>(VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead);
 
-    if (indices.size() > 0 && wantedBuffers.index) {
+    if (lIndices.size() > 0 && wantedBuffers.index) {
         if (indexBuffer.get() == nullptr) {
             indexBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
-            indexBuffer->loadVector(indices);
+            indexBuffer->loadVector(lIndices);
             indexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_indexBuffer |
                         VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo | rtFlags));
-        } else indexBuffer->appendVector(indices);
+        } else indexBuffer->appendVector(lIndices);
+        indices.insert(indices.end(), lIndices.begin(), lIndices.end());
         VUL_NAME_VK(indexBuffer->getBuffer())
     }
-    if (vertices.size() > 0 && wantedBuffers.vertex) {
+    if (lVertices.size() > 0 && wantedBuffers.vertex) {
         if (vertexBuffer.get() == nullptr) {
             vertexBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
-            vertexBuffer->loadVector(vertices);
+            vertexBuffer->loadVector(lVertices);
             vertexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
                         VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo | rtFlags));
-        } else vertexBuffer->appendVector(vertices);
+        } else vertexBuffer->appendVector(lVertices);
+        vertices.insert(vertices.end(), lVertices.begin(), lVertices.end());
         VUL_NAME_VK(vertexBuffer->getBuffer())
     }
-    if (normals.size() > 0 && wantedBuffers.normal) {
+    if (lNormals.size() > 0 && wantedBuffers.normal) {
         if (normalBuffer.get() == nullptr) {
             normalBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
-            normalBuffer->loadVector(normals);
+            normalBuffer->loadVector(lNormals);
             normalBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
                         VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo));
-        } else normalBuffer->appendVector(normals);
+        } else normalBuffer->appendVector(lNormals);
+        normals.insert(normals.end(), lNormals.begin(), lNormals.end());
         VUL_NAME_VK(normalBuffer->getBuffer())
     }
-    if (tangents.size() > 0 && wantedBuffers.tangent) {
+    if (lTangents.size() > 0 && wantedBuffers.tangent) {
         if (tangentBuffer.get() == nullptr) {
             tangentBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
-            tangentBuffer->loadVector(tangents);
+            tangentBuffer->loadVector(lTangents);
             tangentBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
                         VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo));
-        } else tangentBuffer->appendVector(tangents);
+        } else tangentBuffer->appendVector(lTangents);
+        tangents.insert(tangents.end(), lTangents.begin(), lTangents.end());
         VUL_NAME_VK(tangentBuffer->getBuffer())
     }
-    if (uvs.size() > 0 && wantedBuffers.uv) {
+    if (lUvs.size() > 0 && wantedBuffers.uv) {
         if (uvBuffer.get() == nullptr) {
             uvBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
-            uvBuffer->loadVector(uvs);
+            uvBuffer->loadVector(lUvs);
             uvBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
                         VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo));
-        } else uvBuffer->appendVector(uvs);
+        } else uvBuffer->appendVector(lUvs);
+        uvs.insert(uvs.end(), lUvs.begin(), lUvs.end());
         VUL_NAME_VK(uvBuffer->getBuffer())
     }
     if (packedMaterials.size() > 0 && wantedBuffers.material) {

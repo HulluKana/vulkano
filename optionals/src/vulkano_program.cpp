@@ -3,6 +3,7 @@
 #include "vul_descriptors.hpp"
 #include <vul_debug_tools.hpp>
 #include "vul_renderer.hpp"
+#include "vul_settings.hpp"
 #include <cstdlib>
 #include <vulkan/vulkan_core.h>
 #include<vulkano_program.hpp>
@@ -94,7 +95,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
                 if (!firstPass) vulRenderer.stopRendering(commandBuffer);
                 if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, commandBuffer);
                 if (renderData.sampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionImageLayout(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
-                vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::rendererConfig.renderWidth, settings::rendererConfig.renderHeight);
+                vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, renderData.swapChainClearColor, renderData.depthClearColor, settings::rendererConfig.renderWidth, settings::rendererConfig.renderHeight);
                 prevSwapChainMode = renderData.swapChainImageMode;
                 prevDepthImageMode = renderData.depthImageMode;
                 prevAttachmentImageCount = renderData.attachmentImages[vulRenderer.getFrameIndex()].size();
@@ -119,7 +120,7 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
             if (firstPass || renderData.swapChainImageMode != prevSwapChainMode || renderData.depthImageMode != prevDepthImageMode || renderData.attachmentImages[vulRenderer.getFrameIndex()].size() > 0) {
                 if (!firstPass) vulRenderer.stopRendering(commandBuffer);
                 if (prevSampleFromDepth) for (const auto &depthImage : vulRenderer.getDepthImages()) depthImage->transitionImageLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, commandBuffer);
-                vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, settings::rendererConfig.renderWidth, settings::rendererConfig.renderHeight);
+                vulRenderer.beginRendering(commandBuffer, renderData.attachmentImages[vulRenderer.getFrameIndex()], renderData.swapChainImageMode, renderData.depthImageMode, renderData.swapChainClearColor, renderData.depthClearColor, settings::rendererConfig.renderWidth, settings::rendererConfig.renderHeight);
                 prevSwapChainMode = renderData.swapChainImageMode;
                 prevDepthImageMode = renderData.depthImageMode;
                 prevAttachmentImageCount = renderData.attachmentImages[vulRenderer.getFrameIndex()].size();
@@ -138,8 +139,13 @@ bool Vulkano::endFrame(VkCommandBuffer commandBuffer)
     }
 
     if (firstPass || VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent != prevSwapChainMode || VulRenderer::DepthImageMode::noDepthImage != prevDepthImageMode || prevAttachmentImageCount > 0) {
-        if (!firstPass) vulRenderer.stopRendering(commandBuffer);
-        vulRenderer.beginRendering(commandBuffer, {}, VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent, VulRenderer::DepthImageMode::noDepthImage, settings::rendererConfig.renderWidth, settings::rendererConfig.renderHeight);
+        VulRenderer::SwapChainImageMode swapChainImageMode = VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent;
+        if (!firstPass) {
+            vulRenderer.stopRendering(commandBuffer);
+            swapChainImageMode = VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent;
+        }
+        if (vul::settings::rendererConfig.renderingOutsideOfVulkano) swapChainImageMode = VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent;
+        vulRenderer.beginRendering(commandBuffer, {}, swapChainImageMode, VulRenderer::DepthImageMode::noDepthImage, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 1.0f, settings::rendererConfig.renderWidth, settings::rendererConfig.renderHeight);
     }
     if (!cameraController.hideGUI) m_vulGUI.endFrame(commandBuffer);
     vulRenderer.stopRendering(commandBuffer);

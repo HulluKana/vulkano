@@ -180,10 +180,6 @@ void VulDevice::createLogicalDevice() {
   rtPipelineFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR;
   rtPipelineFeatures.pNext = &accelStructFeatures;
 
-  VkPhysicalDeviceHostQueryResetFeatures reset{};
-  reset.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES;
-  reset.pNext = &rtPipelineFeatures;
-
   VkPhysicalDeviceFragmentShadingRateKHR fragShadingRateFeatures{};
   fragShadingRateFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FRAGMENT_SHADING_RATE_FEATURES_KHR;
 
@@ -206,8 +202,8 @@ void VulDevice::createLogicalDevice() {
       deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
       deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
       deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-      if (!vul::settings::deviceInitConfig.enableMeshShaderSupport) physicalFeaturesVulkan11.pNext = &reset;
-      else fragShadingRateFeatures.pNext = &reset;
+      if (!vul::settings::deviceInitConfig.enableMeshShaderSupport) physicalFeaturesVulkan11.pNext = &rtPipelineFeatures;
+      else fragShadingRateFeatures.pNext = &rtPipelineFeatures;
   }
 
   if (vul::settings::deviceInitConfig.enableMeshShaderSupport) {

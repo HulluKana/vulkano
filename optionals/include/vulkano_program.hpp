@@ -42,8 +42,8 @@ class Vulkano{
         VkCommandBuffer startFrame();
         bool endFrame(VkCommandBuffer commandBuffer);
 
-        float getFrameTime() const {return m_frameTime;}
-        float getIdleTime() const {return m_idleTime;}
+        double getFrameTime() const {return m_frameTime;}
+        double getIdleTime() const {return m_idleTime;}
 
         int getFrameIdx() const {return vulRenderer.getFrameIndex();}
 
@@ -100,15 +100,17 @@ class Vulkano{
 
         struct RenderData {
             bool enable = true;
-            bool is3d;
+            bool is3d = true;
             std::shared_ptr<vul::VulPipeline> pipeline;
             std::vector<vul::VulPipeline::DrawData> drawDatas;
             std::vector<std::shared_ptr<vul::VulBuffer>> additionalVertexBuffers;
             std::array<std::vector<std::shared_ptr<vul::VulDescriptorSet>>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descriptorSets;
             std::array<std::vector<std::shared_ptr<VulImage>>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> attachmentImages;
-            vul::VulRenderer::SwapChainImageMode swapChainImageMode;
-            vul::VulRenderer::DepthImageMode depthImageMode;
-            bool sampleFromDepth;
+            vul::VulRenderer::SwapChainImageMode swapChainImageMode = vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent;
+            vul::VulRenderer::DepthImageMode depthImageMode = vul::VulRenderer::DepthImageMode::clearPreviousDiscardCurrent;
+            glm::vec4 swapChainClearColor = glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+            float depthClearColor = 1.0f;
+            bool sampleFromDepth = false;
         };
         std::vector<RenderData> renderDatas;
 

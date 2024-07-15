@@ -25,6 +25,7 @@ int main() {
 
     vul::settings::maxFps = 60.0f;
     vul::settings::cameraProperties.farPlane = 500.0f;
+    vul::settings::rendererConfig.renderingOutsideOfVulkano = true;
 
     vulkano.cameraController.baseMoveSpeed *= 2.5f;
     vulkano.cameraController.speedChanger *= 5.0f;

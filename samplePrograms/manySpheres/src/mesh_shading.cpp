@@ -96,7 +96,7 @@ void updateMeshUbo(const vul::Vulkano &vulkano, const MeshResources &res)
 void meshShade(const vul::Vulkano &vulkano, const MeshResources &res, VkCommandBuffer cmdBuf)
 {
     vulkano.vulRenderer.beginRendering(cmdBuf, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent,
-            vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent, 0, 0);
+            vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 1.0f, 0, 0);
     res.renderPipeline->meshShade(VOLUME_VOLUME / CUBES_PER_MESH / MESH_PER_TASK, 1, 1, nullptr, 0, {res.renderDescSets[vulkano.getFrameIdx()]->getSet()}, cmdBuf);
     vulkano.vulRenderer.stopRendering(cmdBuf);
 }

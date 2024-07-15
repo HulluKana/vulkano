@@ -1,3 +1,4 @@
+#include "vul_settings.hpp"
 #include <vul_debug_tools.hpp>
 #include<vul_pipeline.hpp>
 
@@ -169,7 +170,8 @@ VulPipeline::PipelineContents VulPipeline::createPipelineContents(const VulDevic
     dynamicStateInfo.flags = 0;
 
     VkPushConstantRange pushConstantRange{};
-    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT;
+    pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+    if (vul::settings::deviceInitConfig.enableMeshShaderSupport) pushConstantRange.stageFlags |= VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT;
     pushConstantRange.offset = 0;
     pushConstantRange.size = vulDevice.properties.limits.maxPushConstantsSize; 
 

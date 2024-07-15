@@ -1,5 +1,6 @@
 #include "vul_descriptors.hpp"
 #include "vul_image.hpp"
+#include "vul_settings.hpp"
 #include "vul_swap_chain.hpp"
 #include <iomanip>
 #include <ios>
@@ -123,7 +124,7 @@ Resources createReources(vul::Vulkano &vulkano)
     output.multipleBounce2dImage = vul::VulImage::createDefaultWholeImageAllInOneSingleTime(vulkano.getVulDevice(), vul::VulImage::RawImageData{LIGHT_DIR_COUNT,
             ROUGHNESS_COUNT, 1, {{&results[0][0]}}}, VK_FORMAT_R8_UNORM, false, vul::VulImage::InputDataType::rawData, vul::VulImage::ImageType::texture2d);
     output.multipleBounce2dImage->vulSampler = vul::VulSampler::createCustomSampler(vulkano.getVulDevice(), VK_FILTER_LINEAR,
-            VK_SAMPLER_ADDRESS_MODE_REPEAT, 0.0f, VK_BORDER_COLOR_INT_OPAQUE_BLACK, VK_SAMPLER_MIPMAP_MODE_NEAREST, 0.0f, 0.0f, 1.0f);
+            VK_SAMPLER_ADDRESS_MODE_REPEAT, 0.0f, VK_BORDER_COLOR_INT_OPAQUE_BLACK, VK_SAMPLER_MIPMAP_MODE_NEAREST, false, VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE, 0.0f, 0.0f, 1.0f);
 
     output.multipleBounce1dImage = vul::VulImage::createDefaultWholeImageAllInOneSingleTime(vulkano.getVulDevice(), vul::VulImage::RawImageData{
             ROUGHNESS_COUNT, 1, 1, {{&otherResults[0]}}}, VK_FORMAT_R8_UNORM, false, vul::VulImage::InputDataType::rawData, vul::VulImage::ImageType::texture1d);
@@ -457,7 +458,11 @@ void GuiStuff(vul::Vulkano &vulkano, float ownStuffTime) {
 }
 
 int main() {
+    vul::settings::rendererConfig.enableSamplingDepthImages = true;
     vul::Vulkano vulkano(2560, 1440, "Vulkano");
+    vul::settings::rendererConfig.depthImageSampler = vul::VulSampler::createDefaultTexSampler(vulkano.getVulDevice(), 1);
+    for (size_t i = 0; i < vulkano.vulRenderer.getDepthImages().size(); i++) vulkano.vulRenderer.getDepthImages()[i]->vulSampler = vul::settings::rendererConfig.depthImageSampler;
+
     vulkano.loadScene("../Models/room/Room.gltf", "../Models/room", {});
     vulkano.scene.loadSpheres({{{-3.0f, 3.0f, 2.0f}, 2.5f, 4, 0}, {{4.0f, 8.0f, 3.0f}, 3.5f, 2, 0}}, {{}}, {});
     vulkano.scene.loadCubes({{{7.0f, 5.0f, -4.0f}, {1.0f, 1.0f, 1.0f}, 0}, {{-5.5f, 9.0f, 0.0f}, {2.0f, 1.5f, 0.7f}, 0}}, {{}}, {});
@@ -482,6 +487,7 @@ int main() {
         stop = vulkano.endFrame(commandBuffer);
         updateOitResources(vulkano, renderDataIndices, resources, requiredABufferSize);
     }
+    vul::settings::rendererConfig.depthImageSampler = nullptr;
     vulkano.letVulkanoFinish();
 
     return 0;

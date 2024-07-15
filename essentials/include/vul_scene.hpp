@@ -46,6 +46,12 @@ class Scene
         std::vector<GltfLoader::Material> materials;
         std::vector<std::shared_ptr<VulImage>> images;
 
+        std::vector<glm::vec3> vertices;
+        std::vector<glm::vec3> normals;
+        std::vector<glm::vec4> tangents;
+        std::vector<glm::vec2> uvs;
+        std::vector<uint32_t> indices;
+
         std::unique_ptr<VulBuffer> vertexBuffer;
         std::unique_ptr<VulBuffer> normalBuffer;
         std::unique_ptr<VulBuffer> tangentBuffer;
@@ -88,8 +94,8 @@ class Scene
     private:
         VulDevice &m_vulDevice; 
 
-        void createBuffers(const std::vector<uint32_t> &indices, const std::vector<glm::vec3> &vertices,
-                const std::vector<glm::vec3> &normals, const std::vector<glm::vec4> &tangents, const std::vector<glm::vec2> &uvs,
+        void createBuffers(const std::vector<uint32_t> &lIndices, const std::vector<glm::vec3> &lVertices,
+                const std::vector<glm::vec3> &lNormals, const std::vector<glm::vec4> &lTangents, const std::vector<glm::vec2> &lUvs,
                 const std::vector<GltfLoader::Material> &mats, const std::vector<GltfLoader::GltfNode> &nods, WantedBuffers wantedBuffers);
 };
 

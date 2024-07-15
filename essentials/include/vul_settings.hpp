@@ -22,8 +22,9 @@ public:
         uint32_t renderHeight = 0;
         bool enableSamplingDepthImages = false;
         std::shared_ptr<VulSampler> depthImageSampler = nullptr;
+        bool renderingOutsideOfVulkano = false;
     };
-    static inline RendererConfig rendererConfig{0, 0, false, nullptr};
+    static inline RendererConfig rendererConfig{0, 0, false, nullptr, false};
 
     static inline float maxFps{60.0f};
 
