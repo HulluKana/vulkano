@@ -1,6 +1,7 @@
 #pragma once
 
 #include <vul_device.hpp>
+#include <vulkan/vulkan_core.h>
 
 namespace vul {
 
@@ -15,6 +16,8 @@ class VulMeshPipeline {
             VkBlendOp blendOp = VK_BLEND_OP_ADD;
             VkBlendFactor blendSrcFactor = VK_BLEND_FACTOR_ONE;
             VkBlendFactor blendDstFactor = VK_BLEND_FACTOR_ZERO;
+            VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL;
+            float lineWidth = 1.0f;
         };
 
         VulMeshPipeline(const VulDevice &vulDevice, const std::string &taskShaderFile, const std::string &meshShaderFile, const std::string &fragShaderFile, const PipelineConfigInfo &configInfo);

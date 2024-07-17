@@ -21,6 +21,8 @@ class VulPipeline{
             VkBlendOp blendOp = VK_BLEND_OP_ADD;
             VkBlendFactor blendSrcFactor = VK_BLEND_FACTOR_ONE;
             VkBlendFactor blendDstFactor = VK_BLEND_FACTOR_ZERO;
+            VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL;
+            float lineWidth = 1.0f;
         };
 
         VulPipeline(const VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo);
@@ -51,7 +53,8 @@ class VulPipeline{
         static PipelineContents createPipelineContents(const VulDevice &vulDevice, const std::vector<VkPipelineShaderStageCreateInfo> &shaderStageCreateInfos,
             const std::vector<VkVertexInputAttributeDescription> &attributeDescriptions, const std::vector<VkVertexInputBindingDescription> &bindingDescriptions,
             const std::vector<VkDescriptorSetLayout> &setLayouts, const std::vector<VkFormat> &colorAttachmentFormats, VkFormat depthAttachmentFormat,
-            VkCullModeFlagBits cullMode, bool enableColorBlending, VkBlendOp blendOp, VkBlendFactor blendSrcFactor, VkBlendFactor blendDstFactor);
+            VkCullModeFlagBits cullMode, bool enableColorBlending, VkBlendOp blendOp, VkBlendFactor blendSrcFactor, VkBlendFactor blendDstFactor,
+            VkPolygonMode polygonMode, float lineWidth);
         static VkShaderModule createShaderModule(const VulDevice &vulDevice, const std::string &filePath);
 
         VkPipeline getPipeline() const {return m_pipeline;}

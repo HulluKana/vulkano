@@ -33,7 +33,7 @@ VulPipeline::VulPipeline(const VulDevice& device, const std::string& vertFile, c
 
     PipelineContents pipelineContents = createPipelineContents(device, shaderStages, configInfo.attributeDescriptions, configInfo.bindingDescriptions,
             configInfo.setLayouts, configInfo.colorAttachmentFormats, configInfo.depthAttachmentFormat, configInfo.cullMode, configInfo.enableColorBlending,
-            configInfo.blendOp, configInfo.blendSrcFactor, configInfo.blendDstFactor);
+            configInfo.blendOp, configInfo.blendSrcFactor, configInfo.blendDstFactor, configInfo.polygonMode, configInfo.lineWidth);
     m_pipeline = pipelineContents.pipeline;
     m_layout = pipelineContents.layout;
 
@@ -76,7 +76,8 @@ void VulPipeline::draw( VkCommandBuffer cmdBuf, const std::vector<VkDescriptorSe
 VulPipeline::PipelineContents VulPipeline::createPipelineContents(const VulDevice &vulDevice, const std::vector<VkPipelineShaderStageCreateInfo> &shaderStageCreateInfos,
             const std::vector<VkVertexInputAttributeDescription> &attributeDescriptions, const std::vector<VkVertexInputBindingDescription> &bindingDescriptions,
             const std::vector<VkDescriptorSetLayout> &setLayouts, const std::vector<VkFormat> &colorAttachmentFormats, VkFormat depthAttachmentFormat,
-            VkCullModeFlagBits cullMode, bool enableColorBlending, VkBlendOp blendOp, VkBlendFactor blendSrcFactor, VkBlendFactor blendDstFactor)
+            VkCullModeFlagBits cullMode, bool enableColorBlending, VkBlendOp blendOp, VkBlendFactor blendSrcFactor, VkBlendFactor blendDstFactor,
+            VkPolygonMode polygonMode, float lineWidth)
 {
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -107,8 +108,8 @@ VulPipeline::PipelineContents VulPipeline::createPipelineContents(const VulDevic
     rasterizationInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
     rasterizationInfo.depthClampEnable = VK_FALSE;
     rasterizationInfo.rasterizerDiscardEnable = VK_FALSE;
-    rasterizationInfo.polygonMode = VK_POLYGON_MODE_FILL;
-    rasterizationInfo.lineWidth = 1.0f;
+    rasterizationInfo.polygonMode = polygonMode;
+    rasterizationInfo.lineWidth = lineWidth;
     rasterizationInfo.cullMode = cullMode;
     rasterizationInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterizationInfo.depthBiasEnable = VK_FALSE;
