@@ -103,7 +103,8 @@ class Vulkano{
             bool is3d = true;
             std::shared_ptr<vul::VulPipeline> pipeline;
             std::vector<vul::VulPipeline::DrawData> drawDatas;
-            std::vector<std::shared_ptr<vul::VulBuffer>> additionalVertexBuffers;
+            VulBuffer *indexBuffer;
+            std::vector<VulBuffer *> vertexBuffers;
             std::array<std::vector<std::shared_ptr<vul::VulDescriptorSet>>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descriptorSets;
             std::array<std::vector<std::shared_ptr<VulImage>>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> attachmentImages;
             vul::VulRenderer::SwapChainImageMode swapChainImageMode = vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent;

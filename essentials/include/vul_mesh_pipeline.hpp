@@ -18,6 +18,7 @@ class VulMeshPipeline {
             VkBlendFactor blendDstFactor = VK_BLEND_FACTOR_ZERO;
             VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL;
             float lineWidth = 1.0f;
+            VkPrimitiveTopology primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         };
 
         VulMeshPipeline(const VulDevice &vulDevice, const std::string &taskShaderFile, const std::string &meshShaderFile, const std::string &fragShaderFile, const PipelineConfigInfo &configInfo);

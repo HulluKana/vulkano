@@ -23,6 +23,7 @@ class VulPipeline{
             VkBlendFactor blendDstFactor = VK_BLEND_FACTOR_ZERO;
             VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL;
             float lineWidth = 1.0f;
+            VkPrimitiveTopology primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         };
 
         VulPipeline(const VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo);
@@ -54,7 +55,7 @@ class VulPipeline{
             const std::vector<VkVertexInputAttributeDescription> &attributeDescriptions, const std::vector<VkVertexInputBindingDescription> &bindingDescriptions,
             const std::vector<VkDescriptorSetLayout> &setLayouts, const std::vector<VkFormat> &colorAttachmentFormats, VkFormat depthAttachmentFormat,
             VkCullModeFlagBits cullMode, bool enableColorBlending, VkBlendOp blendOp, VkBlendFactor blendSrcFactor, VkBlendFactor blendDstFactor,
-            VkPolygonMode polygonMode, float lineWidth);
+            VkPolygonMode polygonMode, float lineWidth, VkPrimitiveTopology primitiveTopology);
         static VkShaderModule createShaderModule(const VulDevice &vulDevice, const std::string &filePath);
 
         VkPipeline getPipeline() const {return m_pipeline;}

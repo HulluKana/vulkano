@@ -273,6 +273,8 @@ void createPipelines(vul::Vulkano &vulkano, RenderDataIndices inputData)
     mainConfig.cullMode = VK_CULL_MODE_NONE;
     mainConfig.enableColorBlending = false;
     vulkano.renderDatas[inputData.mainRenderDataIdx].pipeline = std::make_shared<vul::VulPipeline>(vulkano.getVulDevice(), "default3D.vert.spv", "default3D.frag.spv", mainConfig);
+    vulkano.renderDatas[inputData.mainRenderDataIdx].indexBuffer = vulkano.scene.indexBuffer.get();
+    vulkano.renderDatas[inputData.mainRenderDataIdx].vertexBuffers = {vulkano.scene.vertexBuffer.get(), vulkano.scene.normalBuffer.get(), vulkano.scene.tangentBuffer.get(), vulkano.scene.uvBuffer.get()};
     vulkano.renderDatas[inputData.mainRenderDataIdx].is3d = true;
     vulkano.renderDatas[inputData.mainRenderDataIdx].swapChainImageMode = vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent;
     vulkano.renderDatas[inputData.mainRenderDataIdx].depthImageMode = vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent;
@@ -310,6 +312,8 @@ void createPipelines(vul::Vulkano &vulkano, RenderDataIndices inputData)
         }
     }
 
+    vulkano.renderDatas[inputData.oitColoringRenderDataIdx].indexBuffer = vulkano.scene.indexBuffer.get();
+    vulkano.renderDatas[inputData.oitColoringRenderDataIdx].vertexBuffers = {vulkano.scene.vertexBuffer.get(), vulkano.scene.normalBuffer.get(), vulkano.scene.tangentBuffer.get(), vulkano.scene.uvBuffer.get()};
     vulkano.renderDatas[inputData.oitColoringRenderDataIdx].is3d = true;
     vulkano.renderDatas[inputData.oitColoringRenderDataIdx].swapChainImageMode = vul::VulRenderer::SwapChainImageMode::noSwapChainImage;
     vulkano.renderDatas[inputData.oitColoringRenderDataIdx].depthImageMode = vul::VulRenderer::DepthImageMode::noDepthImage;

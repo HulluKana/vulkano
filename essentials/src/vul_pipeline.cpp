@@ -33,7 +33,7 @@ VulPipeline::VulPipeline(const VulDevice& device, const std::string& vertFile, c
 
     PipelineContents pipelineContents = createPipelineContents(device, shaderStages, configInfo.attributeDescriptions, configInfo.bindingDescriptions,
             configInfo.setLayouts, configInfo.colorAttachmentFormats, configInfo.depthAttachmentFormat, configInfo.cullMode, configInfo.enableColorBlending,
-            configInfo.blendOp, configInfo.blendSrcFactor, configInfo.blendDstFactor, configInfo.polygonMode, configInfo.lineWidth);
+            configInfo.blendOp, configInfo.blendSrcFactor, configInfo.blendDstFactor, configInfo.polygonMode, configInfo.lineWidth, configInfo.primitiveTopology);
     m_pipeline = pipelineContents.pipeline;
     m_layout = pipelineContents.layout;
 
@@ -77,7 +77,7 @@ VulPipeline::PipelineContents VulPipeline::createPipelineContents(const VulDevic
             const std::vector<VkVertexInputAttributeDescription> &attributeDescriptions, const std::vector<VkVertexInputBindingDescription> &bindingDescriptions,
             const std::vector<VkDescriptorSetLayout> &setLayouts, const std::vector<VkFormat> &colorAttachmentFormats, VkFormat depthAttachmentFormat,
             VkCullModeFlagBits cullMode, bool enableColorBlending, VkBlendOp blendOp, VkBlendFactor blendSrcFactor, VkBlendFactor blendDstFactor,
-            VkPolygonMode polygonMode, float lineWidth)
+            VkPolygonMode polygonMode, float lineWidth, VkPrimitiveTopology primitiveTopology)
 {
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -94,7 +94,7 @@ VulPipeline::PipelineContents VulPipeline::createPipelineContents(const VulDevic
 
     VkPipelineInputAssemblyStateCreateInfo inputAssemblyInfo{};
     inputAssemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-    inputAssemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+    inputAssemblyInfo.topology = primitiveTopology;
     inputAssemblyInfo.primitiveRestartEnable = VK_FALSE;
     
     VkPipelineViewportStateCreateInfo viewportInfo{};

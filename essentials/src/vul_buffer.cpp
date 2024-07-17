@@ -115,7 +115,7 @@ VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize 
             VkResult result = map(size, offset);
             if (result != VK_SUCCESS) return result;
         }
-        VkDeviceSize neededOffset = (m_mapped == nullptr) ? 0 : offset;
+        VkDeviceSize neededOffset = (m_mapped == nullptr) ? offset : 0;
         memcpy(reinterpret_cast<char *>(m_mapped) + neededOffset, data, size);
         if (needUnmapping) unmap();
     }
