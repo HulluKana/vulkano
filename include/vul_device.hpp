@@ -5,6 +5,7 @@
 // std lib headers
 #include <string>
 #include <vector>
+#include <vulkan/vulkan_core.h>
 
 namespace vul {
 
@@ -56,6 +57,8 @@ class VulDevice {
   QueueFamilyIndices findPhysicalQueueFamilies() { return findQueueFamilies(physicalDevice); }
   VkFormat findSupportedFormat(
       const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
+
+  void waitForIdle() const {vkDeviceWaitIdle(device_);}
 
   // Buffer Helper Functions
   VkCommandBuffer beginSingleTimeCommands() const;

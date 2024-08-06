@@ -21,9 +21,9 @@ class VulPipeline{
             VkBlendOp blendOp = VK_BLEND_OP_ADD;
             VkBlendFactor blendSrcFactor = VK_BLEND_FACTOR_ONE;
             VkBlendFactor blendDstFactor = VK_BLEND_FACTOR_ZERO;
+            VkPrimitiveTopology primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
             VkPolygonMode polygonMode = VK_POLYGON_MODE_FILL;
             float lineWidth = 1.0f;
-            VkPrimitiveTopology primitiveTopology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
         };
 
         VulPipeline(const VulDevice& device, const std::string& vertFile, const std::string& fragFile, const PipelineConfigInfo& configInfo);

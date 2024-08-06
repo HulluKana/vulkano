@@ -48,7 +48,7 @@ class VulDescriptorPool {
     public:
         class Builder {
             public:
-                Builder(VulDevice &vulDevice) : vulDevice{vulDevice} {}
+                Builder(const VulDevice &vulDevice) : vulDevice{vulDevice} {}
 
                 Builder &addPoolSize(VkDescriptorType descriptorType, uint32_t count);
                 Builder &setPoolFlags(VkDescriptorPoolCreateFlags flags);
@@ -56,14 +56,14 @@ class VulDescriptorPool {
                 std::unique_ptr<VulDescriptorPool> build() const;
 
             private:
-                VulDevice &vulDevice;
+                const VulDevice &vulDevice;
                 std::vector<VkDescriptorPoolSize> poolSizes{};
                 uint32_t maxSets = 1000;
                 VkDescriptorPoolCreateFlags poolFlags = 0;
         };
 
         VulDescriptorPool(
-                VulDevice &vulDevice,
+                const VulDevice &vulDevice,
                 uint32_t maxSets,
                 VkDescriptorPoolCreateFlags poolFlags,
                 const std::vector<VkDescriptorPoolSize> &poolSizes);
@@ -81,7 +81,7 @@ class VulDescriptorPool {
         void resetPool();
 
     private:
-        VulDevice &vulDevice;
+        const VulDevice &vulDevice;
         VkDescriptorPool descriptorPool;
 
         friend class VulDescriptorSet;
@@ -89,7 +89,29 @@ class VulDescriptorPool {
 
 class VulDescriptorSet{
     public:
-        VulDescriptorSet(std::shared_ptr<VulDescriptorSetLayout> setLayout, VulDescriptorPool &pool);
+        enum class DescriptorType{
+            uniformBuffer,
+            storageBuffer,
+            combinedImgSampler,
+            spCombinedImgSampler,
+            upCombinedImgSampler,
+            rawImageInfo,
+            storageImage,
+            accelerationStructure 
+        };
+        struct RawImageDescriptorInfo {
+            VkDescriptorType descriptorType;
+            VkDescriptorImageInfo descriptorInfo;
+        };
+        struct Descriptor{
+            DescriptorType type;
+            VkShaderStageFlags stages;
+            const void *content;
+            uint32_t count = 1;
+        };
+        static std::unique_ptr<VulDescriptorSet> createDescriptorSet(const std::vector<Descriptor> &descriptors, const VulDescriptorPool &pool);
+
+        VulDescriptorSet(std::shared_ptr<VulDescriptorSetLayout> setLayout, const VulDescriptorPool &pool);
 
         VulDescriptorSet(const VulDescriptorSet &) = delete;
         VulDescriptorSet &operator=(const VulDescriptorSet &) = delete;
@@ -119,7 +141,7 @@ class VulDescriptorSet{
         void overwrite();
 
         std::shared_ptr<VulDescriptorSetLayout> m_setLayout;
-        VulDescriptorPool &m_pool;
+        const VulDescriptorPool &m_pool;
         std::vector<VkWriteDescriptorSet> m_writes;
 
         VkDescriptorSet m_set;

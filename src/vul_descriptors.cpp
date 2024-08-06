@@ -1,11 +1,12 @@
 #include "vul_debug_tools.hpp"
 #include<vul_descriptors.hpp>
+#include <vul_buffer.hpp>
+#include <vul_image.hpp>
+#include <vul_acceleration_structure.hpp>
  
-// std
 #include <cassert>
 #include <stdexcept>
 #include <iostream>
-#include <vulkan/vulkan_core.h>
  
 namespace vul {
  
@@ -85,7 +86,7 @@ std::unique_ptr<VulDescriptorPool> VulDescriptorPool::Builder::build() const {
 // *************** Descriptor Pool *********************
 
 VulDescriptorPool::VulDescriptorPool(
-        VulDevice &vulDevice,
+        const VulDevice &vulDevice,
         uint32_t maxSets,
         VkDescriptorPoolCreateFlags poolFlags,
         const std::vector<VkDescriptorPoolSize> &poolSizes)
@@ -139,7 +140,7 @@ void VulDescriptorPool::resetPool() {
 
 // *************** Descriptor Writer *********************
 
-VulDescriptorSet::VulDescriptorSet(std::shared_ptr<VulDescriptorSetLayout> setLayout, VulDescriptorPool &pool)
+VulDescriptorSet::VulDescriptorSet(std::shared_ptr<VulDescriptorSetLayout> setLayout, const VulDescriptorPool &pool)
     : m_setLayout{setLayout}, m_pool{pool} {}
 
 void VulDescriptorSet::free()
@@ -269,6 +270,106 @@ void VulDescriptorSet::overwrite() {
         write.dstSet = m_set;
     }
     vkUpdateDescriptorSets(m_pool.vulDevice.device(), m_writes.size(), m_writes.data(), 0, nullptr);
+}
+
+std::unique_ptr<VulDescriptorSet> VulDescriptorSet::createDescriptorSet(const std::vector<Descriptor> &descriptors, const VulDescriptorPool &pool)
+{
+    VulDescriptorSetLayout::Builder layoutBuilder = VulDescriptorSetLayout::Builder(pool.vulDevice);
+    for (size_t i = 0; i < descriptors.size(); i++){
+        VkDescriptorType type{};
+        if (descriptors[i].type == DescriptorType::uniformBuffer) type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        else if (descriptors[i].type == DescriptorType::storageBuffer) type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        else if (descriptors[i].type == DescriptorType::combinedImgSampler ||
+            descriptors[i].type == DescriptorType::spCombinedImgSampler || descriptors[i].type == DescriptorType::upCombinedImgSampler)
+            type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        else if (descriptors[i].type == DescriptorType::rawImageInfo) type = static_cast<const RawImageDescriptorInfo *>(descriptors[i].content)->descriptorType;
+        else if (descriptors[i].type == DescriptorType::storageImage) type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+        else if (descriptors[i].type == DescriptorType::accelerationStructure) type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
+        layoutBuilder.addBinding(i, type, descriptors[i].stages, descriptors[i].count);
+    }
+    std::shared_ptr<VulDescriptorSetLayout> layout = layoutBuilder.build();
+
+    std::unique_ptr<VulDescriptorSet> set = std::make_unique<VulDescriptorSet>(layout, pool);
+    std::vector<std::vector<VkDescriptorBufferInfo>> bufferInfosStorage;
+    std::vector<std::vector<VkDescriptorImageInfo>> imageInfosStorage;
+    std::vector<std::vector<VkWriteDescriptorSetAccelerationStructureKHR>> tlasInfosStorage;
+    for (size_t i = 0; i < descriptors.size(); i++){
+        const Descriptor &desc = descriptors[i];
+        if (desc.type == DescriptorType::uniformBuffer || desc.type == DescriptorType::storageBuffer){
+            const VulBuffer *buffer = static_cast<const VulBuffer *>(desc.content);
+            std::vector<VkDescriptorBufferInfo> bufferInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++)
+                bufferInfos[j] = buffer[j].getDescriptorInfo();
+            bufferInfosStorage.push_back(bufferInfos);
+            set->writeBuffer(i, bufferInfosStorage[bufferInfosStorage.size() - 1].data(), desc.count);
+        }
+        if (desc.type == DescriptorType::combinedImgSampler){
+            const VulImage *image = static_cast<const VulImage *>(desc.content);
+            std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++){
+                imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfos[j].imageView = image[j].getImageView();
+                imageInfos[j].sampler = image[j].vulSampler->getSampler();
+            }
+            imageInfosStorage.push_back(imageInfos);
+            set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
+        }
+        if (desc.type == DescriptorType::spCombinedImgSampler){
+            const std::shared_ptr<VulImage> *image = static_cast<const std::shared_ptr<VulImage> *>(desc.content);
+            std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++){
+                imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfos[j].imageView = image[j]->getImageView();
+                imageInfos[j].sampler = image[j]->vulSampler->getSampler();
+            }
+            imageInfosStorage.push_back(imageInfos);
+            set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
+        }
+        if (desc.type == DescriptorType::upCombinedImgSampler){
+            const std::unique_ptr<VulImage> *image = static_cast<const std::unique_ptr<VulImage> *>(desc.content);
+            std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++){
+                imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                imageInfos[j].imageView = image[j]->getImageView();
+                imageInfos[j].sampler = image[j]->vulSampler->getSampler();
+            }
+            imageInfosStorage.push_back(imageInfos);
+            set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
+        }
+        if (desc.type == DescriptorType::rawImageInfo) {
+            const RawImageDescriptorInfo *info = static_cast<const RawImageDescriptorInfo *>(desc.content);
+            std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++) {
+                imageInfos[j] = info[j].descriptorInfo;
+            }
+            imageInfosStorage.push_back(imageInfos);
+            set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
+        }
+        if (desc.type == DescriptorType::storageImage){
+            const VulImage *image = static_cast<const VulImage *>(desc.content);
+            std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++){
+                imageInfos[j].imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+                imageInfos[j].imageView = image[j].getImageView();
+            }
+            imageInfosStorage.push_back(imageInfos);
+            set->writeImage(i, imageInfosStorage[imageInfosStorage.size() - 1].data(), desc.count);
+        }
+        if (desc.type == DescriptorType::accelerationStructure) {
+            const VulAs *as = static_cast<const VulAs *>(desc.content);
+            std::vector<VkWriteDescriptorSetAccelerationStructureKHR> asInfos(desc.count);
+            for (uint32_t j = 0; j < desc.count; j++) {
+                asInfos[j].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+                asInfos[j].accelerationStructureCount = 1;
+                asInfos[j].pAccelerationStructures = as->getPTlas();
+            }
+            tlasInfosStorage.push_back(asInfos);
+            set->writeTlas(i, tlasInfosStorage[tlasInfosStorage.size() - 1].data(), desc.count);
+        }
+    }
+    set->build();
+
+    return set;
 }
  
 }
