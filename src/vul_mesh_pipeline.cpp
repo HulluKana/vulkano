@@ -43,7 +43,7 @@ VulMeshPipeline::VulMeshPipeline(const VulDevice &vulDevice, const std::string &
 
     VulPipeline::PipelineContents pipelineContents = VulPipeline::createPipelineContents(vulDevice, shaderStages, {}, {}, configInfo.setLayouts,
             configInfo.colorAttachmentFormats, configInfo.depthAttachmentFormat, configInfo.cullMode, configInfo.enableColorBlending, configInfo.blendOp,
-            configInfo.blendSrcFactor, configInfo.blendDstFactor, configInfo.polygonMode, configInfo.lineWidth, configInfo.primitiveTopology);
+            configInfo.blendSrcFactor, configInfo.blendDstFactor, configInfo.polygonMode, configInfo.lineWidth, configInfo.primitiveTopology, true);
 
     m_pipeline = pipelineContents.pipeline;
     m_layout = pipelineContents.layout;

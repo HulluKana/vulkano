@@ -1,4 +1,3 @@
-#include "vul_settings.hpp"
 #include <vul_debug_tools.hpp>
 #include<vul_pipeline.hpp>
 
@@ -33,7 +32,7 @@ VulPipeline::VulPipeline(const VulDevice& device, const std::string& vertFile, c
 
     PipelineContents pipelineContents = createPipelineContents(device, shaderStages, configInfo.attributeDescriptions, configInfo.bindingDescriptions,
             configInfo.setLayouts, configInfo.colorAttachmentFormats, configInfo.depthAttachmentFormat, configInfo.cullMode, configInfo.enableColorBlending,
-            configInfo.blendOp, configInfo.blendSrcFactor, configInfo.blendDstFactor, configInfo.polygonMode, configInfo.lineWidth, configInfo.primitiveTopology);
+            configInfo.blendOp, configInfo.blendSrcFactor, configInfo.blendDstFactor, configInfo.polygonMode, configInfo.lineWidth, configInfo.primitiveTopology, false);
     m_pipeline = pipelineContents.pipeline;
     m_layout = pipelineContents.layout;
 
@@ -77,7 +76,7 @@ VulPipeline::PipelineContents VulPipeline::createPipelineContents(const VulDevic
             const std::vector<VkVertexInputAttributeDescription> &attributeDescriptions, const std::vector<VkVertexInputBindingDescription> &bindingDescriptions,
             const std::vector<VkDescriptorSetLayout> &setLayouts, const std::vector<VkFormat> &colorAttachmentFormats, VkFormat depthAttachmentFormat,
             VkCullModeFlagBits cullMode, bool enableColorBlending, VkBlendOp blendOp, VkBlendFactor blendSrcFactor, VkBlendFactor blendDstFactor,
-            VkPolygonMode polygonMode, float lineWidth, VkPrimitiveTopology primitiveTopology)
+            VkPolygonMode polygonMode, float lineWidth, VkPrimitiveTopology primitiveTopology, bool enableMeshShading)
 {
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -172,7 +171,7 @@ VulPipeline::PipelineContents VulPipeline::createPipelineContents(const VulDevic
 
     VkPushConstantRange pushConstantRange{};
     pushConstantRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-    if (vul::settings::deviceInitConfig.enableMeshShaderSupport) pushConstantRange.stageFlags |= VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT;
+    if (enableMeshShading) pushConstantRange.stageFlags |= VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT;
     pushConstantRange.offset = 0;
     pushConstantRange.size = vulDevice.properties.limits.maxPushConstantsSize; 
 

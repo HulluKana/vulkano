@@ -55,7 +55,7 @@ class VulPipeline{
             const std::vector<VkVertexInputAttributeDescription> &attributeDescriptions, const std::vector<VkVertexInputBindingDescription> &bindingDescriptions,
             const std::vector<VkDescriptorSetLayout> &setLayouts, const std::vector<VkFormat> &colorAttachmentFormats, VkFormat depthAttachmentFormat,
             VkCullModeFlagBits cullMode, bool enableColorBlending, VkBlendOp blendOp, VkBlendFactor blendSrcFactor, VkBlendFactor blendDstFactor,
-            VkPolygonMode polygonMode, float lineWidth, VkPrimitiveTopology primitiveTopology);
+            VkPolygonMode polygonMode, float lineWidth, VkPrimitiveTopology primitiveTopology, bool enableMeshShading);
         static VkShaderModule createShaderModule(const VulDevice &vulDevice, const std::string &filePath);
 
         VkPipeline getPipeline() const {return m_pipeline;}

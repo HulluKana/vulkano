@@ -27,6 +27,13 @@ class Scene
             uint32_t subdivisionCount;
             uint32_t matIdx;
         };
+        struct Plane {
+            glm::vec3 topLeftCorner;
+            glm::vec3 topRightCorner;
+            glm::vec3 bottomLeftCorner;
+            glm::vec3 bottomRightCorner;
+            uint32_t matIdx;
+        };
         struct WantedBuffers {
             bool vertex = true;
             bool index = true;
@@ -34,10 +41,13 @@ class Scene
             bool tangent = true;
             bool uv = true;
             bool material = true;
-            bool primInfo = true;
+            bool primInfo = false;
+            bool enableAddressTaking = false;
+            bool enableUsageForAccelerationStructures = false;
         };
         void loadCubes(const std::vector<Cube> &cubes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers);
         void loadSpheres(const std::vector<Sphere> &spheres, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers);
+        void loadPlanes(const std::vector<Plane> &planes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers);
         void loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers);
 
         std::vector<GltfLoader::GltfLight> lights;

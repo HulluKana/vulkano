@@ -17,7 +17,7 @@ static void check_vk_result(VkResult err)
         abort();
 }
 
-void VulGUI::initImGui(GLFWwindow *window, VkDescriptorPool &descriptorPool, VulRenderer &vulRenderer, VulDevice &vulDevice)
+VulGUI::VulGUI(GLFWwindow *window, VkDescriptorPool &descriptorPool, VulRenderer &vulRenderer, VulDevice &vulDevice)
 {
     ImGui::CreateContext();
     ImGui_ImplGlfw_InitForVulkan(window, true);
@@ -48,6 +48,13 @@ void VulGUI::initImGui(GLFWwindow *window, VkDescriptorPool &descriptorPool, Vul
     ImGui_ImplVulkan_DestroyFontUploadObjects();
 }
 
+VulGUI::~VulGUI()
+{
+    ImGui_ImplVulkan_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+}
+
 void VulGUI::startFrame()
 {
     VUL_PROFILE_FUNC()
@@ -63,11 +70,5 @@ void VulGUI::endFrame(VkCommandBuffer &commandBuffer)
     ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
 }
 
-void VulGUI::destroyImGui()
-{
-    ImGui_ImplVulkan_Shutdown();
-    ImGui_ImplGlfw_Shutdown();
-    ImGui::DestroyContext();
-}
 
 }

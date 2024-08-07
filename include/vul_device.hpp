@@ -2,8 +2,6 @@
 
 #include"vul_window.hpp"
 
-// std lib headers
-#include <string>
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
@@ -33,10 +31,9 @@ class VulDevice {
   const bool enableValidationLayers = true;
 #endif
 
-  VulDevice(VulWindow &window);
+  VulDevice(VulWindow &window, bool enableMeshShading, bool enableRayTracing);
   ~VulDevice();
 
-  // Not copyable or movable
   VulDevice(const VulDevice &) = delete;
   VulDevice &operator=(const VulDevice &) = delete;
   VulDevice(VulDevice &&) = delete;
@@ -60,7 +57,6 @@ class VulDevice {
 
   void waitForIdle() const {vkDeviceWaitIdle(device_);}
 
-  // Buffer Helper Functions
   VkCommandBuffer beginSingleTimeCommands() const;
   void endSingleTimeCommands(VkCommandBuffer commandBuffer) const;
   void copyBufferToImage(
@@ -73,10 +69,9 @@ class VulDevice {
   void setupDebugMessenger();
   void createSurface();
   void pickPhysicalDevice();
-  void createLogicalDevice();
+  void createLogicalDevice(bool enableMeshShading, bool enableRaytracing);
   void createCommandPools();
 
-  // helper functions
   bool isDeviceSuitable(VkPhysicalDevice device);
   std::vector<const char *> getRequiredExtensions();
   bool checkValidationLayerSupport();
@@ -99,8 +94,7 @@ class VulDevice {
   VkQueue presentQueue_;
   VkQueue m_computeQueue;
 
-  const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"}; // Enabled validation layers for normal use
-  //const std::vector<const char *> validationLayers = {}; // Disabled validation layers for nsight
+  const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
   std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 };
 

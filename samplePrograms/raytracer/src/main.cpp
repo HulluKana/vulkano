@@ -1,24 +1,21 @@
-#include <vul_2d_object.hpp>
+#include <glm/ext/matrix_clip_space.hpp>
 #include <vul_GUI.hpp>
 #include <vul_camera.hpp>
-#include <vul_movement_controller.hpp>
 #include <iostream>
 #include <vul_descriptors.hpp>
-#include <vul_settings.hpp>
 #include <vul_rt_pipeline.hpp>
 #include<host_device.hpp>
 #include <vul_acceleration_structure.hpp>
 #include <vul_pipeline.hpp>
 #include <vul_renderer.hpp>
+#include <vul_transform.hpp>
 
 #include<imgui.h>
 #include <memory>
 
 void GuiStuff(double frameTime) {
     ImGui::Begin("Performance");
-    ImGui::DragFloat("Max FPS", &vul::settings::maxFps, vul::settings::maxFps / 30.0f, 3.0f, 10'000.0f);
-    ImGui::Text("Fps: %f\nTotal frame time: %fms",
-            1.0f / frameTime, frameTime * 1000.0f);
+    ImGui::Text("Fps: %f\nTotal frame time: %fms", 1.0f / frameTime, frameTime * 1000.0f);
     ImGui::End();
 }
 
@@ -85,15 +82,15 @@ std::unique_ptr<vul::VulDescriptorSet> createRtDescSet(const vul::Scene &scene, 
 std::unique_ptr<vul::VulPipeline> createPipeline(const vul::VulRenderer &vulRenderer, const std::array<std::unique_ptr<vul::VulDescriptorSet>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> &descSets, const vul::VulDevice &device)
 {
     vul::VulPipeline::PipelineConfigInfo pipConf{};
-    pipConf.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32_SFLOAT, 0}};
-    pipConf.bindingDescriptions = {{0, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
+    pipConf.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32_SFLOAT, 0}};
+    pipConf.bindingDescriptions = {{0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
     pipConf.colorAttachmentFormats = {vulRenderer.getSwapChainColorFormat()};
     pipConf.depthAttachmentFormat = vulRenderer.getDepthFormat();
     pipConf.setLayouts = {descSets[0]->getLayout()->getDescriptorSetLayout()};
     pipConf.enableColorBlending = false;
     pipConf.cullMode = VK_CULL_MODE_NONE;
 
-    return std::make_unique<vul::VulPipeline>(device, "../bin/raytrace.vert.spv", "../bin/raytrace.frag.spv", pipConf);
+    return std::make_unique<vul::VulPipeline>(device, "raytrace.vert.spv", "raytrace.frag.spv", pipConf);
 }
 
 void resizeRtImgs(std::array<std::unique_ptr<vul::VulImage>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> &rtImgs,
@@ -113,12 +110,12 @@ void resizeRtImgs(std::array<std::unique_ptr<vul::VulImage>, vul::VulSwapChain::
     }
 }
 
-void updateUniformBuffer(const std::unique_ptr<vul::VulBuffer> &ubo, const vul::Scene &scene, const vul::VulCamera &camera, const glm::vec3 &camPos, uint32_t swapChainHeight)
+void updateUniformBuffer(const std::unique_ptr<vul::VulBuffer> &ubo, const vul::Scene &scene, const vul::VulCamera &camera, uint32_t swapChainHeight, float fovY)
 {
     GlobalUbo uboData{};
     uboData.inverseViewMatrix = glm::inverse(camera.getView());
     uboData.inverseProjectionMatrix = glm::inverse(camera.getProjection());
-    uboData.cameraPosition = glm::vec4(camPos, 0.0f);
+    uboData.cameraPosition = glm::vec4(camera.pos, 0.0f);
 
     uboData.numLights = std::min(static_cast<int>(scene.lights.size()), MAX_LIGHTS);
     for (int i = 0; i < uboData.numLights; i++){
@@ -129,7 +126,7 @@ void updateUniformBuffer(const std::unique_ptr<vul::VulBuffer> &ubo, const vul::
 
     // Pixel spread angle is from equation 30 from
     // https://media.contentapi.ea.com/content/dam/ea/seed/presentations/2019-ray-tracing-gems-chapter-20-akenine-moller-et-al.pdf
-    uboData.pixelSpreadAngle = atan((2.0f * tan(vul::settings::cameraProperties.fovY / 2.0f)) / static_cast<float>(swapChainHeight));
+    uboData.pixelSpreadAngle = atan((2.0f * tan(fovY / 2.0f)) / static_cast<float>(swapChainHeight));
     uboData.padding1 = 69;
     uboData.padding2 = 420;
 
@@ -137,24 +134,23 @@ void updateUniformBuffer(const std::unique_ptr<vul::VulBuffer> &ubo, const vul::
 }
 
 int main() {
-    vul::settings::deviceInitConfig.enableRaytracingSupport = true;
     vul::VulWindow vulWindow(2560, 1440, "Vulkano");
-    vul::VulDevice vulDevice(vulWindow);
-    vul::VulRenderer vulRenderer(vulWindow, vulDevice);
+    vul::VulDevice vulDevice(vulWindow, false, true);
+    vul::VulRenderer vulRenderer(vulWindow, vulDevice, nullptr);
     std::unique_ptr<vul::VulDescriptorPool> descPool = vul::VulDescriptorPool::Builder(vulDevice).setMaxSets(8).setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT).build();
-    vul::Scene scene(vulDevice);
-    scene.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza/", {});
-    vul::Object2D fullScreenQuad;
-    fullScreenQuad.addSquare(vulDevice, 0.0f, 0.0f, 1.0f, 1.0f);
-    vul::settings::maxFps = 60.0f;
+
+    vul::Scene mainScene(vulDevice);
+    mainScene.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza/", {.primInfo = true, .enableAddressTaking = true, .enableUsageForAccelerationStructures = true});
+    vul::Scene fullScreenQuad(vulDevice);
+    fullScreenQuad.loadPlanes({{{-1.0f, -1.0f, 0.5f}, {1.0f, -1.0f, 0.5f}, {-1.0f, 1.0f, 0.5f}, {1.0f, 1.0f, 0.5f}, 0}}, {}, {.normal = false, .tangent = false, .material = false});
 
     std::unique_ptr<vul::VulImage> enviromentMap = vul::VulImage::createDefaultWholeImageAllInOneSingleTime(vulDevice,
             "../enviromentMaps/sunsetCube.exr", {}, true, vul::VulImage::InputDataType::exrFile, vul::VulImage::ImageType::hdrCube);
 
-    std::vector<vul::VulAs::AsNode> asNodes(scene.nodes.size());
-    for (size_t i = 0; i < scene.nodes.size(); i++) asNodes[i] = {.nodeIndex = static_cast<uint32_t>(i), .blasIndex = 0};
+    std::vector<vul::VulAs::AsNode> asNodes(mainScene.nodes.size());
+    for (size_t i = 0; i < mainScene.nodes.size(); i++) asNodes[i] = {.nodeIndex = static_cast<uint32_t>(i), .blasIndex = 0};
     vul::VulAs as(vulDevice);
-    as.loadScene(scene, asNodes, {vul::VulAs::InstanceInfo{.blasIdx = 0, .customIndex = 0,
+    as.loadScene(mainScene, asNodes, {vul::VulAs::InstanceInfo{.blasIdx = 0, .customIndex = 0,
             .shaderBindingTableRecordOffset = 0, .transform = vul::transform3D{}.transformMat()}}, false);
 
     std::array<std::unique_ptr<vul::VulImage>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> rtImgs;
@@ -170,20 +166,22 @@ int main() {
         ubos[i] = std::make_unique<vul::VulBuffer>(vulDevice);
         ubos[i]->keepEmpty(sizeof(GlobalUbo), 1);
         ubos[i]->createBuffer(false, vul::VulBuffer::usage_ubo);
-        descSets[i] = createRtDescSet(scene, as, rtImgs[i], ubos[i], enviromentMap, descPool);
+        descSets[i] = createRtDescSet(mainScene, as, rtImgs[i], ubos[i], enviromentMap, descPool);
     }
 
     std::unique_ptr<vul::VulPipeline> pipeline = createPipeline(vulRenderer, descSets, vulDevice);
-    vul::VulRtPipeline rtPipeline(vulDevice, "../bin/raytrace.rgen.spv", {"../bin/raytrace.rmiss.spv", "../bin/raytraceShadow.rmiss.spv"},
-            {"../bin/raytrace.rchit.spv"}, {"../bin/raytraceShadow.rahit.spv"}, {}, {{0, 0, -1}},
+    vul::VulRtPipeline rtPipeline(vulDevice, "raytrace.rgen.spv", {"raytrace.rmiss.spv", "raytraceShadow.rmiss.spv"},
+            {"raytrace.rchit.spv"}, {"raytraceShadow.rahit.spv"}, {}, {{0, 0, -1}},
             {descSets[0]->getLayout()->getDescriptorSetLayout()});
 
-    vul::VulGUI vulGui;
-    vulGui.initImGui(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice);
+    vul::VulGUI vulGui(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice);
+    struct CameraInfo {
+        float fovY = 80.0f * (M_PI * 2.0f / 360.0f);
+        float nearPlane = 0.1f;
+        float farPlane = 100.0f;
+    } camInfo;
     vul::VulCamera camera;
-    camera.setPerspectiveProjection(vul::settings::cameraProperties.fovY, vulRenderer.getAspectRatio(), vul::settings::cameraProperties.nearPlane, vul::settings::cameraProperties.farPlane);
-    vul::transform3D cameraTransform{};
-    vul::MovementController movementController{};
+    camera.setPerspectiveProjection(camInfo.fovY, vulRenderer.getAspectRatio(), camInfo.nearPlane, camInfo.farPlane);
 
     double frameStartTime = glfwGetTime();
     while (!vulWindow.shouldClose()) {
@@ -195,25 +193,20 @@ int main() {
 
         const double frameTime = glfwGetTime() - frameStartTime;
         frameStartTime = glfwGetTime();
-        if (!movementController.hideGUI) GuiStuff(frameTime);
+        if (!camera.shouldHideGui()) GuiStuff(frameTime);
 
-        movementController.modifyValues(vulWindow.getGLFWwindow(), cameraTransform);
-        movementController.rotate(vulWindow.getGLFWwindow(), frameTime, cameraTransform, vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height);
-        movementController.move(vulWindow.getGLFWwindow(), frameTime, cameraTransform);
-        camera.setPerspectiveProjection(vul::settings::cameraProperties.fovY, vulRenderer.getAspectRatio(), vul::settings::cameraProperties.nearPlane, vul::settings::cameraProperties.farPlane);
-        camera.setViewXYZ(cameraTransform.pos, cameraTransform.rot);
-        updateUniformBuffer(ubos[frameIdx], scene, camera, cameraTransform.pos, vulRenderer.getSwapChainExtent().height);
+        camera.applyInputs(vulWindow.getGLFWwindow(), frameTime, vulRenderer.getSwapChainExtent().height);
+        camera.setPerspectiveProjection(camInfo.fovY, vulRenderer.getAspectRatio(), camInfo.nearPlane, camInfo.farPlane);
+        camera.updateXYZ();
+        updateUniformBuffer(ubos[frameIdx], mainScene, camera, vulRenderer.getSwapChainExtent().height, camInfo.fovY);
 
         std::vector<VkDescriptorSet> vkDescSets = {descSets[(frameIdx + 1) % vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT]->getSet()};
         rtPipeline.traceRays(vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height, 0, nullptr, vkDescSets, commandBuffer);
 
         vulRenderer.beginRendering(commandBuffer, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent, vul::VulRenderer::DepthImageMode::noDepthImage,
                 glm::vec4(0.0, 0.0, 0.0, 1.0), {}, vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->getPipelineLayout(), 0, 1, vkDescSets.data(), 0, nullptr);
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline->getPipeline());
-        fullScreenQuad.bind(commandBuffer);
-        fullScreenQuad.draw(commandBuffer);
-
+        pipeline->draw(commandBuffer, vkDescSets, {fullScreenQuad.vertexBuffer->getBuffer(), fullScreenQuad.uvBuffer->getBuffer()}, fullScreenQuad.indexBuffer->getBuffer(),
+                {vul::VulPipeline::DrawData{.indexCount = fullScreenQuad.meshes[0].indexCount, .firstIndex = fullScreenQuad.meshes[0].firstIndex}});
         vulGui.endFrame(commandBuffer);
         vulRenderer.stopRendering(commandBuffer);
 
@@ -221,7 +214,6 @@ int main() {
         if (vulRenderer.wasSwapChainRecreated()) resizeRtImgs(rtImgs, descSets, vulDevice, vulRenderer.getSwapChainExtent());
     }
     vulDevice.waitForIdle();
-    vulGui.destroyImGui();
 
     return 0;
 }

@@ -7,12 +7,11 @@ namespace vul{
 
 class VulGUI{
     public:
-        void initImGui(GLFWwindow *window, VkDescriptorPool &descriptorPool, VulRenderer &vulRenderer, VulDevice &vulDevice);
+        VulGUI(GLFWwindow *window, VkDescriptorPool &descriptorPool, VulRenderer &vulRenderer, VulDevice &vulDevice);
+        ~VulGUI();
 
         void startFrame();
         void endFrame(VkCommandBuffer &commandBuffer);
-
-        void destroyImGui();
 };
 
 }

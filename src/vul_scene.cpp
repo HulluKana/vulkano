@@ -1,5 +1,4 @@
 #include "vul_buffer.hpp"
-#include "vul_settings.hpp"
 #include "vul_transform.hpp"
 #include <cmath>
 #include <cstdint>
@@ -228,6 +227,60 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vu
     createBuffers(lIndices, lVertices, lVertices, uselessTangents, uselessUvs, mats, nods, wantedBuffers);
 }
 
+void Scene::loadPlanes(const std::vector<Plane> &planes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers)
+{
+    std::vector<uint32_t> lIndices;
+    std::vector<glm::vec3> lVertices;
+    std::vector<glm::vec2> lUvs;
+    std::vector<GltfLoader::GltfNode> nods;
+    for (size_t i = 0; i < planes.size(); i++) {
+        lVertices.push_back(planes[i].topLeftCorner);    
+        lVertices.push_back(planes[i].topRightCorner);    
+        lVertices.push_back(planes[i].bottomLeftCorner);    
+        lVertices.push_back(planes[i].bottomRightCorner);    
+        
+        lUvs.emplace_back(glm::vec2{0.0f, 0.0f});
+        lUvs.emplace_back(glm::vec2{1.0f, 0.0f});
+        lUvs.emplace_back(glm::vec2{0.0f, 1.0f});
+        lUvs.emplace_back(glm::vec2{1.0f, 1.0f});
+
+        lIndices.push_back(0);
+        lIndices.push_back(1);
+        lIndices.push_back(2);
+        lIndices.push_back(2);
+        lIndices.push_back(1);
+        lIndices.push_back(3);
+
+        GltfLoader::GltfPrimMesh mesh;
+        mesh.name = "Procedural sphere mesh " + std::to_string(i);
+        mesh.posMin = glm::min(glm::min(glm::min(planes[i].topLeftCorner, planes[i].topRightCorner), planes[i].bottomLeftCorner), planes[i].bottomRightCorner);
+        mesh.posMax = glm::max(glm::max(glm::max(planes[i].topLeftCorner, planes[i].topRightCorner), planes[i].bottomLeftCorner), planes[i].bottomRightCorner);
+        mesh.indexCount = 6;
+        mesh.firstIndex = lIndices.size() - mesh.indexCount + indices.size();
+        mesh.vertexCount = 4;
+        mesh.vertexOffset = lVertices.size() - mesh.vertexCount + vertices.size();
+        mesh.materialIndex = planes[i].matIdx + materials.size();
+        meshes.push_back(mesh);
+
+        transform3D transform{};
+
+        GltfLoader::GltfNode node;
+        node.name = "Procedural plane " + std::to_string(i);
+        node.primMesh = meshes.size() - 1;
+        node.position = {};
+        node.worldMatrix = transform.transformMat();
+        node.normalMatrix = transform.normalMat();
+        nods.push_back(node);
+    }
+    nodes.insert(nodes.end(), nods.begin(), nods.end());
+    materials.insert(materials.end(), mats.begin(), mats.end());
+
+    std::vector<glm::vec4> uselessTangents(lVertices.size());
+    std::vector<glm::vec3> uselessNormals(lVertices.size());
+
+    createBuffers(lIndices, lVertices, uselessNormals, uselessTangents, lUvs, mats, nods, wantedBuffers);
+}
+
 void Scene::loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers)
 {
     tinygltf::Model model;
@@ -304,16 +357,16 @@ void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vect
         primInfos.push_back(primInfo);
     }
 
-    VulBuffer::Usage rtFlags = VulBuffer::usage_none;
-    if (settings::deviceInitConfig.enableRaytracingSupport)
-        rtFlags = static_cast<VulBuffer::Usage>(VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead);
+    VulBuffer::Usage optionalFlags = VulBuffer::usage_none;
+    if (wantedBuffers.enableAddressTaking) optionalFlags =  VulBuffer::usage_getAddress;
+    if (wantedBuffers.enableUsageForAccelerationStructures) optionalFlags = static_cast<VulBuffer::Usage>(optionalFlags | VulBuffer::usage_accelerationStructureBuildRead);
 
     if (lIndices.size() > 0 && wantedBuffers.index) {
         if (indexBuffer.get() == nullptr) {
             indexBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
             indexBuffer->loadVector(lIndices);
             indexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_indexBuffer |
-                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo | rtFlags));
+                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo | optionalFlags));
         } else indexBuffer->appendVector(lIndices);
         indices.insert(indices.end(), lIndices.begin(), lIndices.end());
         VUL_NAME_VK(indexBuffer->getBuffer())
@@ -323,7 +376,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vect
             vertexBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
             vertexBuffer->loadVector(lVertices);
             vertexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
-                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo | rtFlags));
+                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo | optionalFlags));
         } else vertexBuffer->appendVector(lVertices);
         vertices.insert(vertices.end(), lVertices.begin(), lVertices.end());
         VUL_NAME_VK(vertexBuffer->getBuffer())

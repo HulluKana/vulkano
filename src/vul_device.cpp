@@ -1,6 +1,5 @@
 #include <vul_debug_tools.hpp>
 #include<vul_device.hpp>
-#include<vul_settings.hpp>
 #include <vul_extensions.hpp>
 
 // std headers
@@ -56,12 +55,12 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance,
 }
 
 // class member functions
-VulDevice::VulDevice(vul::VulWindow &window) : window{window} {
+VulDevice::VulDevice(vul::VulWindow &window, bool enableMeshShading, bool enableRayTracing) : window{window} {
     createInstance();
     setupDebugMessenger();
     createSurface();
     pickPhysicalDevice();
-    createLogicalDevice();
+    createLogicalDevice(enableMeshShading, enableRayTracing);
     createCommandPools();
 
     DebugNamer::initialize(*this);
@@ -156,7 +155,7 @@ void VulDevice::pickPhysicalDevice() {
   // std::cout << "physical device: " << properties.deviceName << std::endl;
 }
 
-void VulDevice::createLogicalDevice() {
+void VulDevice::createLogicalDevice(bool enableMeshShading, bool enableRayTracing) {
   QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
 
   std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
@@ -198,15 +197,15 @@ void VulDevice::createLogicalDevice() {
   physicalFeaturesVulkan13.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
   physicalFeaturesVulkan13.pNext = &physicalFeaturesVulkan12;
 
-  if (vul::settings::deviceInitConfig.enableRaytracingSupport) {
+  if (enableRayTracing) {
       deviceExtensions.push_back(VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME);
       deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
       deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
-      if (!vul::settings::deviceInitConfig.enableMeshShaderSupport) physicalFeaturesVulkan11.pNext = &rtPipelineFeatures;
-      else fragShadingRateFeatures.pNext = &rtPipelineFeatures;
+      if (enableMeshShading) fragShadingRateFeatures.pNext = &rtPipelineFeatures;
+      else physicalFeaturesVulkan11.pNext = &rtPipelineFeatures;
   }
 
-  if (vul::settings::deviceInitConfig.enableMeshShaderSupport) {
+  if (enableMeshShading) {
       deviceExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
       deviceExtensions.push_back(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
       physicalFeaturesVulkan11.pNext = &meshShaderFeatures;
@@ -249,11 +248,11 @@ void VulDevice::createLogicalDevice() {
   vkGetDeviceQueue(device_, indices.presentFamily, 0, &presentQueue_);
   vkGetDeviceQueue(device_, indices.computeFamily, 0, &m_computeQueue);
 
-  if (vul::settings::deviceInitConfig.enableRaytracingSupport) {
+  if (enableRayTracing) {
       extensions::addAccelerationStructure(device_, vkGetDeviceProcAddr);
       extensions::addRayTracingPipeline(device_, vkGetDeviceProcAddr);
   }
-  if (vul::settings::deviceInitConfig.enableMeshShaderSupport) extensions::addMeshShader(device_, vkGetDeviceProcAddr);
+  if (enableMeshShading) extensions::addMeshShader(device_, vkGetDeviceProcAddr);
 }
 
 void VulDevice::createCommandPools() {
@@ -429,12 +428,8 @@ QueueFamilyIndices VulDevice::findQueueFamilies(VkPhysicalDevice device) {
     if (queueFamily.queueCount > 0 &&
         (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT) &&
         !indices.computeFamilyHasValue) {
-      if (vul::settings::deviceInitConfig.preferSeparateComputeQueue)
-        computeFamilies.push_back(i);
-      else {
         indices.computeFamily = i;
         indices.computeFamilyHasValue = true;
-      }
     }
     VkBool32 presentSupport = false;
     vkGetPhysicalDeviceSurfaceSupportKHR(device, i, surface_, &presentSupport);
@@ -445,18 +440,6 @@ QueueFamilyIndices VulDevice::findQueueFamilies(VkPhysicalDevice device) {
     }
 
     i++;
-  }
-
-  if (vul::settings::deviceInitConfig.preferSeparateComputeQueue) {
-    for (uint32_t computeFamilyIdx : computeFamilies) {
-      if (computeFamilyIdx != indices.graphicsFamily) {
-        indices.computeFamily = computeFamilyIdx;
-        indices.computeFamilyHasValue = true;
-        break;
-      }
-    }
-    if (!indices.computeFamilyHasValue)
-      indices.computeFamily = computeFamilies[0];
   }
 
   return indices;

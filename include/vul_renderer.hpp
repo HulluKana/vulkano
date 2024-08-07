@@ -13,7 +13,7 @@ namespace vul{
 
 class VulRenderer{
     public:
-        VulRenderer(VulWindow &window, VulDevice &device);
+        VulRenderer(VulWindow &window, VulDevice &device, std::shared_ptr<vul::VulSampler> depthImgSampler);
         ~VulRenderer();
 
         /* These 2 lines remove the copy constructor and operator from VulRenderer class.
@@ -68,6 +68,7 @@ class VulRenderer{
 
         std::vector<std::unique_ptr<VulImage>> m_depthImages;
         VkFormat m_depthFormat;
+        std::shared_ptr<vul::VulSampler> m_depthImgSampler;
 
         uint32_t currentImageIndex;
         int currentFrameIndex{0};

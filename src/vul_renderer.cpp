@@ -1,5 +1,4 @@
 #include "vul_image.hpp"
-#include "vul_settings.hpp"
 #include <vul_debug_tools.hpp>
 #include <cstddef>
 #include <cstdlib>
@@ -18,8 +17,9 @@
 
 namespace vul{
 
-VulRenderer::VulRenderer(VulWindow &window, VulDevice &device) : vulWindow{window}, vulDevice{device}
+VulRenderer::VulRenderer(VulWindow &window, VulDevice &device, std::shared_ptr<vul::VulSampler> depthImgSampler) : vulWindow{window}, vulDevice{device}
 {
+    m_depthImgSampler = depthImgSampler;
     recreateSwapChain();
     createCommandBuffers();
 }
@@ -54,14 +54,14 @@ void VulRenderer::recreateSwapChain()
     m_depthFormat = vulDevice.findSupportedFormat({  VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT}, 
                                                             VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
     VkImageUsageFlags depthUsage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-    if (settings::rendererConfig.enableSamplingDepthImages) depthUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
+    if (m_depthImgSampler != nullptr) depthUsage |= VK_IMAGE_USAGE_SAMPLED_BIT;
     m_depthImages.resize(vulSwapChain->imageCount());
     for (size_t i = 0; i < vulSwapChain->imageCount(); i++) {
         m_depthImages[i] = std::make_unique<vul::VulImage>(vulDevice);
         m_depthImages[i]->keepEmpty(vulSwapChain->getSwapChainExtent().width, vulSwapChain->getSwapChainExtent().height, 1, 1, 1, m_depthFormat, 0, 0);
         m_depthImages[i]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, depthUsage,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, cmdBuf);
-        if (settings::rendererConfig.enableSamplingDepthImages) m_depthImages[i]->vulSampler = settings::rendererConfig.depthImageSampler;
+        m_depthImages[i]->vulSampler = m_depthImgSampler;
     }
     vulDevice.endSingleTimeCommands(cmdBuf);
 }
