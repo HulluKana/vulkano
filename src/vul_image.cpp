@@ -346,13 +346,11 @@ void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkI
     if (containsData && isDeviceLocal) {
         transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
         for (size_t i = 0; i < m_mipLevelsCount; i++) {
-            m_stagingBuffers.push_back(std::make_unique<vul::VulBuffer>(m_vulDevice));
-            const size_t stgIdx = m_stagingBuffers.size() - 1;
-            m_stagingBuffers[stgIdx]->loadData(m_mipLevels[i].layers[0], 1, m_mipLevels[i].layerSize * m_arrayLayersCount);
-            m_stagingBuffers[stgIdx]->createBuffer(false, vul::VulBuffer::usage_transferSrc);
-            copyBufferToImage(m_stagingBuffers[stgIdx]->getBuffer(), i, cmdBuf);
+            m_stagingBuffers.push_back(std::make_unique<vul::VulBuffer>(1, m_mipLevels[i].layerSize * m_arrayLayersCount, false, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, m_vulDevice));
+            m_stagingBuffers[m_stagingBuffers.size() - 1]->writeData(m_mipLevels[i].layers[0], m_stagingBuffers[m_stagingBuffers.size() - 1]->getBufferSize(), 0, VK_NULL_HANDLE);
+            copyBufferToImage(m_stagingBuffers[m_stagingBuffers.size() - 1]->getBuffer(), i, cmdBuf);
 
-            VUL_NAME_VK(m_stagingBuffers[stgIdx]->getBuffer())
+            VUL_NAME_VK(m_stagingBuffers[m_stagingBuffers.size() - 1]->getBuffer())
         }
         transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout, cmdBuf);
     }
@@ -503,19 +501,6 @@ void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newL
     m_layout = newLayout;
 }
 
-std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOneSingleTime(const vul::VulDevice &vulDevice,
-        std::variant<std::string, RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format,
-        bool addSampler, InputDataType dataType, ImageType imageType)
-{
-    VkCommandBuffer cmdBuf = vulDevice.beginSingleTimeCommands();
-    std::unique_ptr<VulImage> img = createDefaultWholeImageAllInOne(vulDevice, data, format, addSampler, dataType, imageType, cmdBuf);
-    vulDevice.endSingleTimeCommands(cmdBuf);
-
-    img->deleteStagingResources();
-    img->deleteCpuData();
-    return img;
-}
-
 std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOne(const vul::VulDevice &vulDevice, std::variant<std::string,
         RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format, bool addSampler,
         InputDataType dataType, ImageType imageType, VkCommandBuffer cmdBuf)
@@ -566,25 +551,6 @@ void VulImage::keepRegularRaw2d8bitRgbaEmpty(uint32_t width, uint32_t height)
 void VulImage::keepRegularRaw2d32bitRgbaEmpty(uint32_t width, uint32_t height)
 {
     keepEmpty(width, height, 1, 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT, 0, 0);
-}
-
-void VulImage::createCustomImageSingleTime(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
-        VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect)
-{
-    VkCommandBuffer cmdBuf = m_vulDevice.beginSingleTimeCommands();
-    createCustomImage(type, layout, usage, memoryProperties, tiling, aspect, cmdBuf);
-    m_vulDevice.endSingleTimeCommands(cmdBuf);
-    deleteStagingResources();
-    deleteCpuData();
-}
-
-void VulImage::createDefaultImageSingleTime(ImageType type)
-{
-    VkCommandBuffer cmdBuf = m_vulDevice.beginSingleTimeCommands();
-    createDefaultImage(type, cmdBuf);
-    m_vulDevice.endSingleTimeCommands(cmdBuf);
-    deleteStagingResources();
-    deleteCpuData();
 }
 
 void VulImage::createDefaultImage(ImageType type, VkCommandBuffer cmdBuf)

@@ -17,7 +17,7 @@ static void check_vk_result(VkResult err)
         abort();
 }
 
-VulGUI::VulGUI(GLFWwindow *window, VkDescriptorPool &descriptorPool, VulRenderer &vulRenderer, VulDevice &vulDevice)
+VulGUI::VulGUI(GLFWwindow *window, VkDescriptorPool &descriptorPool, VulRenderer &vulRenderer, VulDevice &vulDevice, VulCmdPool &cmdPool)
 {
     ImGui::CreateContext();
     ImGui_ImplGlfw_InitForVulkan(window, true);
@@ -40,9 +40,9 @@ VulGUI::VulGUI(GLFWwindow *window, VkDescriptorPool &descriptorPool, VulRenderer
     info.Queue = vulDevice.graphicsQueue();
     ImGui_ImplVulkan_Init(&info, nullptr);
 
-    VkCommandBuffer commandBuffer = vulDevice.beginSingleTimeCommands();
+    VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
     ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-    vulDevice.endSingleTimeCommands(commandBuffer);
+    cmdPool.submitAndWait(commandBuffer);
 
     vkDeviceWaitIdle(vulDevice.device());
     ImGui_ImplVulkan_DestroyFontUploadObjects();

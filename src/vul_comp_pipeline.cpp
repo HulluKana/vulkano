@@ -1,4 +1,6 @@
+#include "vul_command_pool.hpp"
 #include "vul_debug_tools.hpp"
+#include <memory>
 #include<vul_comp_pipeline.hpp>
 #include<vul_pipeline.hpp>
 #include<vul_swap_chain.hpp>
@@ -43,10 +45,12 @@ VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vecto
     if (vkCreateComputePipelines(m_vulDevice.device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline) != VK_SUCCESS)
         throw std::runtime_error("Failed to create compute pipeline");
 
+    m_cmdPool = std::make_unique<VulCmdPool>(VulCmdPool::QueueFamilyType::ComputeFamily, VK_NULL_HANDLE, 0, 0, m_vulDevice);
+
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = m_vulDevice.getComputeCommandPool();
+    allocInfo.commandPool = m_cmdPool->getPool();
     allocInfo.commandBufferCount = m_maxFramesInFlight;
 
     m_cmdBufs.resize(m_maxFramesInFlight);
@@ -75,7 +79,7 @@ VulCompPipeline::~VulCompPipeline()
 {
     vkDestroyPipeline(m_vulDevice.device(), m_pipeline, nullptr);
     vkDestroyPipelineLayout(m_vulDevice.device(), m_layout, nullptr);
-    vkFreeCommandBuffers(m_vulDevice.device(), m_vulDevice.getComputeCommandPool(), m_maxFramesInFlight, m_cmdBufs.data());
+    vkFreeCommandBuffers(m_vulDevice.device(), m_cmdPool->getPool(), m_maxFramesInFlight, m_cmdBufs.data());
     for (uint32_t i = 0; i < m_maxFramesInFlight; i++)
         vkDestroyFence(m_vulDevice.device(), m_fences[i], nullptr);
 }

@@ -1,4 +1,3 @@
-#include <glm/ext/matrix_clip_space.hpp>
 #include <vul_GUI.hpp>
 #include <vul_camera.hpp>
 #include <iostream>
@@ -9,9 +8,11 @@
 #include <vul_pipeline.hpp>
 #include <vul_renderer.hpp>
 #include <vul_transform.hpp>
+#include <vul_command_pool.hpp>
 
 #include<imgui.h>
 #include <memory>
+#include <vulkan/vulkan_core.h>
 
 void GuiStuff(double frameTime) {
     ImGui::Begin("Performance");
@@ -94,15 +95,16 @@ std::unique_ptr<vul::VulPipeline> createPipeline(const vul::VulRenderer &vulRend
 }
 
 void resizeRtImgs(std::array<std::unique_ptr<vul::VulImage>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> &rtImgs,
-        std::array<std::unique_ptr<vul::VulDescriptorSet>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> &descSets, const vul::VulDevice &vulDevice, VkExtent2D swapChainExtent)
+        std::array<std::unique_ptr<vul::VulDescriptorSet>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> &descSets,
+        const vul::VulDevice &vulDevice, VkExtent2D swapChainExtent, vul::VulCmdPool &cmdPool)
 {
-    VkCommandBuffer cmdBuf = vulDevice.beginSingleTimeCommands();
+    VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
     for (size_t i = 0; i < rtImgs.size(); i++) {
         rtImgs[i] = std::make_unique<vul::VulImage>(vulDevice);
         rtImgs[i]->keepRegularRaw2d32bitRgbaEmpty(swapChainExtent.width, swapChainExtent.height);
         rtImgs[i]->createDefaultImage(vul::VulImage::ImageType::storage2d, cmdBuf);
     }
-    vulDevice.endSingleTimeCommands(cmdBuf);
+    cmdPool.submitAndWait(cmdBuf);
     
     for (size_t i = 0; i < rtImgs.size(); i++) {
         descSets[i]->descriptorInfos[0].imageInfos[0].imageView = rtImgs[i]->getImageView();
@@ -130,7 +132,7 @@ void updateUniformBuffer(const std::unique_ptr<vul::VulBuffer> &ubo, const vul::
     uboData.padding1 = 69;
     uboData.padding2 = 420;
 
-    ubo->writeData(&uboData, sizeof(GlobalUbo), 0);
+    ubo->writeData(&uboData, sizeof(GlobalUbo), 0, VK_NULL_HANDLE);
 }
 
 int main() {
@@ -138,43 +140,45 @@ int main() {
     vul::VulDevice vulDevice(vulWindow, false, true);
     vul::VulRenderer vulRenderer(vulWindow, vulDevice, nullptr);
     std::unique_ptr<vul::VulDescriptorPool> descPool = vul::VulDescriptorPool::Builder(vulDevice).setMaxSets(8).setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT).build();
+    vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueFamilyType::GraphicsFamily, vulDevice.graphicsQueue(), 0, 0, vulDevice);
+    vul::VulGUI vulGui(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice, cmdPool);
 
     vul::Scene mainScene(vulDevice);
-    mainScene.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza/", {.primInfo = true, .enableAddressTaking = true, .enableUsageForAccelerationStructures = true});
-    vul::Scene fullScreenQuad(vulDevice);
-    fullScreenQuad.loadPlanes({{{-1.0f, -1.0f, 0.5f}, {1.0f, -1.0f, 0.5f}, {-1.0f, 1.0f, 0.5f}, {1.0f, 1.0f, 0.5f}, 0}}, {}, {.normal = false, .tangent = false, .material = false});
+    mainScene.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza/", {.primInfo = true, .enableAddressTaking = true, .enableUsageForAccelerationStructures = true}, cmdPool);
 
-    std::unique_ptr<vul::VulImage> enviromentMap = vul::VulImage::createDefaultWholeImageAllInOneSingleTime(vulDevice,
-            "../enviromentMaps/sunsetCube.exr", {}, true, vul::VulImage::InputDataType::exrFile, vul::VulImage::ImageType::hdrCube);
+    VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
+    vul::Scene fullScreenQuad(vulDevice);
+    fullScreenQuad.loadPlanes({{{-1.0f, -1.0f, 0.5f}, {1.0f, -1.0f, 0.5f}, {-1.0f, 1.0f, 0.5f}, {1.0f, 1.0f, 0.5f}, 0}}, {}, {.normal = false, .tangent = false, .material = false}, commandBuffer);
+
+    std::unique_ptr<vul::VulImage> enviromentMap = vul::VulImage::createDefaultWholeImageAllInOne(vulDevice, "../enviromentMaps/sunsetCube.exr",
+            {}, true, vul::VulImage::InputDataType::exrFile, vul::VulImage::ImageType::hdrCube, commandBuffer);
+    cmdPool.submitAndWait(commandBuffer);
 
     std::vector<vul::VulAs::AsNode> asNodes(mainScene.nodes.size());
     for (size_t i = 0; i < mainScene.nodes.size(); i++) asNodes[i] = {.nodeIndex = static_cast<uint32_t>(i), .blasIndex = 0};
     vul::VulAs as(vulDevice);
     as.loadScene(mainScene, asNodes, {vul::VulAs::InstanceInfo{.blasIdx = 0, .customIndex = 0,
-            .shaderBindingTableRecordOffset = 0, .transform = vul::transform3D{}.transformMat()}}, false);
+            .shaderBindingTableRecordOffset = 0, .transform = vul::transform3D{}.transformMat()}}, false, cmdPool);
 
     std::array<std::unique_ptr<vul::VulImage>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> rtImgs;
     std::array<std::unique_ptr<vul::VulBuffer>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> ubos;
     std::array<std::unique_ptr<vul::VulDescriptorSet>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descSets;
+    commandBuffer = cmdPool.getPrimaryCommandBuffer();
     for (int i = 0; i < vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
         rtImgs[i] = std::make_unique<vul::VulImage>(vulDevice);
         rtImgs[i]->keepRegularRaw2d32bitRgbaEmpty(vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height);
-        VkCommandBuffer cmdBuf = vulDevice.beginSingleTimeCommands();
-        rtImgs[i]->createDefaultImage(vul::VulImage::ImageType::storage2d, cmdBuf);
-        vulDevice.endSingleTimeCommands(cmdBuf);
+        rtImgs[i]->createDefaultImage(vul::VulImage::ImageType::storage2d, commandBuffer);
 
-        ubos[i] = std::make_unique<vul::VulBuffer>(vulDevice);
-        ubos[i]->keepEmpty(sizeof(GlobalUbo), 1);
-        ubos[i]->createBuffer(false, vul::VulBuffer::usage_ubo);
+        ubos[i] = std::make_unique<vul::VulBuffer>(sizeof(GlobalUbo), 1, false, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, vulDevice);
         descSets[i] = createRtDescSet(mainScene, as, rtImgs[i], ubos[i], enviromentMap, descPool);
     }
+    cmdPool.submitAndWait(commandBuffer);
 
     std::unique_ptr<vul::VulPipeline> pipeline = createPipeline(vulRenderer, descSets, vulDevice);
     vul::VulRtPipeline rtPipeline(vulDevice, "raytrace.rgen.spv", {"raytrace.rmiss.spv", "raytraceShadow.rmiss.spv"},
             {"raytrace.rchit.spv"}, {"raytraceShadow.rahit.spv"}, {}, {{0, 0, -1}},
-            {descSets[0]->getLayout()->getDescriptorSetLayout()});
+            {descSets[0]->getLayout()->getDescriptorSetLayout()}, cmdPool);
 
-    vul::VulGUI vulGui(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice);
     struct CameraInfo {
         float fovY = 80.0f * (M_PI * 2.0f / 360.0f);
         float nearPlane = 0.1f;
@@ -186,7 +190,7 @@ int main() {
     double frameStartTime = glfwGetTime();
     while (!vulWindow.shouldClose()) {
         glfwPollEvents();
-        VkCommandBuffer commandBuffer = vulRenderer.beginFrame();
+        commandBuffer = vulRenderer.beginFrame();
         vulGui.startFrame();
         if (commandBuffer == nullptr) continue;
         int frameIdx = vulRenderer.getFrameIndex();
@@ -211,7 +215,7 @@ int main() {
         vulRenderer.stopRendering(commandBuffer);
 
         vulRenderer.endFrame();
-        if (vulRenderer.wasSwapChainRecreated()) resizeRtImgs(rtImgs, descSets, vulDevice, vulRenderer.getSwapChainExtent());
+        if (vulRenderer.wasSwapChainRecreated()) resizeRtImgs(rtImgs, descSets, vulDevice, vulRenderer.getSwapChainExtent(), cmdPool);
     }
     vulDevice.waitForIdle();
 

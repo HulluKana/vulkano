@@ -1,5 +1,6 @@
 #pragma once
 
+#include "vul_command_pool.hpp"
 #include"vul_device.hpp"
 #include"vul_swap_chain.hpp"
 #include"vul_window.hpp"
@@ -65,6 +66,7 @@ class VulRenderer{
         VulDevice& vulDevice;
         std::unique_ptr<VulSwapChain> vulSwapChain;
         std::vector<VkCommandBuffer> commandBuffers;
+        std::unique_ptr<VulCmdPool> m_cmdPool;
 
         std::vector<std::unique_ptr<VulImage>> m_depthImages;
         VkFormat m_depthFormat;

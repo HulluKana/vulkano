@@ -13,6 +13,7 @@
 #include <iostream>
 
 #include<tiny_gltf.h>
+#include <vulkan/vulkan_core.h>
 
 
 namespace vul
@@ -23,7 +24,7 @@ Scene::Scene(vul::VulDevice &vulDevice) : m_vulDevice{vulDevice}
 
 }
 
-void Scene::loadCubes(const std::vector<Cube> &cubes, const std::vector<vul::GltfLoader::Material> &mats, WantedBuffers wantedBuffers)
+void Scene::loadCubes(const std::vector<Cube> &cubes, const std::vector<vul::GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VkCommandBuffer cmdBuf)
 {
     const uint32_t oldIdxCount = indexBuffer.get() ? indexBuffer->getBufferSize() / sizeof(uint32_t) : 0;
     const uint32_t oldVertexCount = vertexBuffer.get() ? vertexBuffer->getBufferSize() / sizeof(glm::vec3) : 0;
@@ -123,10 +124,10 @@ void Scene::loadCubes(const std::vector<Cube> &cubes, const std::vector<vul::Glt
     std::vector<glm::vec4> uselessTangents(lVertices.size());
     std::vector<glm::vec2> uselessUvs(lVertices.size());
 
-    createBuffers(lIndices, lVertices, lNormals, uselessTangents, uselessUvs, mats, nods, wantedBuffers);
+    createBuffers(lIndices, lVertices, lNormals, uselessTangents, uselessUvs, mats, nods, wantedBuffers, cmdBuf);
 }
 
-void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vul::GltfLoader::Material> &mats, WantedBuffers wantedBuffers)
+void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vul::GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VkCommandBuffer cmdBuf)
 {
     const size_t oldIdxCount = indexBuffer.get() ? indexBuffer->getBufferSize() / sizeof(uint32_t) : 0;
     const size_t oldVertexCount = vertexBuffer.get() ? vertexBuffer->getBufferSize() / sizeof(glm::vec3) : 0;
@@ -224,10 +225,10 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vu
     std::vector<glm::vec4> uselessTangents(lVertices.size());
     std::vector<glm::vec2> uselessUvs(lVertices.size());
 
-    createBuffers(lIndices, lVertices, lVertices, uselessTangents, uselessUvs, mats, nods, wantedBuffers);
+    createBuffers(lIndices, lVertices, lVertices, uselessTangents, uselessUvs, mats, nods, wantedBuffers, cmdBuf);
 }
 
-void Scene::loadPlanes(const std::vector<Plane> &planes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers)
+void Scene::loadPlanes(const std::vector<Plane> &planes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VkCommandBuffer cmdBuf)
 {
     std::vector<uint32_t> lIndices;
     std::vector<glm::vec3> lVertices;
@@ -278,10 +279,10 @@ void Scene::loadPlanes(const std::vector<Plane> &planes, const std::vector<GltfL
     std::vector<glm::vec4> uselessTangents(lVertices.size());
     std::vector<glm::vec3> uselessNormals(lVertices.size());
 
-    createBuffers(lIndices, lVertices, uselessNormals, uselessTangents, lUvs, mats, nods, wantedBuffers);
+    createBuffers(lIndices, lVertices, uselessNormals, uselessTangents, lUvs, mats, nods, wantedBuffers, cmdBuf);
 }
 
-void Scene::loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers)
+void Scene::loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers, VulCmdPool &cmdPool)
 {
     tinygltf::Model model;
     tinygltf::TinyGLTF context;
@@ -294,7 +295,7 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory,
 
     GltfLoader gltfLoader;
     gltfLoader.importMaterials(model);
-    gltfLoader.importTextures(model, textureDirectory, m_vulDevice);
+    gltfLoader.importTextures(model, textureDirectory, m_vulDevice, cmdPool);
     gltfLoader.importDrawableNodes(model, GltfLoader::gltfAttribOr(GltfLoader::gltfAttribOr(GltfLoader::GltfAttributes::Normal,
                     GltfLoader::GltfAttributes::Tangent), GltfLoader::GltfAttributes::TexCoord));
 
@@ -321,12 +322,15 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory,
     materials.insert(materials.end(), gltfLoader.materials.begin(), gltfLoader.materials.end());
     images.insert(images.end(), gltfLoader.images.begin(), gltfLoader.images.end());
 
-    createBuffers(gltfLoader.indices, gltfLoader.positions, gltfLoader.normals, gltfLoader.tangents, gltfLoader.uvCoords, gltfLoader.materials, gltfLoader.nodes, wantedBuffers);
+    VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
+    createBuffers(gltfLoader.indices, gltfLoader.positions, gltfLoader.normals, gltfLoader.tangents, gltfLoader.uvCoords, gltfLoader.materials, gltfLoader.nodes, wantedBuffers, cmdBuf);
+    cmdPool.submitAndWait(cmdBuf);
 }
 
 void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vector<glm::vec3> &lVertices,
                 const std::vector<glm::vec3> &lNormals, const std::vector<glm::vec4> &lTangents, const std::vector<glm::vec2> &lUvs,
-                const std::vector<vul::GltfLoader::Material> &mats, const std::vector<vul::GltfLoader::GltfNode> &nods, WantedBuffers wantedBuffers)
+                const std::vector<GltfLoader::Material> &mats, const std::vector<GltfLoader::GltfNode> &nods,
+                WantedBuffers wantedBuffers, VkCommandBuffer cmdBuf)
 {
     std::vector<PackedMaterial> packedMaterials;
     for (const GltfLoader::Material &mat : mats) {
@@ -357,76 +361,69 @@ void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vect
         primInfos.push_back(primInfo);
     }
 
-    VulBuffer::Usage optionalFlags = VulBuffer::usage_none;
-    if (wantedBuffers.enableAddressTaking) optionalFlags =  VulBuffer::usage_getAddress;
-    if (wantedBuffers.enableUsageForAccelerationStructures) optionalFlags = static_cast<VulBuffer::Usage>(optionalFlags | VulBuffer::usage_accelerationStructureBuildRead);
+    VkBufferUsageFlags optionalFlags = 0;
+    if (wantedBuffers.enableAddressTaking) optionalFlags =  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+    if (wantedBuffers.enableUsageForAccelerationStructures) optionalFlags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
 
     if (lIndices.size() > 0 && wantedBuffers.index) {
         if (indexBuffer.get() == nullptr) {
-            indexBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
-            indexBuffer->loadVector(lIndices);
-            indexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_indexBuffer |
-                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo | optionalFlags));
-        } else indexBuffer->appendVector(lIndices);
+            indexBuffer = std::make_unique<vul::VulBuffer>(sizeof(*lIndices.data()), lIndices.size(), true, VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | optionalFlags, m_vulDevice);
+            indexBuffer->writeVector(lIndices, 0, cmdBuf);
+        } 
         indices.insert(indices.end(), lIndices.begin(), lIndices.end());
         VUL_NAME_VK(indexBuffer->getBuffer())
     }
     if (lVertices.size() > 0 && wantedBuffers.vertex) {
         if (vertexBuffer.get() == nullptr) {
-            vertexBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
-            vertexBuffer->loadVector(lVertices);
-            vertexBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
-                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo | optionalFlags));
-        } else vertexBuffer->appendVector(lVertices);
+            vertexBuffer = std::make_unique<vul::VulBuffer>(sizeof(*lVertices.data()), lVertices.size(), true, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | optionalFlags, m_vulDevice);
+            vertexBuffer->writeVector(lVertices, 0, cmdBuf);
+        } else vertexBuffer->appendVector(lVertices, cmdBuf);
         vertices.insert(vertices.end(), lVertices.begin(), lVertices.end());
         VUL_NAME_VK(vertexBuffer->getBuffer())
     }
     if (lNormals.size() > 0 && wantedBuffers.normal) {
         if (normalBuffer.get() == nullptr) {
-            normalBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
-            normalBuffer->loadVector(lNormals);
-            normalBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
-                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo));
-        } else normalBuffer->appendVector(lNormals);
+            normalBuffer = std::make_unique<vul::VulBuffer>(sizeof(*lNormals.data()), lNormals.size(), true, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, m_vulDevice);
+            normalBuffer->writeVector(lNormals, 0, cmdBuf);
+        } else normalBuffer->appendVector(lNormals, cmdBuf);
         normals.insert(normals.end(), lNormals.begin(), lNormals.end());
         VUL_NAME_VK(normalBuffer->getBuffer())
     }
     if (lTangents.size() > 0 && wantedBuffers.tangent) {
         if (tangentBuffer.get() == nullptr) {
-            tangentBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
-            tangentBuffer->loadVector(lTangents);
-            tangentBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
-                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo));
-        } else tangentBuffer->appendVector(lTangents);
+            tangentBuffer = std::make_unique<vul::VulBuffer>(sizeof(*lTangents.data()), lTangents.size(), true, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, m_vulDevice);
+            tangentBuffer->writeVector(lTangents, 0, cmdBuf);
+        } else tangentBuffer->appendVector(lTangents, cmdBuf);
         tangents.insert(tangents.end(), lTangents.begin(), lTangents.end());
         VUL_NAME_VK(tangentBuffer->getBuffer())
     }
     if (lUvs.size() > 0 && wantedBuffers.uv) {
         if (uvBuffer.get() == nullptr) {
-            uvBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
-            uvBuffer->loadVector(lUvs);
-            uvBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_vertexBuffer |
-                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc | VulBuffer::usage_ssbo));
-        } else uvBuffer->appendVector(lUvs);
+            uvBuffer = std::make_unique<vul::VulBuffer>(sizeof(*lUvs.data()), lUvs.size(), true, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, m_vulDevice);
+            uvBuffer->writeVector(lUvs, 0, cmdBuf);
+        } else uvBuffer->appendVector(lUvs, cmdBuf);
         uvs.insert(uvs.end(), lUvs.begin(), lUvs.end());
         VUL_NAME_VK(uvBuffer->getBuffer())
     }
     if (packedMaterials.size() > 0 && wantedBuffers.material) {
         if (materialBuffer.get() == nullptr) {
-            materialBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
-            materialBuffer->loadVector(packedMaterials);
-            materialBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo |
-                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc));
-        } else materialBuffer->appendVector(packedMaterials);
+            materialBuffer = std::make_unique<vul::VulBuffer>(sizeof(*packedMaterials.data()), packedMaterials.size(), true,
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, m_vulDevice);
+            materialBuffer->writeVector(packedMaterials, 0, cmdBuf);
+        } else materialBuffer->appendVector(packedMaterials, cmdBuf);
         VUL_NAME_VK(materialBuffer->getBuffer())
     }
     if (primInfos.size() > 0 && wantedBuffers.primInfo) {
         if (primInfoBuffer.get() == nullptr) {
-            primInfoBuffer = std::make_unique<vul::VulBuffer>(m_vulDevice);
-            primInfoBuffer->loadVector(primInfos);
-            primInfoBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo |
-                        VulBuffer::usage_transferDst | VulBuffer::usage_transferSrc));
-        } else primInfoBuffer->appendVector(primInfos);
+            primInfoBuffer = std::make_unique<vul::VulBuffer>(sizeof(*primInfos.data()), primInfos.size(), true,
+                    VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, m_vulDevice);
+            primInfoBuffer->writeVector(primInfos, 0, cmdBuf);
+        } else primInfoBuffer->appendVector(primInfos, cmdBuf);
         VUL_NAME_VK(primInfoBuffer->getBuffer())
     }
 }

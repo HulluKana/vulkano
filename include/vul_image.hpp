@@ -95,25 +95,13 @@ class VulImage {
             std::vector<std::vector<void *>> data;
         };
 
-        static std::unique_ptr<VulImage> createDefaultWholeImageAllInOneSingleTime(const VulDevice &vulDevice, std::variant<std::string,
-                RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format, bool addSampler,
-                InputDataType dataType, ImageType imageType);
         static std::unique_ptr<VulImage> createDefaultWholeImageAllInOne(const VulDevice &vulDevice, std::variant<std::string,
                 RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format, bool addSampler,
                 InputDataType dataType, ImageType imageType, VkCommandBuffer cmdBuf);
-        static std::unique_ptr<VulImage> createSamplerlessCustomImageAllInOneSingleTime(const VulDevice &vulDevice,
-                std::variant<const std::string &, const RawImageData &> data, std::variant<KtxCompressionFormat,
-                VkFormat> format, InputDataType dataType, VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
-                VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling);
         static std::unique_ptr<VulImage> createSamplerlessCustomImageAllInOne(const VulDevice &vulDevice, std::variant<const std::string &,
                 const RawImageData &> data, std::variant<KtxCompressionFormat, VkFormat> format, InputDataType dataType,
                 VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryProperties,
                 VkImageTiling tiling, VkCommandBuffer cmdBuf);
-        static std::unique_ptr<VulImage> createCustomImageAllInOneSingleTime(const VulDevice &vulDevice,
-                std::variant<const std::string &, const RawImageData &> data, std::variant<KtxCompressionFormat,
-                VkFormat> format, InputDataType dataType, VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
-                VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkFilter filter, VkSamplerAddressMode addressMode,
-                float maxAnisotropy, VkBorderColor borderColor, float mipLodBias, float mipMinLod, float mipMaxLod);
         static std::unique_ptr<VulImage> createCustomImageAllInOne(const VulDevice &vulDevice, std::variant<const std::string &,
                 const RawImageData &> data, std::variant<KtxCompressionFormat, VkFormat> format, InputDataType dataType,
                 VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage, VkMemoryPropertyFlags memoryProperties,
@@ -143,30 +131,23 @@ class VulImage {
         void keepEmpty(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth, uint32_t mipCount, uint32_t arrayCount,
                 VkFormat format, uint32_t baseOutputMipLevel, uint32_t baseOutputArrayLayer);
 
-        void createDefaultImageSingleTime(ImageType type);
         void createDefaultImage(ImageType type, VkCommandBuffer cmdBuf);
-        void createCustomImageSingleTime(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
-                VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect);
         void createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
                 VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf);
 
         void createFromVkImage(VkImage image, VkImageViewType type, VkFormat format, VkImageAspectFlags aspect,
                 uint32_t mipLevelCount, uint32_t arrayLayerCount);
 
-        void createMipMapsSingleTime();
         void createMipMaps(VkCommandBuffer cmdBuf);
         void createImageViewsForMipMaps();
 
-        void modifyImageSingleTime(const std::vector<DataSection> &modificationSections);
         void modifyImage(const std::vector<DataSection> &modificationSections, VkCommandBuffer cmdBuf);
-
-        void readImageSingleTime(std::vector<DataSection> &readSections);
         void readImage(std::vector<DataSection> &readSections, VkCommandBuffer cmdBuf);
 
         void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf);
 
         void deleteStagingResources() {m_stagingBuffers.clear();}
-        void deleteCpuData() {delete m_data.release(); m_dataSize = 0;}
+        void deleteCpuData() {m_data.reset(nullptr); m_dataSize = 0;}
 
         VkRenderingAttachmentInfo getAttachmentInfo(VkClearValue clearValue) const;
         VkDescriptorImageInfo getDescriptorInfo() const;

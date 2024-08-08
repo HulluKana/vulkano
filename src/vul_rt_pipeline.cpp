@@ -1,4 +1,5 @@
 #include "vul_buffer.hpp"
+#include "vul_command_pool.hpp"
 #include "vul_debug_tools.hpp"
 #include "vul_pipeline.hpp"
 #include <algorithm>
@@ -14,10 +15,10 @@ namespace vul {
 VulRtPipeline::VulRtPipeline(const vul::VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
                 const std::vector<std::string> &closestHitShaders, const std::vector<std::string> &anyHitShaders,
                 const std::vector<std::string> &intersectionShaders, const std::vector<HitGroup> &hitGroups,
-                const std::vector<VkDescriptorSetLayout> &setLayouts) : m_vulDevice{vulDevice}
+                const std::vector<VkDescriptorSetLayout> &setLayouts, VulCmdPool &cmdPool) : m_vulDevice{vulDevice}
 {
     createPipeline(raygenShader, missShaders, closestHitShaders, anyHitShaders, intersectionShaders, hitGroups, setLayouts);
-    createSBT(static_cast<uint32_t>(missShaders.size()), static_cast<uint32_t>(hitGroups.size()));
+    createSBT(static_cast<uint32_t>(missShaders.size()), static_cast<uint32_t>(hitGroups.size()), cmdPool);
 }
 
 VulRtPipeline::~VulRtPipeline()
@@ -136,7 +137,7 @@ void VulRtPipeline::createPipeline(const std::string &raygenShader, const std::v
     VUL_NAME_VK(m_layout)    
 }
 
-void VulRtPipeline::createSBT(uint32_t missCount, uint32_t hitCount)
+void VulRtPipeline::createSBT(uint32_t missCount, uint32_t hitCount, VulCmdPool &cmdPool)
 {
     std::function<uint32_t(uint32_t, uint32_t)> alignUp = [](uint32_t victim, uint32_t murderer) {return (victim + murderer - 1) & ~(victim - 1);};
 
@@ -164,9 +165,7 @@ void VulRtPipeline::createSBT(uint32_t missCount, uint32_t hitCount)
         throw std::runtime_error("Failed to get ray tracing shader group handles");
 
     VkDeviceSize sbtSize = m_rgenRegion.size + m_rmissRegion.size + m_rhitRegion.size + m_callRegion.size;
-    m_SBTBuffer = std::make_unique<VulBuffer>(m_vulDevice);
-    m_SBTBuffer->keepEmpty(1, sbtSize);
-    m_SBTBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_sbt | VulBuffer::usage_getAddress | VulBuffer::usage_transferDst));
+    m_SBTBuffer = std::make_unique<VulBuffer>(1, sbtSize, true, VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, m_vulDevice);
 
     VkDeviceAddress sbtAddress = m_SBTBuffer->getBufferAddress();
     m_rgenRegion.deviceAddress = sbtAddress;
@@ -191,7 +190,9 @@ void VulRtPipeline::createSBT(uint32_t missCount, uint32_t hitCount)
         pData += m_rhitRegion.stride;
     }
     
-    m_SBTBuffer->writeData(pSbtData, sbtSize, 0);
+    VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
+    m_SBTBuffer->writeData(pSbtData, sbtSize, 0, commandBuffer);
+    cmdPool.submitAndWait(commandBuffer);
     delete[] pSbtData;
 
     VUL_NAME_VK(m_SBTBuffer->getBuffer())

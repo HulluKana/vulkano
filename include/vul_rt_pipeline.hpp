@@ -1,6 +1,8 @@
 #pragma once
 
+#include "vul_command_pool.hpp"
 #include <vul_buffer.hpp>
+#include <vulkan/vulkan_core.h>
 
 namespace vul {
 
@@ -14,7 +16,7 @@ class VulRtPipeline {
         VulRtPipeline(const VulDevice &vulDevice, const std::string &raygenShader, const std::vector<std::string> &missShaders,
                 const std::vector<std::string> &closestHitShaders, const std::vector<std::string> &anyHitShaders,
                 const std::vector<std::string> &intersectionShaders, const std::vector<HitGroup> &hitGroups,
-                const std::vector<VkDescriptorSetLayout> &setLayouts);
+                const std::vector<VkDescriptorSetLayout> &setLayouts, VulCmdPool &cmdPool);
         ~VulRtPipeline();
 
         VulRtPipeline(const VulRtPipeline &) = delete;
@@ -28,7 +30,7 @@ class VulRtPipeline {
                 const std::vector<std::string> &closestHitShaders, const std::vector<std::string> &anyHitShaders,
                 const std::vector<std::string> &intersectionShaders, const std::vector<HitGroup> &hitGroups,
                 const std::vector<VkDescriptorSetLayout> &setLayouts);
-        void createSBT(uint32_t missCount, uint32_t hitCount);
+        void createSBT(uint32_t missCount, uint32_t hitCount, VulCmdPool &cmdPool);
 
         std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_shaderGroups;
         VkPipelineLayout m_layout;

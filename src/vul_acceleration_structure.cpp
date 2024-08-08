@@ -1,4 +1,5 @@
 #include "vul_buffer.hpp"
+#include "vul_command_pool.hpp"
 #include <algorithm>
 #include <cassert>
 #include <glm/matrix.hpp>
@@ -21,7 +22,7 @@ VulAs::~VulAs()
     for (As &as : m_blases) vkDestroyAccelerationStructureKHR(m_vulDevice.device(), as.as, nullptr);
 }
 
-void VulAs::loadScene(const Scene &scene, const std::vector<AsNode> &nodes, const std::vector<InstanceInfo> &instanceInfos, bool allowUpdating)
+void VulAs::loadScene(const Scene &scene, const std::vector<AsNode> &nodes, const std::vector<InstanceInfo> &instanceInfos, bool allowUpdating, VulCmdPool &cmdPool)
 {
     assert(nodes.size() > 0);
     assert(instanceInfos.size() > 0);
@@ -48,7 +49,7 @@ void VulAs::loadScene(const Scene &scene, const std::vector<AsNode> &nodes, cons
         blasInputs.emplace_back(gltfNodesToBlasInput(scene, orderedNodes, usedNodeCount, nodeCount, transformsBuf));
         usedNodeCount += nodeCount;
     }
-    buildBlases(blasInputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
+    buildBlases(blasInputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR, cmdPool);
 
     for (size_t i = 0; i < instanceInfos.size(); i++) {
         const InstanceInfo &instInf = instanceInfos[i];
@@ -57,10 +58,10 @@ void VulAs::loadScene(const Scene &scene, const std::vector<AsNode> &nodes, cons
 
     m_tlasBuildFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
     if (allowUpdating) m_tlasBuildFlags |= VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
-    buildTlas(m_instances, m_tlasBuildFlags, false);
+    buildTlas(m_instances, m_tlasBuildFlags, false, cmdPool);
 }
 
-void VulAs::loadAabbs(const std::vector<Aabb> &aabbs, const std::vector<InstanceInfo> &instanceInfos, bool allowUpdating)
+void VulAs::loadAabbs(const std::vector<Aabb> &aabbs, const std::vector<InstanceInfo> &instanceInfos, bool allowUpdating, VulCmdPool &cmdPool)
 {
     assert(aabbs.size() > 0);
     assert(instanceInfos.size() > 0);
@@ -84,9 +85,8 @@ void VulAs::loadAabbs(const std::vector<Aabb> &aabbs, const std::vector<Instance
         aabbCountPerBlas[i] = aabbCount;
     } 
 
-    VulBuffer aabbBuf(m_vulDevice);
-    aabbBuf.loadVector(orderedAabbs);
-    aabbBuf.createBuffer(false, static_cast<VulBuffer::Usage>(VulBuffer::usage_transferDst | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead));
+    VulBuffer aabbBuf(sizeof(VkAabb), orderedAabbs.size(), false, VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, m_vulDevice);
+    aabbBuf.writeVector(orderedAabbs, 0, VK_NULL_HANDLE);
 
     std::vector<BlasInput> blasInputs;
     size_t usedAabbCount = 0;
@@ -94,7 +94,7 @@ void VulAs::loadAabbs(const std::vector<Aabb> &aabbs, const std::vector<Instance
         blasInputs.emplace_back(aabbsToBlasInput(aabbBuf, aabbCount, usedAabbCount));
         usedAabbCount += aabbCount;
     }
-    buildBlases(blasInputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
+    buildBlases(blasInputs, VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR, cmdPool);
 
     for (size_t i = 0; i < instanceInfos.size(); i++) {
         const InstanceInfo &instInf = instanceInfos[i];
@@ -103,10 +103,10 @@ void VulAs::loadAabbs(const std::vector<Aabb> &aabbs, const std::vector<Instance
 
     m_tlasBuildFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
     if (allowUpdating) m_tlasBuildFlags |= VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
-    buildTlas(m_instances, m_tlasBuildFlags, false);
+    buildTlas(m_instances, m_tlasBuildFlags, false, cmdPool);
 }
 
-void VulAs::updateInstanceTransforms(const std::vector<InstanceTransform> &instanceTransforms)
+void VulAs::updateInstanceTransforms(const std::vector<InstanceTransform> &instanceTransforms, VulCmdPool &cmdPool)
 {
     assert((m_tlasBuildFlags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR) == VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
 
@@ -116,19 +116,18 @@ void VulAs::updateInstanceTransforms(const std::vector<InstanceTransform> &insta
         const glm::mat4 transposedTrans = glm::transpose(instTrans.transform);
         memcpy(&m_instances[instTrans.instanceIdx].transform, &transposedTrans, sizeof(VkTransformMatrixKHR));
     }
-    buildTlas(m_instances, m_tlasBuildFlags, true);
+    buildTlas(m_instances, m_tlasBuildFlags, true, cmdPool);
 }
 
-void VulAs::buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asInsts, VkBuildAccelerationStructureFlagsKHR flags, bool update)
+void VulAs::buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asInsts, VkBuildAccelerationStructureFlagsKHR flags, bool update, VulCmdPool &cmdPool)
 {
     assert((m_tlas.buffer == nullptr) ^ update);
 
-    VulBuffer instsBuf(m_vulDevice); 
-    instsBuf.loadVector(asInsts);
-    instsBuf.createBuffer(false, static_cast<VulBuffer::Usage>(VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead
-                | VulBuffer::usage_transferDst));
+    VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
 
-    VkCommandBuffer cmdBuf = m_vulDevice.beginSingleTimeCommands();
+    VulBuffer instsBuf(sizeof(VkAccelerationStructureInstanceKHR), asInsts.size(), false, VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, m_vulDevice); 
+    instsBuf.writeVector(asInsts, 0, VK_NULL_HANDLE);
+
     VkMemoryBarrier barrier{};
     barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -165,9 +164,7 @@ void VulAs::buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asI
         m_tlas = createAs(creatInf, true);
     }
 
-    VulBuffer scratchBuffer(m_vulDevice);
-    scratchBuffer.keepEmpty(1, sizeInfo.buildScratchSize);
-    scratchBuffer.createBuffer(false, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_getAddress));
+    VulBuffer scratchBuffer(1, sizeInfo.buildScratchSize, false, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, m_vulDevice);
 
     buildInfo.srcAccelerationStructure = update ? m_tlas.as : VK_NULL_HANDLE;
     buildInfo.dstAccelerationStructure = m_tlas.as;
@@ -181,10 +178,11 @@ void VulAs::buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asI
     const VkAccelerationStructureBuildRangeInfoKHR *pBuildRangeInf = &buildRangeInf;
 
     vkCmdBuildAccelerationStructuresKHR(cmdBuf, 1, &buildInfo, &pBuildRangeInf);
-    m_vulDevice.endSingleTimeCommands(cmdBuf);
+
+    cmdPool.submitAndWait(cmdBuf);
 }
 
-void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAccelerationStructureFlagsKHR flags)
+void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAccelerationStructureFlagsKHR flags, VulCmdPool &cmdPool)
 {
     std::vector<BlasBuildData> buildDatas(blasInputs.size());
     VkDeviceSize maxScratchSize{};
@@ -212,9 +210,7 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
                 == VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR) compactionsCount++;
     }
 
-    VulBuffer scratchBuffer(m_vulDevice);
-    scratchBuffer.keepEmpty(1, maxScratchSize);
-    scratchBuffer.createBuffer(false, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_getAddress));
+    VulBuffer scratchBuffer(1, maxScratchSize, false, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, m_vulDevice);
 
     VkQueryPool queryPool = VK_NULL_HANDLE;
     if (compactionsCount > 0) {
@@ -236,7 +232,7 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
         if (batchSize >= batchLimit || i == blasInputs.size() - 1) {
             if (queryPool) vkResetQueryPool(m_vulDevice.device(), queryPool, 0, static_cast<uint32_t>(indices.size()));
             uint32_t queryCount{};
-            VkCommandBuffer cmdBuf = m_vulDevice.beginSingleTimeCommands();
+            VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
             for (size_t idx : indices) {
                 VkAccelerationStructureCreateInfoKHR createInfo{};
                 createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
@@ -263,7 +259,7 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
                 VUL_NAME_VK_IDX(m_blases[idx].as, idx)
                 VUL_NAME_VK_IDX(m_blases[idx].buffer->getBuffer(), idx)
             }
-            m_vulDevice.endSingleTimeCommands(cmdBuf);
+            cmdPool.submitAndWait(cmdBuf);
 
             if (queryPool) {
                 std::vector<VkDeviceSize> compactSizes(indices.size());
@@ -271,7 +267,7 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
                         compactSizes.data(), sizeof(VkDeviceSize), VK_QUERY_RESULT_WAIT_BIT);
                 std::vector<As> bigAses;
                 uint32_t queryCnt{};
-                VkCommandBuffer cmdBuf = m_vulDevice.beginSingleTimeCommands();
+                VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
 
                 for (size_t idx : indices) {
                     VkAccelerationStructureCreateInfoKHR assCreate{};
@@ -293,7 +289,7 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
                     VUL_NAME_VK_IDX(m_blases[idx].as, idx)
                     VUL_NAME_VK_IDX(m_blases[idx].buffer->getBuffer(), idx)
                 }
-                m_vulDevice.endSingleTimeCommands(cmdBuf);
+                cmdPool.submitAndWait(cmdBuf);
                 for (As &as : bigAses) vkDestroyAccelerationStructureKHR(m_vulDevice.device(), as.as, nullptr);
             }
 
@@ -392,18 +388,17 @@ std::unique_ptr<VulBuffer> VulAs::createTransformsBuffer(const Scene &scene, con
         memcpy(&transforms[i], &trasposedTransformMat, sizeof(VkTransformMatrixKHR));
     }
 
-    std::unique_ptr<vul::VulBuffer> transformsBuffer = std::make_unique<VulBuffer>(m_vulDevice);
-    transformsBuffer->loadVector(transforms);
-    assert(transformsBuffer->createBuffer(true, static_cast<VulBuffer::Usage>(VulBuffer::usage_ssbo | VulBuffer::usage_transferDst | VulBuffer::usage_getAddress | VulBuffer::usage_accelerationStructureBuildRead)) == VK_SUCCESS);
+    std::unique_ptr<vul::VulBuffer> transformsBuffer = std::make_unique<VulBuffer>(sizeof(VkTransformMatrixKHR), transforms.size(), false,
+            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR, m_vulDevice);
+    VkResult result = transformsBuffer->writeVector(transforms, 0, VK_NULL_HANDLE);
+    assert(result == VK_SUCCESS);
     return transformsBuffer;
 }
 
 VulAs::As VulAs::createAs(VkAccelerationStructureCreateInfoKHR &createInfo, bool deviceLocal)
 {
     As as{};
-    as.buffer = std::make_unique<VulBuffer>(m_vulDevice);
-    as.buffer->keepEmpty(1, createInfo.size);
-    assert(as.buffer->createBuffer(deviceLocal, static_cast<VulBuffer::Usage>(VulBuffer::usage_accelerationStructureBuffer | VulBuffer::usage_getAddress)) == VK_SUCCESS);
+    as.buffer = std::make_unique<VulBuffer>(1, createInfo.size, deviceLocal, VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT, m_vulDevice);
 
     createInfo.sType = VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR;
     createInfo.buffer = as.buffer->getBuffer();

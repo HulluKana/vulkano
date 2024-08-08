@@ -72,7 +72,7 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
     }
 }
 
-void GltfLoader::importTextures(const tinygltf::Model &model, const std::string &textureDirectory, VulDevice &device)
+void GltfLoader::importTextures(const tinygltf::Model &model, const std::string &textureDirectory, VulDevice &device, VulCmdPool &cmdPool)
 {
     if (model.images.size() == 0) return;
 
@@ -143,9 +143,9 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
         vkEndCommandBuffer(cmdBufs[i]);
     }
 
-    VkCommandBuffer cmdBuf = device.beginSingleTimeCommands();
+    VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
     vkCmdExecuteCommands(cmdBuf, cmdBufs.size(), cmdBufs.data());
-    device.endSingleTimeCommands(cmdBuf);
+    cmdPool.submitAndWait(cmdBuf);
     for (size_t i = 0; i < pools.size(); i++) {
         vkFreeCommandBuffers(device.device(), pools[i], 1, &cmdBufs[i]);
         vkDestroyCommandPool(device.device(), pools[i], nullptr);

@@ -1,6 +1,8 @@
 #pragma once
 
+#include "vul_command_pool.hpp"
 #include"vul_device.hpp"
+#include <memory>
 #include <vulkan/vulkan_core.h>
 
 namespace vul
@@ -28,6 +30,7 @@ class VulCompPipeline
         VkPipeline m_pipeline;
         VkPipelineLayout m_layout;
 
+        std::unique_ptr<VulCmdPool> m_cmdPool;
         std::vector<VkCommandBuffer> m_cmdBufs;
         std::vector<VkFence> m_fences;
         uint32_t m_frame = 0;

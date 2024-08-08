@@ -1,11 +1,13 @@
 #pragma once
 
+#include "vul_command_pool.hpp"
 #include "vul_device.hpp"
 #include"vul_image.hpp"
 #include <cstdint>
 #include <string>
 #include <unordered_map>
 #include <memory>
+#include <vulkan/vulkan_core.h>
 
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
@@ -105,7 +107,7 @@ class GltfLoader
         std::vector<std::shared_ptr<VulImage>> images;
 
         void importMaterials(const tinygltf::Model &model);
-        void importTextures(const tinygltf::Model &model, const std::string &textureDirectory, VulDevice &device);
+        void importTextures(const tinygltf::Model &model, const std::string &textureDirectory, VulDevice &device, VulCmdPool &cmdPool);
         void importDrawableNodes(const tinygltf::Model &model, GltfAttributes requestedAttributes);
 
     private:

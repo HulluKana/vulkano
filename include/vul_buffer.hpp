@@ -10,65 +10,47 @@ namespace vul {
 
 class VulBuffer {
     public:
+        VulBuffer(uint32_t elementSize, uint32_t elementCount, bool isLocal, VkBufferUsageFlags usage, const VulDevice &vulDevice);
         VulBuffer(const VulDevice &vulDevice);
         ~VulBuffer();
 
         VulBuffer(const VulBuffer &) = delete;
         VulBuffer &operator=(const VulBuffer &) = delete;
         VulBuffer(VulBuffer &&) = default;
-        VulBuffer &operator=(VulBuffer &&) = default;
 
-        template<typename T> void loadVector(const std::vector<T> &vector) {loadData(vector.data(), sizeof(T), static_cast<uint32_t>(vector.size()));}
-        void loadData(const void *data, uint32_t elementSize, uint32_t elementCount);
-        void keepEmpty(uint32_t elementSize, uint32_t elementCount) {loadData(nullptr, elementSize, elementCount);}
+        VkResult createBuffer(uint32_t elementSize, uint32_t elementCount, bool isLocal, VkBufferUsageFlags usage);
 
-        enum Usage : VkBufferUsageFlags {
-            usage_none = 0,
-            usage_transferSrc = VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            usage_transferDst = VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            usage_getAddress = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT,
-            usage_accelerationStructureBuildRead = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR,
-            usage_ssbo = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
-            usage_ubo = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-            usage_indexBuffer = VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-            usage_vertexBuffer = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-            usage_accelerationStructureBuffer = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR,
-            usage_sbt = VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR
-        };
-        VkResult createBuffer(bool isLocal, Usage usage);
-
-        VkResult writeData(const void *data, VkDeviceSize size, VkDeviceSize offset);
-        template<typename T> VkResult writeVector(const std::vector<T> &vector, VkDeviceSize offset) {return writeData(vector.data(), sizeof(T) * vector.size(), sizeof(T) * offset);}
+        VkResult writeData(const void *data, VkDeviceSize size, VkDeviceSize offset, VkCommandBuffer cmdBuf);
+        template<typename T> VkResult writeVector(const std::vector<T> &vector, VkDeviceSize offset, VkCommandBuffer cmdBuf) {return writeData(vector.data(), sizeof(T) * vector.size(), sizeof(T) * offset, cmdBuf);}
         
-        VkResult readData(void *data, VkDeviceSize size, VkDeviceSize offset);
-        template<typename T> VkResult readVector(std::vector<T> &vector, size_t elementCount, VkDeviceSize offset)
+        VkResult readData(void *data, VkDeviceSize size, VkDeviceSize offset, VkCommandBuffer cmdBuf);
+        template<typename T> VkResult readVector(std::vector<T> &vector, size_t elementCount, VkDeviceSize offset, VkCommandBuffer cmdBuf)
         {
             if (sizeof(T) != m_elementSize) throw std::runtime_error("Size of the element in the read destination vector must be the same as the size of the element in the buffer");
             size_t oldSizeInBytes = vector.size();
             vector.resize(vector.size() + elementCount);
-            return readData(&vector[oldSizeInBytes], elementCount * sizeof(T), offset);
+            return readData(&vector[oldSizeInBytes], elementCount * sizeof(T), offset, cmdBuf);
         }
         template<typename T> VkResult readVectorAll(std::vector<T> &vector) {return readVector(vector, m_elementCount, 0);}
 
-        void copyDataFromBufferSingleTime(VulBuffer &srcBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset);
         void copyDataFromBuffer(VulBuffer &srcBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset, VkCommandBuffer cmdBuf);
 
         VkResult mapAll() {return map(m_bufferSize, 0);}
         VkResult map(VkDeviceSize size, VkDeviceSize offset);
         void unmap();
 
-        VkResult resizeBufferWithData(const void *data, uint32_t elementSize, uint32_t elementCount);
-        template<typename T> VkResult resizeBufferWithVector(const std::vector<T> &vector) {return resizeBufferWithData(vector.data(), sizeof(T), static_cast<uint32_t>(vector.size()));}
-        VkResult resizeBufferAsEmpty(uint32_t elementSize, uint32_t elementCount) {return resizeBufferWithData(nullptr, elementSize, elementCount);}
+        VkResult resizeBufferWithData(const void *data, uint32_t elementSize, uint32_t elementCount, VkCommandBuffer commandBuffer);
+        template<typename T> VkResult resizeBufferWithVector(const std::vector<T> &vector, VkCommandBuffer commandBuffer) {return resizeBufferWithData(vector.data(), sizeof(T), static_cast<uint32_t>(vector.size()), commandBuffer);}
+        VkResult resizeBufferAsEmpty(uint32_t elementSize, uint32_t elementCount) {return resizeBufferWithData(nullptr, elementSize, elementCount, VK_NULL_HANDLE);}
 
-        VkResult reallocElsewhere(bool isLocal);
+        VkResult reallocElsewhere(bool isLocal, VkCommandBuffer commandBuffer);
 
-        VkResult appendData(const void *data, uint32_t elementCount);
-        template<typename T> VkResult appendVector(const std::vector<T> &vector) {return appendData(vector.data(), static_cast<uint32_t>(vector.size()));}
-        VkResult appendEmpty(uint32_t elementCount) {return appendData(nullptr, elementCount);}
+        VkResult appendData(const void *data, uint32_t elementCount, VkCommandBuffer commandBuffer);
+        template<typename T> VkResult appendVector(const std::vector<T> &vector, VkCommandBuffer commandBuffer) {return appendData(vector.data(), static_cast<uint32_t>(vector.size()), commandBuffer);}
+        VkResult appendEmpty(uint32_t elementCount) {return appendData(nullptr, elementCount, VK_NULL_HANDLE);}
 
         VkResult addStagingBuffer();
-        void deleteStagingBuffer() {delete m_stagingBuffer.release(); m_stagingBuffer = nullptr;}
+        void deleteStagingBuffer() {m_stagingBuffer.reset(nullptr);}
 
         VkBuffer getBuffer() const { return m_buffer; }
         VkDeviceMemory getMemory() const {return m_memory; }
@@ -88,10 +70,8 @@ class VulBuffer {
     private:
         const VulDevice &m_vulDevice; 
 
-        const void *m_inputData = nullptr;
         uint32_t m_elementSize = 0;
         uint32_t m_elementCount = 0;
-        bool m_creationPreparationDone = false;
 
         void* m_mapped = nullptr;
         VkBuffer m_buffer = VK_NULL_HANDLE;

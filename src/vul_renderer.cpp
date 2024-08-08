@@ -1,3 +1,4 @@
+#include "vul_command_pool.hpp"
 #include "vul_image.hpp"
 #include <vul_debug_tools.hpp>
 #include <cstddef>
@@ -19,6 +20,7 @@ namespace vul{
 
 VulRenderer::VulRenderer(VulWindow &window, VulDevice &device, std::shared_ptr<vul::VulSampler> depthImgSampler) : vulWindow{window}, vulDevice{device}
 {
+    m_cmdPool = std::make_unique<VulCmdPool>(VulCmdPool::QueueFamilyType::ComputeFamily, device.computeQueue(), 0, 0, device);
     m_depthImgSampler = depthImgSampler;
     recreateSwapChain();
     createCommandBuffers();
@@ -26,7 +28,7 @@ VulRenderer::VulRenderer(VulWindow &window, VulDevice &device, std::shared_ptr<v
 
 VulRenderer::~VulRenderer()
 {
-    vkFreeCommandBuffers(vulDevice.device(), vulDevice.getCommandPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+    vkFreeCommandBuffers(vulDevice.device(), m_cmdPool->getPool(), static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
 }
 
 void VulRenderer::recreateSwapChain()
@@ -50,7 +52,7 @@ void VulRenderer::recreateSwapChain()
         }
     }
 
-    VkCommandBuffer cmdBuf = vulDevice.beginSingleTimeCommands();
+    VkCommandBuffer cmdBuf = m_cmdPool->getPrimaryCommandBuffer();
     m_depthFormat = vulDevice.findSupportedFormat({  VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT}, 
                                                             VK_IMAGE_TILING_OPTIMAL, VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
     VkImageUsageFlags depthUsage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
@@ -63,7 +65,7 @@ void VulRenderer::recreateSwapChain()
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, cmdBuf);
         m_depthImages[i]->vulSampler = m_depthImgSampler;
     }
-    vulDevice.endSingleTimeCommands(cmdBuf);
+    m_cmdPool->submitAndWait(cmdBuf);
 }
 
 void VulRenderer::createCommandBuffers() 
@@ -73,7 +75,7 @@ void VulRenderer::createCommandBuffers()
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = vulDevice.getCommandPool();
+    allocInfo.commandPool = m_cmdPool->getPool();
     allocInfo.commandBufferCount = static_cast<uint32_t>(commandBuffers.size());
 
     if (vkAllocateCommandBuffers(vulDevice.device(), &allocInfo, commandBuffers.data()) != VK_SUCCESS){

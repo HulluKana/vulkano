@@ -1,3 +1,4 @@
+#include "vul_command_pool.hpp"
 #include "vul_gltf_loader.hpp"
 #include <iterator>
 #include <vul_device.hpp>
@@ -32,14 +33,14 @@ class VulAs {
             uint32_t shaderBindingTableRecordOffset;
             glm::mat4 transform;
         };
-        void loadScene(const Scene &scene, const std::vector<AsNode> &nodes, const std::vector<InstanceInfo> &instanceInfos, bool allowUpdating);
-        void loadAabbs(const std::vector<Aabb> &aabbs, const std::vector<InstanceInfo> &instanceInfos, bool allowUpdating);
+        void loadScene(const Scene &scene, const std::vector<AsNode> &nodes, const std::vector<InstanceInfo> &instanceInfos, bool allowUpdating, VulCmdPool &cmdPool);
+        void loadAabbs(const std::vector<Aabb> &aabbs, const std::vector<InstanceInfo> &instanceInfos, bool allowUpdating, VulCmdPool &cmdPool);
 
         struct InstanceTransform {
             uint32_t instanceIdx;
             glm::mat4 transform;
         };
-        void updateInstanceTransforms(const std::vector<InstanceTransform> &instanceTransforms);
+        void updateInstanceTransforms(const std::vector<InstanceTransform> &instanceTransforms, VulCmdPool &cmdPool);
 
         const VkAccelerationStructureKHR *getPTlas() const {return &m_tlas.as;}
     private:
@@ -58,9 +59,9 @@ class VulAs {
             const VkAccelerationStructureBuildRangeInfoKHR* rangeInfo;
         };
 
-        void buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asInsts, VkBuildAccelerationStructureFlagsKHR flags, bool update);
+        void buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asInsts, VkBuildAccelerationStructureFlagsKHR flags, bool update, VulCmdPool &cmdPool);
 
-        void buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAccelerationStructureFlagsKHR flags);
+        void buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAccelerationStructureFlagsKHR flags, VulCmdPool &cmdPool);
         As buildBlas(BlasBuildData &buildData, VkDeviceAddress scratchBufferAddress, VkQueryPool queryPool, uint32_t queryIndex, VkCommandBuffer cmdBuf);
 
         VkAccelerationStructureInstanceKHR blasToAsInstance(uint32_t index, uint32_t sbtOffset, const glm::mat4 &transform, const As &blas);
