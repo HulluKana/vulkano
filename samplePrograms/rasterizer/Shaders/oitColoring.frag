@@ -4,7 +4,7 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 
 #include"../include/host_device.hpp"
-#include"../../../essentials/include/vul_scene.hpp"
+#include"../../../include/vul_scene.hpp"
 #include"common.glsl"
 
 layout (location = 0) in vec3 fragPosWorld;

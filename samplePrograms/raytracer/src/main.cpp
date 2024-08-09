@@ -142,14 +142,15 @@ int main() {
     std::unique_ptr<vul::VulDescriptorPool> descPool = vul::VulDescriptorPool::Builder(vulDevice).setMaxSets(8).setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT).build();
     vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueFamilyType::GraphicsFamily, vulDevice.graphicsQueue(), 0, 0, vulDevice);
     vul::VulGUI vulGui(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice, cmdPool);
+    vul::VulCamera camera{};
 
     vul::Scene mainScene(vulDevice);
     mainScene.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza/", {.primInfo = true, .enableAddressTaking = true, .enableUsageForAccelerationStructures = true}, cmdPool);
 
-    VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
     vul::Scene fullScreenQuad(vulDevice);
-    fullScreenQuad.loadPlanes({{{-1.0f, -1.0f, 0.5f}, {1.0f, -1.0f, 0.5f}, {-1.0f, 1.0f, 0.5f}, {1.0f, 1.0f, 0.5f}, 0}}, {}, {.normal = false, .tangent = false, .material = false}, commandBuffer);
+    fullScreenQuad.loadPlanes({{{-1.0f, -1.0f, 0.5f}, {1.0f, -1.0f, 0.5f}, {-1.0f, 1.0f, 0.5f}, {1.0f, 1.0f, 0.5f}, 0}}, {}, {.normal = false, .tangent = false, .material = false}, cmdPool);
 
+    VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
     std::unique_ptr<vul::VulImage> enviromentMap = vul::VulImage::createDefaultWholeImageAllInOne(vulDevice, "../enviromentMaps/sunsetCube.exr",
             {}, true, vul::VulImage::InputDataType::exrFile, vul::VulImage::ImageType::hdrCube, commandBuffer);
     cmdPool.submitAndWait(commandBuffer);
@@ -179,14 +180,6 @@ int main() {
             {"raytrace.rchit.spv"}, {"raytraceShadow.rahit.spv"}, {}, {{0, 0, -1}},
             {descSets[0]->getLayout()->getDescriptorSetLayout()}, cmdPool);
 
-    struct CameraInfo {
-        float fovY = 80.0f * (M_PI * 2.0f / 360.0f);
-        float nearPlane = 0.1f;
-        float farPlane = 100.0f;
-    } camInfo;
-    vul::VulCamera camera;
-    camera.setPerspectiveProjection(camInfo.fovY, vulRenderer.getAspectRatio(), camInfo.nearPlane, camInfo.farPlane);
-
     double frameStartTime = glfwGetTime();
     while (!vulWindow.shouldClose()) {
         glfwPollEvents();
@@ -200,9 +193,9 @@ int main() {
         if (!camera.shouldHideGui()) GuiStuff(frameTime);
 
         camera.applyInputs(vulWindow.getGLFWwindow(), frameTime, vulRenderer.getSwapChainExtent().height);
-        camera.setPerspectiveProjection(camInfo.fovY, vulRenderer.getAspectRatio(), camInfo.nearPlane, camInfo.farPlane);
+        camera.setPerspectiveProjection(80.0f * (M_PI * 2.0f / 360.0f), vulRenderer.getAspectRatio(), 0.01f, 100.0f);
         camera.updateXYZ();
-        updateUniformBuffer(ubos[frameIdx], mainScene, camera, vulRenderer.getSwapChainExtent().height, camInfo.fovY);
+        updateUniformBuffer(ubos[frameIdx], mainScene, camera, vulRenderer.getSwapChainExtent().height, 80.0f * (M_PI * 2.0f / 360.0f));
 
         std::vector<VkDescriptorSet> vkDescSets = {descSets[(frameIdx + 1) % vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT]->getSet()};
         rtPipeline.traceRays(vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height, 0, nullptr, vkDescSets, commandBuffer);
@@ -210,7 +203,7 @@ int main() {
         vulRenderer.beginRendering(commandBuffer, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent, vul::VulRenderer::DepthImageMode::noDepthImage,
                 glm::vec4(0.0, 0.0, 0.0, 1.0), {}, vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height);
         pipeline->draw(commandBuffer, vkDescSets, {fullScreenQuad.vertexBuffer->getBuffer(), fullScreenQuad.uvBuffer->getBuffer()}, fullScreenQuad.indexBuffer->getBuffer(),
-                {vul::VulPipeline::DrawData{.indexCount = fullScreenQuad.meshes[0].indexCount, .firstIndex = fullScreenQuad.meshes[0].firstIndex}});
+                {vul::VulPipeline::DrawData{.indexCount = 6}});
         vulGui.endFrame(commandBuffer);
         vulRenderer.stopRendering(commandBuffer);
 

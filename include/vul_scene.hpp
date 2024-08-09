@@ -1,14 +1,13 @@
 #ifndef VUL_SCENE_H
 #define VUL_SCENE_H
 
-#include "vul_command_pool.hpp"
-#include <vulkan/vulkan_core.h>
 #ifdef __cplusplus
 #include <cstdint>
 #include <memory>
 
 #include"vul_gltf_loader.hpp"
 #include"vul_buffer.hpp"
+#include "vul_command_pool.hpp"
 
 namespace vul
 {
@@ -47,9 +46,9 @@ class Scene
             bool enableAddressTaking = false;
             bool enableUsageForAccelerationStructures = false;
         };
-        void loadCubes(const std::vector<Cube> &cubes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VkCommandBuffer cmdBuf);
-        void loadSpheres(const std::vector<Sphere> &spheres, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VkCommandBuffer cmdBuf);
-        void loadPlanes(const std::vector<Plane> &planes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VkCommandBuffer cmdBuf);
+        void loadCubes(const std::vector<Cube> &cubes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
+        void loadSpheres(const std::vector<Sphere> &spheres, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
+        void loadPlanes(const std::vector<Plane> &planes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
         void loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
 
         std::vector<GltfLoader::GltfLight> lights;
@@ -109,7 +108,7 @@ class Scene
         void createBuffers(const std::vector<uint32_t> &lIndices, const std::vector<glm::vec3> &lVertices,
                 const std::vector<glm::vec3> &lNormals, const std::vector<glm::vec4> &lTangents, const std::vector<glm::vec2> &lUvs,
                 const std::vector<GltfLoader::Material> &mats, const std::vector<GltfLoader::GltfNode> &nods,
-                WantedBuffers wantedBuffers, VkCommandBuffer cmdBuf);
+                WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
 };
 
 }

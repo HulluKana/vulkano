@@ -1,3 +1,4 @@
+#include "vul_command_pool.hpp"
 #include <vul_debug_tools.hpp>
 #include<vul_buffer.hpp>
 
@@ -84,14 +85,13 @@ VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize 
 {
     VUL_PROFILE_FUNC()
 
+    if (data == nullptr) return VK_SUCCESS;
+
     if (m_buffer == nullptr) throw std::runtime_error("Tried to write to buffer before it was created");
     if (m_isDeviceLocal) {
-        if (!hasStagingBuffer()) {
-            VkResult result = addStagingBuffer();
-            if (result != VK_SUCCESS) return result;
-        }
-
-        VkResult result = m_stagingBuffer->writeData(data, size, offset, commandBuffer);
+        VkResult result = addStagingBuffer();
+        if (result != VK_SUCCESS) return result;
+        result = m_stagingBuffer->writeData(data, size, offset, commandBuffer);
         if (result != VK_SUCCESS) return result;
         copyDataFromBuffer(*m_stagingBuffer, size, offset, offset, commandBuffer);
     }
@@ -109,7 +109,7 @@ VkResult VulBuffer::writeData(const void *data, VkDeviceSize size, VkDeviceSize 
     return VK_SUCCESS;
 }
 
-VkResult VulBuffer::readData(void *data, VkDeviceSize size, VkDeviceSize offset, VkCommandBuffer commandBuffer)
+VkResult VulBuffer::readData(void *data, VkDeviceSize size, VkDeviceSize offset, VulCmdPool &cmdPool)
 {
     if (size + offset > m_bufferSize) throw std::runtime_error("Size + offset of the read data must be at most equal to the size of the buffer");
     if (size == 0) return VK_SUCCESS;
@@ -117,7 +117,9 @@ VkResult VulBuffer::readData(void *data, VkDeviceSize size, VkDeviceSize offset,
     if (m_isDeviceLocal) {
         VkResult result = addStagingBuffer();
         if (result != VK_SUCCESS) return result;
-        m_stagingBuffer->copyDataFromBuffer(*this, size, offset, 0, commandBuffer);
+        VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
+        m_stagingBuffer->copyDataFromBuffer(*this, size, offset, 0, cmdBuf);
+        cmdPool.submitAndWait(cmdBuf);
         memcpy(data, m_stagingBuffer->getMappedMemory(), size);
     } else {
         VkResult result = map(size, offset);
@@ -176,18 +178,9 @@ VkResult VulBuffer::resizeBufferWithData(const void *data, uint32_t elementSize,
 
     m_elementSize = elementSize;
     m_elementCount = elementCount;
-    bool hasStaging = false;
-    if (hasStagingBuffer()) {
-        hasStaging = true;
-        deleteStagingBuffer();
-    }
 
     VkResult result = createBuffer(elementSize, elementCount, m_isDeviceLocal, m_usageFlags);
     if (result != VK_SUCCESS) return result;
-    if (hasStaging) {
-        VkResult result = addStagingBuffer();
-        if (result != VK_SUCCESS) return result;
-    }
     return writeData(data, m_bufferSize, 0, commandBuffer);
 }
 
@@ -195,13 +188,19 @@ VkResult VulBuffer::reallocElsewhere(bool isLocal, VkCommandBuffer commandBuffer
 {
     VUL_PROFILE_FUNC()
 
-    std::unique_ptr<uint8_t> data = std::unique_ptr<uint8_t>(new uint8_t[m_bufferSize]);
-    readData(data.get(), m_bufferSize, 0, commandBuffer);
+    VkResult result = addStagingBuffer();
+    if (result != VK_SUCCESS) return result;
+    copyDataFromBuffer(*this, m_bufferSize, 0, 0, commandBuffer);
+
     m_isDeviceLocal = isLocal;
-    return resizeBufferWithData(data.get(), m_elementSize, m_elementCount, commandBuffer);
+    result = resizeBufferWithData(nullptr, m_elementSize, m_elementCount, commandBuffer);
+    if (result != VK_SUCCESS) return result;
+
+    copyDataFromBuffer(*m_stagingBuffer.get(), m_bufferSize, 0, 0, commandBuffer);
+    return VK_SUCCESS;
 }
 
-VkResult VulBuffer::appendData(const void *data, uint32_t elementCount, VkCommandBuffer commandBuffer)
+VkResult VulBuffer::appendData(const void *data, uint32_t elementCount, VulCmdPool &cmdPool)
 {
     VUL_PROFILE_FUNC()
 
@@ -210,11 +209,21 @@ VkResult VulBuffer::appendData(const void *data, uint32_t elementCount, VkComman
     std::unique_ptr<uint8_t> newData = std::unique_ptr<uint8_t>(new uint8_t[m_bufferSize + m_elementSize * elementCount]);
     if (!newData.get()) return VK_ERROR_OUT_OF_HOST_MEMORY;
 
-    VkResult result = readData(newData.get(), m_bufferSize, 0, commandBuffer);
+    if (hasStagingBuffer()) {
+        VkResult result = m_stagingBuffer->resizeBufferAsEmpty(m_elementSize, m_elementCount + elementCount);
+        if (result != VK_SUCCESS) return result;
+        result = m_stagingBuffer->mapAll();
+        if (result != VK_SUCCESS) return result;
+    }
+
+    VkResult result = readData(newData.get(), m_bufferSize, 0, cmdPool);
     if (result != VK_SUCCESS) return result;
     if (data != nullptr) memcpy(newData.get() + m_bufferSize, data, m_elementSize * elementCount);
 
-    return resizeBufferWithData(newData.get(), m_elementSize, elementCount + m_elementCount, commandBuffer);
+    VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
+    result = resizeBufferWithData(newData.get(), m_elementSize, elementCount + m_elementCount, cmdBuf);
+    cmdPool.submitAndWait(cmdBuf);
+    return result;
 }
 
 VkResult VulBuffer::addStagingBuffer()

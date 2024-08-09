@@ -1,5 +1,6 @@
 #pragma once
 
+#include "vul_command_pool.hpp"
 #include"vul_device.hpp"
 
 #include <memory>
@@ -23,15 +24,15 @@ class VulBuffer {
         VkResult writeData(const void *data, VkDeviceSize size, VkDeviceSize offset, VkCommandBuffer cmdBuf);
         template<typename T> VkResult writeVector(const std::vector<T> &vector, VkDeviceSize offset, VkCommandBuffer cmdBuf) {return writeData(vector.data(), sizeof(T) * vector.size(), sizeof(T) * offset, cmdBuf);}
         
-        VkResult readData(void *data, VkDeviceSize size, VkDeviceSize offset, VkCommandBuffer cmdBuf);
-        template<typename T> VkResult readVector(std::vector<T> &vector, size_t elementCount, VkDeviceSize offset, VkCommandBuffer cmdBuf)
+        VkResult readData(void *data, VkDeviceSize size, VkDeviceSize offset, VulCmdPool &cmdPool);
+        template<typename T> VkResult readVector(std::vector<T> &vector, size_t elementCount, VkDeviceSize offset, VulCmdPool &cmdPool)
         {
             if (sizeof(T) != m_elementSize) throw std::runtime_error("Size of the element in the read destination vector must be the same as the size of the element in the buffer");
             size_t oldSizeInBytes = vector.size();
             vector.resize(vector.size() + elementCount);
-            return readData(&vector[oldSizeInBytes], elementCount * sizeof(T), offset, cmdBuf);
+            return readData(&vector[oldSizeInBytes], elementCount * sizeof(T), offset, cmdPool);
         }
-        template<typename T> VkResult readVectorAll(std::vector<T> &vector) {return readVector(vector, m_elementCount, 0);}
+        template<typename T> VkResult readVectorAll(std::vector<T> &vector, VulCmdPool &cmdPool) {return readVector(vector, m_elementCount, 0, cmdPool);}
 
         void copyDataFromBuffer(VulBuffer &srcBuffer, VkDeviceSize size, VkDeviceSize srcOffset, VkDeviceSize dstOffset, VkCommandBuffer cmdBuf);
 
@@ -45,9 +46,9 @@ class VulBuffer {
 
         VkResult reallocElsewhere(bool isLocal, VkCommandBuffer commandBuffer);
 
-        VkResult appendData(const void *data, uint32_t elementCount, VkCommandBuffer commandBuffer);
-        template<typename T> VkResult appendVector(const std::vector<T> &vector, VkCommandBuffer commandBuffer) {return appendData(vector.data(), static_cast<uint32_t>(vector.size()), commandBuffer);}
-        VkResult appendEmpty(uint32_t elementCount) {return appendData(nullptr, elementCount, VK_NULL_HANDLE);}
+        VkResult appendData(const void *data, uint32_t elementCount, VulCmdPool &cmdPool);
+        template<typename T> VkResult appendVector(const std::vector<T> &vector, VulCmdPool &cmdPool) {return appendData(vector.data(), static_cast<uint32_t>(vector.size()), cmdPool);}
+        VkResult appendEmpty(uint32_t elementCount, VulCmdPool &cmdPool) {return appendData(nullptr, elementCount, cmdPool);}
 
         VkResult addStagingBuffer();
         void deleteStagingBuffer() {m_stagingBuffer.reset(nullptr);}

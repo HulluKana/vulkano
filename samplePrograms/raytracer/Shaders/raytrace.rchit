@@ -7,7 +7,7 @@
 
 #include "common.glsl"
 #include "../include/host_device.hpp"
-#include"../../../essentials/include/vul_scene.hpp"
+#include"../../../include/vul_scene.hpp"
 
 layout(binding = 1, set = 0) uniform Ubo {GlobalUbo ubo;};
 layout(binding = 2, set = 0) readonly buffer Indices            {uint indices[];};

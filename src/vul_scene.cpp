@@ -1,4 +1,5 @@
 #include "vul_buffer.hpp"
+#include "vul_command_pool.hpp"
 #include "vul_transform.hpp"
 #include <cmath>
 #include <cstdint>
@@ -24,7 +25,7 @@ Scene::Scene(vul::VulDevice &vulDevice) : m_vulDevice{vulDevice}
 
 }
 
-void Scene::loadCubes(const std::vector<Cube> &cubes, const std::vector<vul::GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VkCommandBuffer cmdBuf)
+void Scene::loadCubes(const std::vector<Cube> &cubes, const std::vector<vul::GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VulCmdPool &cmdPool)
 {
     const uint32_t oldIdxCount = indexBuffer.get() ? indexBuffer->getBufferSize() / sizeof(uint32_t) : 0;
     const uint32_t oldVertexCount = vertexBuffer.get() ? vertexBuffer->getBufferSize() / sizeof(glm::vec3) : 0;
@@ -124,10 +125,10 @@ void Scene::loadCubes(const std::vector<Cube> &cubes, const std::vector<vul::Glt
     std::vector<glm::vec4> uselessTangents(lVertices.size());
     std::vector<glm::vec2> uselessUvs(lVertices.size());
 
-    createBuffers(lIndices, lVertices, lNormals, uselessTangents, uselessUvs, mats, nods, wantedBuffers, cmdBuf);
+    createBuffers(lIndices, lVertices, lNormals, uselessTangents, uselessUvs, mats, nods, wantedBuffers, cmdPool);
 }
 
-void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vul::GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VkCommandBuffer cmdBuf)
+void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vul::GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VulCmdPool &cmdPool)
 {
     const size_t oldIdxCount = indexBuffer.get() ? indexBuffer->getBufferSize() / sizeof(uint32_t) : 0;
     const size_t oldVertexCount = vertexBuffer.get() ? vertexBuffer->getBufferSize() / sizeof(glm::vec3) : 0;
@@ -225,10 +226,10 @@ void Scene::loadSpheres(const std::vector<Sphere> &spheres, const std::vector<vu
     std::vector<glm::vec4> uselessTangents(lVertices.size());
     std::vector<glm::vec2> uselessUvs(lVertices.size());
 
-    createBuffers(lIndices, lVertices, lVertices, uselessTangents, uselessUvs, mats, nods, wantedBuffers, cmdBuf);
+    createBuffers(lIndices, lVertices, lVertices, uselessTangents, uselessUvs, mats, nods, wantedBuffers, cmdPool);
 }
 
-void Scene::loadPlanes(const std::vector<Plane> &planes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VkCommandBuffer cmdBuf)
+void Scene::loadPlanes(const std::vector<Plane> &planes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VulCmdPool &cmdPool)
 {
     std::vector<uint32_t> lIndices;
     std::vector<glm::vec3> lVertices;
@@ -279,7 +280,7 @@ void Scene::loadPlanes(const std::vector<Plane> &planes, const std::vector<GltfL
     std::vector<glm::vec4> uselessTangents(lVertices.size());
     std::vector<glm::vec3> uselessNormals(lVertices.size());
 
-    createBuffers(lIndices, lVertices, uselessNormals, uselessTangents, lUvs, mats, nods, wantedBuffers, cmdBuf);
+    createBuffers(lIndices, lVertices, uselessNormals, uselessTangents, lUvs, mats, nods, wantedBuffers, cmdPool);
 }
 
 void Scene::loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers, VulCmdPool &cmdPool)
@@ -322,15 +323,13 @@ void Scene::loadScene(const std::string &fileName, std::string textureDirectory,
     materials.insert(materials.end(), gltfLoader.materials.begin(), gltfLoader.materials.end());
     images.insert(images.end(), gltfLoader.images.begin(), gltfLoader.images.end());
 
-    VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
-    createBuffers(gltfLoader.indices, gltfLoader.positions, gltfLoader.normals, gltfLoader.tangents, gltfLoader.uvCoords, gltfLoader.materials, gltfLoader.nodes, wantedBuffers, cmdBuf);
-    cmdPool.submitAndWait(cmdBuf);
+    createBuffers(gltfLoader.indices, gltfLoader.positions, gltfLoader.normals, gltfLoader.tangents, gltfLoader.uvCoords, gltfLoader.materials, gltfLoader.nodes, wantedBuffers, cmdPool);
 }
 
 void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vector<glm::vec3> &lVertices,
                 const std::vector<glm::vec3> &lNormals, const std::vector<glm::vec4> &lTangents, const std::vector<glm::vec2> &lUvs,
                 const std::vector<GltfLoader::Material> &mats, const std::vector<GltfLoader::GltfNode> &nods,
-                WantedBuffers wantedBuffers, VkCommandBuffer cmdBuf)
+                WantedBuffers wantedBuffers, VulCmdPool &cmdPool)
 {
     std::vector<PackedMaterial> packedMaterials;
     for (const GltfLoader::Material &mat : mats) {
@@ -365,12 +364,13 @@ void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vect
     if (wantedBuffers.enableAddressTaking) optionalFlags =  VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
     if (wantedBuffers.enableUsageForAccelerationStructures) optionalFlags |= VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
 
+    VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
     if (lIndices.size() > 0 && wantedBuffers.index) {
         if (indexBuffer.get() == nullptr) {
             indexBuffer = std::make_unique<vul::VulBuffer>(sizeof(*lIndices.data()), lIndices.size(), true, VK_BUFFER_USAGE_INDEX_BUFFER_BIT |
                     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | optionalFlags, m_vulDevice);
             indexBuffer->writeVector(lIndices, 0, cmdBuf);
-        } 
+        } else indexBuffer->appendVector(lIndices, cmdPool);
         indices.insert(indices.end(), lIndices.begin(), lIndices.end());
         VUL_NAME_VK(indexBuffer->getBuffer())
     }
@@ -379,7 +379,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vect
             vertexBuffer = std::make_unique<vul::VulBuffer>(sizeof(*lVertices.data()), lVertices.size(), true, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | optionalFlags, m_vulDevice);
             vertexBuffer->writeVector(lVertices, 0, cmdBuf);
-        } else vertexBuffer->appendVector(lVertices, cmdBuf);
+        } else vertexBuffer->appendVector(lVertices, cmdPool);
         vertices.insert(vertices.end(), lVertices.begin(), lVertices.end());
         VUL_NAME_VK(vertexBuffer->getBuffer())
     }
@@ -388,7 +388,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vect
             normalBuffer = std::make_unique<vul::VulBuffer>(sizeof(*lNormals.data()), lNormals.size(), true, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, m_vulDevice);
             normalBuffer->writeVector(lNormals, 0, cmdBuf);
-        } else normalBuffer->appendVector(lNormals, cmdBuf);
+        } else normalBuffer->appendVector(lNormals, cmdPool);
         normals.insert(normals.end(), lNormals.begin(), lNormals.end());
         VUL_NAME_VK(normalBuffer->getBuffer())
     }
@@ -397,7 +397,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vect
             tangentBuffer = std::make_unique<vul::VulBuffer>(sizeof(*lTangents.data()), lTangents.size(), true, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, m_vulDevice);
             tangentBuffer->writeVector(lTangents, 0, cmdBuf);
-        } else tangentBuffer->appendVector(lTangents, cmdBuf);
+        } else tangentBuffer->appendVector(lTangents, cmdPool);
         tangents.insert(tangents.end(), lTangents.begin(), lTangents.end());
         VUL_NAME_VK(tangentBuffer->getBuffer())
     }
@@ -406,7 +406,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vect
             uvBuffer = std::make_unique<vul::VulBuffer>(sizeof(*lUvs.data()), lUvs.size(), true, VK_BUFFER_USAGE_VERTEX_BUFFER_BIT |
                     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, m_vulDevice);
             uvBuffer->writeVector(lUvs, 0, cmdBuf);
-        } else uvBuffer->appendVector(lUvs, cmdBuf);
+        } else uvBuffer->appendVector(lUvs, cmdPool);
         uvs.insert(uvs.end(), lUvs.begin(), lUvs.end());
         VUL_NAME_VK(uvBuffer->getBuffer())
     }
@@ -415,7 +415,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vect
             materialBuffer = std::make_unique<vul::VulBuffer>(sizeof(*packedMaterials.data()), packedMaterials.size(), true,
                     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, m_vulDevice);
             materialBuffer->writeVector(packedMaterials, 0, cmdBuf);
-        } else materialBuffer->appendVector(packedMaterials, cmdBuf);
+        } else materialBuffer->appendVector(packedMaterials, cmdPool);
         VUL_NAME_VK(materialBuffer->getBuffer())
     }
     if (primInfos.size() > 0 && wantedBuffers.primInfo) {
@@ -423,9 +423,10 @@ void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vect
             primInfoBuffer = std::make_unique<vul::VulBuffer>(sizeof(*primInfos.data()), primInfos.size(), true,
                     VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, m_vulDevice);
             primInfoBuffer->writeVector(primInfos, 0, cmdBuf);
-        } else primInfoBuffer->appendVector(primInfos, cmdBuf);
+        } else primInfoBuffer->appendVector(primInfos, cmdPool);
         VUL_NAME_VK(primInfoBuffer->getBuffer())
     }
+    cmdPool.submitAndWait(cmdBuf);
 }
 
 }
