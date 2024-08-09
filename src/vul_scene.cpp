@@ -20,7 +20,7 @@
 namespace vul
 {
 
-Scene::Scene(vul::VulDevice &vulDevice) : m_vulDevice{vulDevice}
+Scene::Scene(const vul::VulDevice &vulDevice) : m_vulDevice{vulDevice}
 {
 
 }

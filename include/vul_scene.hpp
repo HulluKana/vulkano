@@ -15,7 +15,7 @@ namespace vul
 class Scene
 {
     public:
-        Scene(VulDevice &vulDevice);
+        Scene(const VulDevice &vulDevice);
 
         struct Cube {
             glm::vec3 centerPos;
@@ -103,7 +103,7 @@ class Scene
         #ifdef __cplusplus
 
     private:
-        VulDevice &m_vulDevice; 
+        const VulDevice &m_vulDevice; 
 
         void createBuffers(const std::vector<uint32_t> &lIndices, const std::vector<glm::vec3> &lVertices,
                 const std::vector<glm::vec3> &lNormals, const std::vector<glm::vec4> &lTangents, const std::vector<glm::vec2> &lUvs,

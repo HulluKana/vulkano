@@ -1,6 +1,7 @@
-#include "vul_comp_pipeline.hpp"
-#include "vul_image.hpp"
-#include <iostream>
+#include "vul_descriptors.hpp"
+#include <vul_device.hpp>
+#include <vul_renderer.hpp>
+#include <vul_camera.hpp>
 #include <limits>
 #include <memory>
 #include <mesh_shading.hpp>
@@ -8,7 +9,7 @@
 #include <vector>
 #include <vulkan/vulkan_core.h>
 
-MeshResources createMeshShadingResources(const vul::Vulkano &vulkano)
+MeshResources createMeshShadingResources(const vul::VulRenderer &vulRenderer, const vul::VulDescriptorPool &descPool, VkCommandBuffer cmdBuf, const vul::VulDevice &vulDevice)
 {
     MeshResources meshResources;
 
@@ -40,63 +41,57 @@ MeshResources createMeshShadingResources(const vul::Vulkano &vulkano)
         }
     }
 
-    meshResources.cubeBuf = std::make_unique<vul::VulBuffer>(vulkano.getVulDevice());
-    meshResources.cubeBuf->loadVector(objDatas);
-    meshResources.cubeBuf->createBuffer(true, static_cast<vul::VulBuffer::Usage>(vul::VulBuffer::usage_ssbo | vul::VulBuffer::usage_transferDst));
-
-    meshResources.chunksBuf = std::make_unique<vul::VulBuffer>(vulkano.getVulDevice());
-    meshResources.chunksBuf->loadVector(chunkDatas);
-    meshResources.chunksBuf->createBuffer(true, static_cast<vul::VulBuffer::Usage>(vul::VulBuffer::usage_ssbo | vul::VulBuffer::usage_transferDst));
+    meshResources.cubeBuf = std::make_unique<vul::VulBuffer>(sizeof(*objDatas.data()), objDatas.size(), true, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, vulDevice);
+    meshResources.cubeBuf->writeVector(objDatas, 0, cmdBuf);
+    meshResources.chunksBuf = std::make_unique<vul::VulBuffer>(sizeof(*chunkDatas.data()), chunkDatas.size(), true, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, vulDevice);
+    meshResources.chunksBuf->writeVector(chunkDatas, 0, cmdBuf);
 
     for (int i = 0; i < vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-        meshResources.ubos[i] = std::make_unique<vul::VulBuffer>(vulkano.getVulDevice());
-        meshResources.ubos[i]->keepEmpty(sizeof(MeshUbo), 1);
-        meshResources.ubos[i]->createBuffer(false, vul::VulBuffer::usage_ubo);
+        meshResources.ubos[i] = std::make_unique<vul::VulBuffer>(sizeof(MeshUbo), 1, false, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, vulDevice);
 
-        std::vector<vul::Vulkano::Descriptor> descs;
-        vul::Vulkano::Descriptor desc;
-        desc.type = vul::Vulkano::DescriptorType::ssbo;
-        desc.stages = {vul::Vulkano::ShaderStage::mesh, vul::Vulkano::ShaderStage::task};
+        std::vector<vul::VulDescriptorSet::Descriptor> descs;
+        vul::VulDescriptorSet::Descriptor desc;
+        desc.type = vul::VulDescriptorSet::DescriptorType::storageBuffer;
+        desc.stages = VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT;
         desc.count = 1;
         desc.content = meshResources.cubeBuf.get();
         descs.push_back(desc);
 
-        desc.stages = {vul::Vulkano::ShaderStage::task};
+        desc.stages = VK_SHADER_STAGE_TASK_BIT_EXT;
         desc.content = meshResources.chunksBuf.get();
         descs.push_back(desc);
 
-        desc.type = vul::Vulkano::DescriptorType::ubo;
-        desc.stages = {vul::Vulkano::ShaderStage::mesh, vul::Vulkano::ShaderStage::task};
+        desc.type = vul::VulDescriptorSet::DescriptorType::uniformBuffer;
+        desc.stages = VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT;
         desc.content = meshResources.ubos[i].get();
         descs.push_back(desc);
 
-        meshResources.renderDescSets[i] = vulkano.createDescriptorSet(descs);
+        meshResources.renderDescSets[i] = vul::VulDescriptorSet::createDescriptorSet(descs, descPool);
     }
 
     vul::VulMeshPipeline::PipelineConfigInfo configInfo{};
-    configInfo.colorAttachmentFormats = {vulkano.vulRenderer.getSwapChainColorFormat()};
-    configInfo.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
+    configInfo.colorAttachmentFormats = {vulRenderer.getSwapChainColorFormat()};
+    configInfo.depthAttachmentFormat = vulRenderer.getDepthFormat();
     configInfo.setLayouts = {meshResources.renderDescSets[0]->getLayout()->getDescriptorSetLayout()};
     configInfo.cullMode = VK_CULL_MODE_BACK_BIT;
 
-    meshResources.renderPipeline = std::make_unique<vul::VulMeshPipeline>(vulkano.getVulDevice(), "mesh.task.spv", "mesh.mesh.spv", "mesh.frag.spv", configInfo);
+    meshResources.renderPipeline = std::make_unique<vul::VulMeshPipeline>(vulDevice, "mesh.task.spv", "mesh.mesh.spv", "mesh.frag.spv", configInfo);
 
     return meshResources;
 }
 
-void updateMeshUbo(const vul::Vulkano &vulkano, const MeshResources &res)
+void updateMeshUbo(const MeshResources &res, const vul::VulCamera &camera, const vul::VulRenderer &vulRenderer)
 {
     MeshUbo ubo;
-    ubo.projectionMatrix = vulkano.camera.getProjection();
-    ubo.viewMatrix = vulkano.camera.getView();
+    ubo.projectionMatrix = camera.getProjection();
+    ubo.viewMatrix = camera.getView();
 
-    res.ubos[vulkano.getFrameIdx()]->writeData(&ubo, sizeof(ubo), 0);
+    res.ubos[vulRenderer.getFrameIndex()]->writeData(&ubo, sizeof(ubo), 0, VK_NULL_HANDLE);
 }
 
-void meshShade(const vul::Vulkano &vulkano, const MeshResources &res, VkCommandBuffer cmdBuf)
+void meshShade(const MeshResources &res, const vul::VulRenderer &vulRenderer, VkCommandBuffer cmdBuf)
 {
-    vulkano.vulRenderer.beginRendering(cmdBuf, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent,
+    vulRenderer.beginRendering(cmdBuf, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent,
             vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 1.0f, 0, 0);
-    res.renderPipeline->meshShade(VOLUME_VOLUME / CUBES_PER_MESH / MESH_PER_TASK, 1, 1, nullptr, 0, {res.renderDescSets[vulkano.getFrameIdx()]->getSet()}, cmdBuf);
-    vulkano.vulRenderer.stopRendering(cmdBuf);
+    res.renderPipeline->meshShade(VOLUME_VOLUME / CUBES_PER_MESH / MESH_PER_TASK, 1, 1, nullptr, 0, {res.renderDescSets[vulRenderer.getFrameIndex()]->getSet()}, cmdBuf);
 }

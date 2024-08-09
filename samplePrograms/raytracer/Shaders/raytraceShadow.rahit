@@ -7,7 +7,7 @@
 
 #include "common.glsl"
 #include "../include/host_device.hpp"
-#include"../../../essentials/include/vul_scene.hpp"
+#include"../../../include/vul_scene.hpp"
 
 layout(binding = 2, set = 0) readonly buffer Indices            {uint indices[];};
 layout(binding = 3, set = 0, scalar) readonly buffer Vertices   {vec3 vertices[];};

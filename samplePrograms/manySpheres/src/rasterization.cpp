@@ -1,10 +1,13 @@
-#include "vul_swap_chain.hpp"
+#include <vulkan/vulkan_core.h>
+#include "vul_camera.hpp"
+#include "vul_renderer.hpp"
+#include <memory>
 #include <rasterizing.hpp>
 #include <host_device.hpp>
 
 #include <random>
 
-RasResources createRasterizationResources(vul::Vulkano &vulkano)
+RasResources createRasterizationResources(const vul::VulRenderer &vulRenderer, const vul::VulDescriptorPool &descPool, vul::VulCmdPool &cmdPool, const vul::VulDevice &vulDevice)
 {
     RasResources res{};
 
@@ -25,77 +28,67 @@ RasResources createRasterizationResources(vul::Vulkano &vulkano)
             }
         }
     }
-    res.objDataBuf = std::make_shared<vul::VulBuffer>(vulkano.getVulDevice());
-    res.objDataBuf->loadVector(objDatas);
-    res.objDataBuf->createBuffer(true, static_cast<vul::VulBuffer::Usage>(vul::VulBuffer::usage_ssbo | vul::VulBuffer::usage_transferDst));
+    VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
+    res.objDataBuf = std::make_unique<vul::VulBuffer>(sizeof(*objDatas.data()), objDatas.size(), true, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, vulDevice);
+    res.objDataBuf->writeVector(objDatas, 0, cmdBuf);
+    cmdPool.submitAndWait(cmdBuf);
 
-    //vulkano.scene.loadCubes({{{0.0f, 0.0f, 0.0f}, {0.3f, 0.3f, 0.3f}}}, {{}}, {});
-    vulkano.scene.loadSpheres({{{0.0f, 0.0f, 0.0f}, 0.3f, 3}}, {{}}, {});
-    vulkano.hasScene = true;
+    res.scene = std::make_unique<vul::Scene>(vulDevice);
+    res.scene->loadCubes({{{0.0f, 0.0f, 0.0f}, {0.3f, 0.3f, 0.3f}}}, {{}}, {}, cmdPool);
+    //res.scene->loadSpheres({{{0.0f, 0.0f, 0.0f}, 0.3f, 3}}, {{}}, {}, cmdPool);
 
-    vul::VulPipeline::DrawData drawData;
-    drawData.firstIndex = vulkano.scene.meshes[0].firstIndex;
-    drawData.indexCount = vulkano.scene.meshes[0].indexCount;
-    drawData.vertexOffset = vulkano.scene.meshes[0].vertexOffset;
-    drawData.instanceCount = objDatas.size();
-    drawData.firstInstance = 0;
-    drawData.pPushData = nullptr;
-    drawData.pushDataSize = 0;
+    res.drawData.firstIndex = 0;
+    res.drawData.indexCount = res.scene->indices.size();
+    res.drawData.vertexOffset = 0;
+    res.drawData.instanceCount = objDatas.size();
+    res.drawData.firstInstance = 0;
+    res.drawData.pPushData = nullptr;
+    res.drawData.pushDataSize = 0;
 
     for (int i = 0; i < vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
-        res.ubos[i] = std::make_unique<vul::VulBuffer>(vulkano.getVulDevice());
-        res.ubos[i]->keepEmpty(sizeof(RasUbo), 1);
-        res.ubos[i]->createBuffer(false, static_cast<vul::VulBuffer::Usage>(vul::VulBuffer::usage_ubo | vul::VulBuffer::usage_transferDst));
+        res.ubos[i] = std::make_unique<vul::VulBuffer>(sizeof(RasUbo), 1, false, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, vulDevice);
 
-        std::vector<vul::Vulkano::Descriptor> descs;
-        vul::Vulkano::Descriptor desc;
+        std::vector<vul::VulDescriptorSet::Descriptor> descs;
+        vul::VulDescriptorSet::Descriptor desc;
         desc.count = 1;
 
-        desc.type = vul::Vulkano::DescriptorType::ubo;
-        desc.stages = {vul::Vulkano::ShaderStage::vert};
+        desc.type = vul::VulDescriptorSet::DescriptorType::uniformBuffer;
+        desc.stages = VK_SHADER_STAGE_VERTEX_BIT;
         desc.content = res.ubos[i].get();
         descs.push_back(desc);
 
-        desc.type = vul::Vulkano::DescriptorType::ssbo;
-        desc.stages = {vul::Vulkano::ShaderStage::vert, vul::Vulkano::ShaderStage::frag};
+        desc.type = vul::VulDescriptorSet::DescriptorType::storageBuffer;
+        desc.stages = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         desc.content = res.objDataBuf.get();
         descs.push_back(desc);
 
-        res.descSets[i] = vulkano.createDescriptorSet(descs);
+        res.descSets[i] = vul::VulDescriptorSet::createDescriptorSet(descs, descPool);
     }
 
     vul::VulPipeline::PipelineConfigInfo pipelineConfig{};
-    pipelineConfig.colorAttachmentFormats = {vulkano.vulRenderer.getSwapChainColorFormat()};
-    pipelineConfig.depthAttachmentFormat = vulkano.vulRenderer.getDepthFormat();
+    pipelineConfig.colorAttachmentFormats = {vulRenderer.getSwapChainColorFormat()};
+    pipelineConfig.depthAttachmentFormat = vulRenderer.getDepthFormat();
     pipelineConfig.enableColorBlending = false;
     pipelineConfig.cullMode = VK_CULL_MODE_BACK_BIT;
     pipelineConfig.attributeDescriptions = {VkVertexInputAttributeDescription{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}};
     pipelineConfig.bindingDescriptions = {VkVertexInputBindingDescription{0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}};
     pipelineConfig.setLayouts = {res.descSets[0]->getLayout()->getDescriptorSetLayout()};
 
-    vul::Vulkano::RenderData renderData{};
-    renderData.is3d = true;
-    renderData.swapChainImageMode = vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent;
-    renderData.depthImageMode = vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent;
-    renderData.sampleFromDepth = false;
-    renderData.pipeline = std::make_shared<vul::VulPipeline>(vulkano.getVulDevice(), "../bin/default.vert.spv", "../bin/default.frag.spv", pipelineConfig);
-    renderData.drawDatas = {drawData};
-    for (int i = 0; i < vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) renderData.descriptorSets[i].push_back(res.descSets[i]);
-    vulkano.renderDatas.push_back(renderData);
+    res.pipeline = std::make_unique<vul::VulPipeline>(vulDevice, "../bin/default.vert.spv", "../bin/default.frag.spv", pipelineConfig);
 
     return res;
 }
 
-void updateRasUbo(const vul::Vulkano &vulkano, RasResources &res, bool fullUpdate)
+void updateRasUbo(const vul::VulCamera &camera, const vul::VulRenderer &vulRenderer, RasResources &res)
 {
-    if (fullUpdate) {
-        RasUbo ubo{};
-        ubo.viewMatrix = vulkano.camera.getView();
-        ubo.projectionMatrix = vulkano.camera.getProjection();
-        for (int i = 0; i < vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) res.ubos[i]->writeData(&ubo, sizeof(ubo), 0);
-    }
-    else {
-        glm::mat4 viewMat = vulkano.camera.getView();
-        res.ubos[vulkano.getFrameIdx()]->writeData(&viewMat, sizeof(viewMat), 0);
-    }
+    RasUbo ubo{};
+    ubo.viewMatrix = camera.getView();
+    ubo.projectionMatrix = camera.getProjection();
+    for (int i = 0; i < vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) res.ubos[i]->writeData(&ubo, sizeof(ubo), 0, VK_NULL_HANDLE);
+}
+
+void rasterize(const RasResources &res, const vul::VulRenderer &vulRenderer, VkCommandBuffer cmdBuf)
+{
+    vulRenderer.beginRendering(cmdBuf, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent, vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent, {0.0f, 0.0f, 0.0f, 1.0f}, 1.0f, 0, 0);
+    res.pipeline->draw(cmdBuf, {res.descSets[vulRenderer.getFrameIndex()]->getSet()}, {res.scene->vertexBuffer->getBuffer()}, res.scene->indexBuffer->getBuffer(), {res.drawData});
 }

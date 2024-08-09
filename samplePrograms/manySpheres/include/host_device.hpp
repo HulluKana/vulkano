@@ -12,7 +12,7 @@ using vec4 = glm::vec4;
 using mat4 = glm::mat4;
 #endif
 
-#define VOLUME_LEN 176
+#define VOLUME_LEN 150
 #define VOLUME_VOLUME (VOLUME_LEN * VOLUME_LEN * VOLUME_LEN)
 #define MESH_PER_CUBE 2
 #define CUBES_PER_MESH 16
