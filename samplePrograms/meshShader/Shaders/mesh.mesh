@@ -1,0 +1,44 @@
+#version 460
+
+#extension GL_EXT_mesh_shader : require
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+
+#include "../include/host_device.hpp"
+
+layout(binding = 0, set = 0) uniform UniformBuffer {Ubo ubo;};
+layout(binding = 3, set = 0, scalar) readonly buffer IndexBuffer {uvec3 triIndices[];};
+layout(binding = 4, set = 0, scalar) readonly buffer VertexBuffer {vec3 verts[];};
+layout(binding = 5, set = 0, scalar) readonly buffer NormalBuffer {vec3 normals[];};
+layout(binding = 6, set = 0) readonly buffer TangentBuffer {vec4 tangents[];};
+layout(binding = 7, set = 0, scalar) readonly buffer UvBuffer {vec2 uvs[];};
+
+layout(local_size_x = 1, local_size_y = 1, local_size_z = 1) in;
+layout(triangles, max_vertices = 3, max_primitives = 1) out;
+
+layout (location = 0) out vec3 fragPosWorld[3];
+layout (location = 1) out vec3 fragNormalWorld[3];
+layout (location = 2) out vec4 fragTangentWorld[3];
+layout (location = 3) out vec2 fragTexCoord[3];
+
+layout(push_constant) uniform Push {PushConstant push;};
+
+void main()
+{
+    if (gl_LocalInvocationIndex.x == 0) SetMeshOutputsEXT(3, 1);
+
+    const mat4 projViewMat = ubo.projectionMatrix * ubo.viewMatrix;
+    const mat3 normalMat = mat3(push.modelMatrix);
+
+    const uvec3 idxs = triIndices[gl_GlobalInvocationID.x + push.firstIndex / 3] + uvec3(push.vertexOffset);
+    fragPosWorld = vec3[3](vec3(push.modelMatrix * vec4(verts[idxs.x], 1.0)), vec3(push.modelMatrix * vec4(verts[idxs.y], 1.0)), vec3(push.modelMatrix * vec4(verts[idxs.z], 1.0)));
+    fragNormalWorld = vec3[3](normalMat * normals[idxs.x], normalMat * normals[idxs.y], normalMat * normals[idxs.z]);
+    fragTangentWorld = vec4[3](vec4(normalMat * tangents[idxs.x].xyz, tangents[idxs.x].w), vec4(normalMat * tangents[idxs.z].xyz, tangents[idxs.z].w), vec4(normalMat * tangents[idxs.z].xyz, tangents[idxs.z].w));
+    fragTexCoord = vec2[3](uvs[idxs.x], uvs[idxs.y], uvs[idxs.z]);
+
+    gl_MeshVerticesEXT[0].gl_Position = projViewMat * vec4(fragPosWorld[0], 1.0);
+    gl_MeshVerticesEXT[1].gl_Position = projViewMat * vec4(fragPosWorld[1], 1.0);
+    gl_MeshVerticesEXT[2].gl_Position = projViewMat * vec4(fragPosWorld[2], 1.0);
+
+    gl_PrimitiveTriangleIndicesEXT[0] = uvec3(0, 1, 2);
+}

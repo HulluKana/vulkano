@@ -28,7 +28,7 @@ class VulMeshPipeline {
         VulMeshPipeline &operator=(const VulMeshPipeline &) = delete;
         VulMeshPipeline(VulMeshPipeline &&) = default;
 
-        void meshShade(uint32_t x, uint32_t y, uint32_t z, void *pushData, uint32_t pushDataSize, const std::vector<VkDescriptorSet> &descSets, VkCommandBuffer cmdBuf);
+        void meshShade(uint32_t x, uint32_t y, uint32_t z, const void *pushData, uint32_t pushDataSize, const std::vector<VkDescriptorSet> &descSets, VkCommandBuffer cmdBuf);
 
     private:
         VkPipeline m_pipeline;
