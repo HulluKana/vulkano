@@ -10,7 +10,12 @@
 using vec3 = glm::vec3;
 using vec4 = glm::vec4;
 using mat4 = glm::mat4;
+using i8vec3 = glm::vec<3, int8_t>;
 #endif
+
+#define MAX_MESHLET_VERTICES 64
+#define MAX_MESHLET_TRIANGLES 124
+#define MESHLETS_PER_TASK_SHADER 32
 
 struct Ubo {
     mat4 viewMatrix;
@@ -28,6 +33,20 @@ struct PushConstant {
     uint vertexOffset;
     uint firstIndex;
     uint matIdx;
+};
+
+struct Meshlet {
+    uint triangleOffset;
+    uint vertexOffset;
+    uint16_t vertexCount;
+    uint16_t triangleCount;
+};
+
+struct MeshletBounds {
+    vec3 center;
+    float radius;
+    i8vec3 coneAxis;
+    int8_t coneCutoff;
 };
 
 #endif

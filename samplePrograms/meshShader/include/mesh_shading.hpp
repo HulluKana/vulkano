@@ -15,6 +15,10 @@ struct MeshResources {
     std::unique_ptr<vul::VulMeshPipeline> pipeline;
     std::array<std::unique_ptr<vul::VulDescriptorSet>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descSets;
     std::array<std::unique_ptr<vul::VulBuffer>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> ubos;
+    std::unique_ptr<vul::VulBuffer> meshletVerticesBuffer;
+    std::unique_ptr<vul::VulBuffer> meshletTrianglesBuffer;
+    std::unique_ptr<vul::VulBuffer> meshletBuffer;
+    std::unique_ptr<vul::VulBuffer> meshletBoundsBuffer;
     std::vector<PushConstant> pushConstants;
 };
 MeshResources createMeshShadingResources(const vul::Scene &scene, const vul::VulRenderer &vulRenderer, const vul::VulDescriptorPool &descPool, VkCommandBuffer cmdBuf, const vul::VulDevice &vulDevice);

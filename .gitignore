@@ -67,6 +67,7 @@
 /samplePrograms/meshShader/build/compile_commands.json
 /samplePrograms/meshShader/build/Makefile
 /samplePrograms/meshShader/build/libImGui.a
+/samplePrograms/meshShader/build/libMeshOptimizer.a
 /samplePrograms/meshShader/c
 /samplePrograms/meshShader/r
 /samplePrograms/meshShader/cr
