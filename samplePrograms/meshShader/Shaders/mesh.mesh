@@ -4,19 +4,20 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int16 : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int8 : enable
+#extension GL_ARB_shader_draw_parameters : enable
 #extension GL_GOOGLE_include_directive : enable
 
 #include "../include/host_device.hpp"
+#include "common.glsl"
 
 layout(binding = 0, set = 0) uniform UniformBuffer {Ubo ubo;};
-layout(binding = 3, set = 0, scalar) readonly buffer IndexBuffer {uvec3 triIndices[];};
-layout(binding = 4, set = 0, scalar) readonly buffer VertexBuffer {vec3 verts[];};
-layout(binding = 5, set = 0, scalar) readonly buffer NormalBuffer {vec3 normals[];};
-layout(binding = 6, set = 0) readonly buffer TangentBuffer {vec4 tangents[];};
-layout(binding = 7, set = 0, scalar) readonly buffer UvBuffer {vec2 uvs[];};
-layout(binding = 8, set = 0) readonly buffer MeshletVerticesBuffer {uint meshletVertices[];};
-layout(binding = 9, set = 0, scalar) readonly buffer MeshletIndicesBuffer {u8vec3 meshletTriangles[];};
-layout(binding = 10, set = 0, scalar) readonly buffer MeshletBuffer {Meshlet meshlets[];};
+layout(binding = 3, set = 0, scalar) readonly buffer VertexBuffer {vec3 verts[];};
+layout(binding = 4, set = 0, scalar) readonly buffer NormalBuffer {vec3 normals[];};
+layout(binding = 5, set = 0) readonly buffer TangentBuffer {vec4 tangents[];};
+layout(binding = 6, set = 0, scalar) readonly buffer UvBuffer {vec2 uvs[];};
+layout(binding = 7, set = 0) readonly buffer MeshletVerticesBuffer {uint meshletVertices[];};
+layout(binding = 8, set = 0, scalar) readonly buffer MeshletTrianglesBuffer {uint8_t meshletTriangles[];};
+layout(binding = 9, set = 0, scalar) readonly buffer MeshletBuffer {Meshlet meshlets[];};
 
 const uint meshShadersPerMeshlet = 32;
 layout(local_size_x = meshShadersPerMeshlet, local_size_y = 1, local_size_z = 1) in;
@@ -26,30 +27,32 @@ layout (location = 0) out vec3 fragPosWorld[];
 layout (location = 1) out vec3 fragNormalWorld[];
 layout (location = 2) out vec4 fragTangentWorld[];
 layout (location = 3) out vec2 fragTexCoord[];
+layout (location = 4) out flat uint matIdx[];
 
-layout(push_constant) uniform Push {PushConstant push;};
-
-taskPayloadSharedEXT uint meshletOffset;
+taskPayloadSharedEXT TaskPayload taskPayload;
 
 void main()
 {
     const uint threadIdx = gl_LocalInvocationID.x;
-    const Meshlet meshlet = meshlets[meshletOffset + gl_WorkGroupID.x];
+    const Meshlet meshlet = meshlets[taskPayload.meshletOffset + gl_WorkGroupID.x];
     if (threadIdx == 0) SetMeshOutputsEXT(uint(meshlet.vertexCount), uint(meshlet.triangleCount));
 
+    const mat4 modelMat = taskPayload.modelMatrix;
     const mat4 projViewMat = ubo.projectionMatrix * ubo.viewMatrix;
-    const mat3 normalMat = mat3(push.modelMatrix);
+    const mat3 normalMat = mat3(modelMat);
 
     for (uint i = threadIdx; i < uint(meshlet.vertexCount); i += meshShadersPerMeshlet) {
         const uint idx = meshletVertices[meshlet.vertexOffset + i];
-        fragPosWorld[i] = vec3(push.modelMatrix * vec4(verts[idx], 1.0));
+        fragPosWorld[i] = vec3(modelMat * vec4(verts[idx], 1.0));
         fragNormalWorld[i] = normalMat * normals[idx];
         fragTangentWorld[i] = vec4(normalMat * tangents[idx].xyz, tangents[idx].w);
         fragTexCoord[i] = uvs[idx];
+        matIdx[i] = taskPayload.matIdx;
         gl_MeshVerticesEXT[i].gl_Position = projViewMat * vec4(fragPosWorld[i], 1.0);
     }
 
     for (uint i = threadIdx; i < uint(meshlet.triangleCount); i += meshShadersPerMeshlet) {
-        gl_PrimitiveTriangleIndicesEXT[i] = uvec3(meshletTriangles[meshlet.triangleOffset / 3 + i]);
+        gl_PrimitiveTriangleIndicesEXT[i] = uvec3(meshletTriangles[meshlet.triangleOffset + i * 3],
+            meshletTriangles[meshlet.triangleOffset + i * 3 + 1], meshletTriangles[meshlet.triangleOffset + i * 3 + 2]);
     }
 }

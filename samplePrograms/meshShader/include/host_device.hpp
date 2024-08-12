@@ -27,11 +27,10 @@ struct Ubo {
     uint lightCount;
 };
 
-struct PushConstant {
+struct MeshInfo {
     mat4 modelMatrix;
-    uint triangleCount;
-    uint vertexOffset;
-    uint firstIndex;
+    uint meshletOffset;
+    uint meshletCount;
     uint matIdx;
 };
 

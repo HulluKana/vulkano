@@ -70,4 +70,13 @@ void VulMeshPipeline::meshShade(uint32_t x, uint32_t y, uint32_t z, const void *
     vkCmdDrawMeshTasksEXT(cmdBuf, x, y, z);
 }
 
+void VulMeshPipeline::meshShadeIndirect(VkBuffer indirectBuffer, VkDeviceSize offset, uint32_t drawCount, uint32_t stride,
+        const void *pushData, uint32_t pushDataSize, const std::vector<VkDescriptorSet> &descSets, VkCommandBuffer cmdBuf)
+{
+    vkCmdBindPipeline(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_pipeline);
+    if (descSets.size() > 0) vkCmdBindDescriptorSets(cmdBuf, VK_PIPELINE_BIND_POINT_GRAPHICS, m_layout, 0, static_cast<uint32_t>(descSets.size()), descSets.data(), 0, nullptr);
+    if (pushDataSize > 0) vkCmdPushConstants(cmdBuf, m_layout, VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, pushDataSize, pushData);
+    vkCmdDrawMeshTasksIndirectEXT(cmdBuf, indirectBuffer, offset, drawCount, stride);
+}
+
 }

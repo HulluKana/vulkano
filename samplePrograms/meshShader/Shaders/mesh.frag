@@ -1,7 +1,10 @@
 #version 460
 
 #extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int16 : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int8 : enable
 #extension GL_EXT_nonuniform_qualifier : enable
+
 
 #include"../include/host_device.hpp"
 #include"../../../include/vul_scene.hpp"
@@ -10,14 +13,13 @@ layout (location = 0) in vec3 fragPosWorld;
 layout (location = 1) in vec3 fragNormalWorld;
 layout (location = 2) in vec4 fragTangentWorld;
 layout (location = 3) in vec2 fragTexCoord;
+layout (location = 4) in flat uint matIdx;
 
 layout (location = 0) out vec4 FragColor;
 
 layout(set = 0, binding = 0) uniform UniformBuffer {Ubo ubo;};
 layout(set = 0, binding = 1) uniform sampler2D textures[];
 layout(set = 0, binding = 2) readonly buffer MaterialBuffer{PackedMaterial materials[];};
-
-layout (push_constant) uniform Push{PushConstant push;};
 
 layout (early_fragment_tests) in;
 
@@ -68,7 +70,7 @@ void main()
 {
     const float epsilon = 0.0001;
 
-    PackedMaterial mat = materials[push.matIdx];
+    const PackedMaterial mat = materials[matIdx];
     vec3 rawColor;
     if (mat.colorTextureIndex >= 0) rawColor = texture(textures[mat.colorTextureIndex], fragTexCoord).xyz;
     else rawColor = sRGBToAlbedo(mat.colorFactor.xyz);

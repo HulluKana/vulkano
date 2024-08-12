@@ -29,6 +29,8 @@ class VulMeshPipeline {
         VulMeshPipeline(VulMeshPipeline &&) = default;
 
         void meshShade(uint32_t x, uint32_t y, uint32_t z, const void *pushData, uint32_t pushDataSize, const std::vector<VkDescriptorSet> &descSets, VkCommandBuffer cmdBuf);
+        void meshShadeIndirect(VkBuffer indirectBuffer, VkDeviceSize offset, uint32_t drawCount, uint32_t stride,
+                const void *pushData, uint32_t pushDataSize, const std::vector<VkDescriptorSet> &descSets, VkCommandBuffer cmdBuf);
 
     private:
         VkPipeline m_pipeline;

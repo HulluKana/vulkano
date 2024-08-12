@@ -4,20 +4,22 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int8 : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int16 : enable
+#extension GL_ARB_shader_draw_parameters : enable
 #extension GL_GOOGLE_include_directive : enable
 
 #include "../include/host_device.hpp"
+#include "common.glsl"
 
-layout(binding = 3, set = 0, scalar) readonly buffer IndexBuffer {uvec3 triIndices[];};
-layout(binding = 4, set = 0, scalar) readonly buffer VertexBuffer {vec3 verts[];};
-layout(binding = 8, set = 0) readonly buffer MeshletVerticesBuffer {uint meshletVertices[];};
-layout(binding = 9, set = 0, scalar) readonly buffer MeshletIndicesBuffer {uint8_t meshletTriangles[];};
-layout(binding = 10, set = 0, scalar) readonly buffer MeshletBuffer {Meshlet meshlets[];};
-layout(binding = 11, set = 0, scalar) readonly buffer MeshletBoundsBuffer {MeshletBounds meshletBounds[];};
+layout(binding = 3, set = 0, scalar) readonly buffer VertexBuffer {vec3 verts[];};
+layout(binding = 7, set = 0) readonly buffer MeshletVerticesBuffer {uint meshletVertices[];};
+layout(binding = 8, set = 0, scalar) readonly buffer MeshletIndicesBuffer {uint8_t meshletTriangles[];};
+layout(binding = 9, set = 0, scalar) readonly buffer MeshletBuffer {Meshlet meshlets[];};
+layout(binding = 10, set = 0, scalar) readonly buffer MeshletBoundsBuffer {MeshletBounds meshletBounds[];};
+layout(binding = 11, set = 0, scalar) readonly buffer MeshInfoBuffer {MeshInfo meshInfos[];};
 
 layout (local_size_x = MESHLETS_PER_TASK_SHADER, local_size_y = 1, local_size_z = 1) in;
 
-taskPayloadSharedEXT uint meshletOffset;
+taskPayloadSharedEXT TaskPayload taskPayload;
 
 void main()
 {
@@ -25,7 +27,10 @@ void main()
     const uint meshletIdx = gl_GlobalInvocationID.x;
 
     if (threadIdx == 0) {
-        meshletOffset = meshletIdx - threadIdx;
-        EmitMeshTasksEXT(MESHLETS_PER_TASK_SHADER, 1, 1);
+        const MeshInfo meshInfo = meshInfos[gl_DrawIDARB];
+        taskPayload.modelMatrix = meshInfo.modelMatrix;
+        taskPayload.meshletOffset = meshletIdx + meshInfo.meshletOffset;
+        taskPayload.matIdx = meshInfo.matIdx;
+        EmitMeshTasksEXT(min(meshInfo.meshletCount - meshletIdx, MESHLETS_PER_TASK_SHADER), 1, 1);
     }
 }
