@@ -22,6 +22,6 @@ struct MeshResources {
     std::unique_ptr<vul::VulBuffer> meshInfoBuffer;
     std::unique_ptr<vul::VulBuffer> drawMeshTasksIndirectBuffer;
 };
-MeshResources createMeshShadingResources(const vul::Scene &scene, const vul::VulRenderer &vulRenderer, const vul::VulDescriptorPool &descPool, VkCommandBuffer cmdBuf, const vul::VulDevice &vulDevice);
+MeshResources createMeshShadingResources(vul::Scene &scene, const vul::VulRenderer &vulRenderer, const vul::VulDescriptorPool &descPool, VkCommandBuffer cmdBuf, const vul::VulDevice &vulDevice);
 void updateMeshUbo(const MeshResources &res, const vul::Scene &scene, const vul::VulCamera &camera, const vul::VulRenderer &vulRenderer, const glm::vec4 &ambientLightColor);
 void meshShade(const MeshResources &res, const vul::Scene &scene, const vul::VulRenderer &vulRenderer, const glm::vec4 &ambientLightColor, VkCommandBuffer cmdBuf);

@@ -8,9 +8,6 @@
 
 layout(binding = 0, set = 0) uniform UniformBuffer {Ubo ubo;};
 layout(binding = 3, set = 0, scalar) readonly buffer VertexBuffer {vec3 verts[];};
-layout(binding = 4, set = 0, scalar) readonly buffer NormalBuffer {vec3 normals[];};
-layout(binding = 5, set = 0) readonly buffer TangentBuffer {vec4 tangents[];};
-layout(binding = 6, set = 0, scalar) readonly buffer UvBuffer {vec2 uvs[];};
 layout(binding = 7, set = 0) readonly buffer MeshletVerticesBuffer {uint meshletVertices[];};
 layout(binding = 8, set = 0, scalar) readonly buffer MeshletTrianglesBuffer {uint8_t meshletTriangles[];};
 layout(binding = 9, set = 0, scalar) readonly buffer MeshletBuffer {Meshlet meshlets[];};
@@ -18,13 +15,16 @@ layout(binding = 9, set = 0, scalar) readonly buffer MeshletBuffer {Meshlet mesh
 layout(local_size_x = meshShadersPerMeshlet, local_size_y = 1, local_size_z = 1) in;
 layout(triangles, max_vertices = MAX_MESHLET_VERTICES, max_primitives = MAX_MESHLET_TRIANGLES) out;
 
-layout (location = 0) out vec3 fragPosWorld[];
-layout (location = 1) out vec3 fragNormalWorld[];
-layout (location = 2) out vec4 fragTangentWorld[];
-layout (location = 3) out vec2 fragTexCoord[];
-layout (location = 4) out flat uint matIdx[];
+layout (location = 0) out flat vec3 fragColor[];
 
 taskPayloadSharedEXT TaskPayload taskPayload;
+
+float randomFloat(inout uint state) {
+    state = state * 747796405 + 2891336453;
+    uint result = ((state >> ((state >> 28) + 4)) ^ state) * 277803737;
+    result = (result >> 22) ^ result;
+    return result / 4294967295.0;
+}
 
 void main()
 {
@@ -32,18 +32,13 @@ void main()
     const Meshlet meshlet = meshlets[taskPayload.meshletIndices[gl_WorkGroupID.x]];
     if (threadIdx == 0) SetMeshOutputsEXT(uint(meshlet.vertexCount), uint(meshlet.triangleCount));
 
-    const mat4 modelMat = taskPayload.modelMatrix;
-    const mat4 projViewMat = ubo.projectionMatrix * ubo.viewMatrix;
-    const mat3 normalMat = mat3(modelMat);
+    const mat4 projViewModelMat = ubo.projectionMatrix * ubo.viewMatrix * taskPayload.modelMatrix;
 
+    uint seed = taskPayload.meshletIndices[gl_WorkGroupID.x];
     for (uint i = threadIdx; i < uint(meshlet.vertexCount); i += meshShadersPerMeshlet) {
         const uint idx = meshletVertices[meshlet.vertexOffset + i];
-        fragPosWorld[i] = vec3(modelMat * vec4(verts[idx], 1.0));
-        fragNormalWorld[i] = normalMat * normals[idx];
-        fragTangentWorld[i] = vec4(normalMat * tangents[idx].xyz, tangents[idx].w);
-        fragTexCoord[i] = uvs[idx];
-        matIdx[i] = taskPayload.matIdx;
-        gl_MeshVerticesEXT[i].gl_Position = projViewMat * vec4(fragPosWorld[i], 1.0);
+        fragColor[i] = vec3(randomFloat(seed), randomFloat(seed), randomFloat(seed));
+        gl_MeshVerticesEXT[i].gl_Position = projViewModelMat * vec4(verts[idx], 1.0);
     }
 
     for (uint i = threadIdx; i < uint(meshlet.triangleCount); i += meshShadersPerMeshlet) {

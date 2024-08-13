@@ -10,7 +10,7 @@
 #include <vulkan/vulkan_core.h>
 #include <meshoptimizer/src/meshoptimizer.h>
 
-MeshResources createMeshShadingResources(const vul::Scene &scene, const vul::VulRenderer &vulRenderer, const vul::VulDescriptorPool &descPool, VkCommandBuffer cmdBuf, const vul::VulDevice &vulDevice)
+MeshResources createMeshShadingResources(vul::Scene &scene, const vul::VulRenderer &vulRenderer, const vul::VulDescriptorPool &descPool, VkCommandBuffer cmdBuf, const vul::VulDevice &vulDevice)
 {
     MeshResources meshResources;
 
@@ -92,7 +92,7 @@ MeshResources createMeshShadingResources(const vul::Scene &scene, const vul::Vul
         std::vector<vul::VulDescriptorSet::Descriptor> descs;
         vul::VulDescriptorSet::Descriptor desc;
         desc.type = vul::VulDescriptorSet::DescriptorType::uniformBuffer;
-        desc.stages = VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        desc.stages = VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_FRAGMENT_BIT;
         desc.count = 1;
         desc.content = meshResources.ubos[i].get();
         descs.push_back(desc);
@@ -142,7 +142,7 @@ MeshResources createMeshShadingResources(const vul::Scene &scene, const vul::Vul
     configInfo.depthAttachmentFormat = vulRenderer.getDepthFormat();
     configInfo.setLayouts = {meshResources.descSets[0]->getLayout()->getDescriptorSetLayout()};
 
-    meshResources.pipeline = std::make_unique<vul::VulMeshPipeline>(vulDevice, "mesh.task.spv", "mesh.mesh.spv", "mesh.frag.spv", configInfo);
+    meshResources.pipeline = std::make_unique<vul::VulMeshPipeline>(vulDevice, "mesh.task.spv", "meshletDebug.mesh.spv", "meshletDebug.frag.spv", configInfo);
 
     return meshResources;
 }

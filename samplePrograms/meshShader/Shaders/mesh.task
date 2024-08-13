@@ -2,14 +2,13 @@
 
 #extension GL_EXT_mesh_shader : require
 #extension GL_EXT_scalar_block_layout : enable
-#extension GL_EXT_shader_explicit_arithmetic_types_int8 : enable
-#extension GL_EXT_shader_explicit_arithmetic_types_int16 : enable
 #extension GL_ARB_shader_draw_parameters : enable
+#extension GL_KHR_shader_subgroup_ballot: require
 #extension GL_GOOGLE_include_directive : enable
 
-#include "../include/host_device.hpp"
 #include "common.glsl"
 
+layout(binding = 0, set = 0) uniform UniformBuffer {Ubo ubo;};
 layout(binding = 3, set = 0, scalar) readonly buffer VertexBuffer {vec3 verts[];};
 layout(binding = 7, set = 0) readonly buffer MeshletVerticesBuffer {uint meshletVertices[];};
 layout(binding = 8, set = 0, scalar) readonly buffer MeshletIndicesBuffer {uint8_t meshletTriangles[];};
@@ -23,14 +22,42 @@ taskPayloadSharedEXT TaskPayload taskPayload;
 
 void main()
 {
-    const uint threadIdx = gl_LocalInvocationID.x;
-    const uint meshletIdx = gl_GlobalInvocationID.x;
+    uint meshletIdx = gl_GlobalInvocationID.x;
+    const MeshInfo meshInfo = meshInfos[gl_DrawIDARB];
+    if (meshletIdx >= meshInfo.meshletCount) return;
+    meshletIdx += meshInfo.meshletOffset;
 
-    if (threadIdx == 0) {
-        const MeshInfo meshInfo = meshInfos[gl_DrawIDARB];
+    // Source for frustum culling: https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf
+    const MeshletBounds bounds = meshletBounds[meshletIdx];
+    const float radius = bounds.radius * length(meshInfo.modelMatrix[0]);
+    vec4 frustumPlanes[6];
+    const mat4 mvpMatrix = ubo.projectionMatrix * ubo.viewMatrix * meshInfo.modelMatrix;
+    for (int i = 0; i < 4; i++) frustumPlanes[0][i] = mvpMatrix[i][3] + mvpMatrix[i][0];
+    for (int i = 0; i < 4; i++) frustumPlanes[1][i] = mvpMatrix[i][3] - mvpMatrix[i][0];
+    for (int i = 0; i < 4; i++) frustumPlanes[2][i] = mvpMatrix[i][3] - mvpMatrix[i][1];
+    for (int i = 0; i < 4; i++) frustumPlanes[3][i] = mvpMatrix[i][3] + mvpMatrix[i][1];
+    for (int i = 0; i < 4; i++) frustumPlanes[4][i] = mvpMatrix[i][3] + mvpMatrix[i][2];
+    for (int i = 0; i < 4; i++) frustumPlanes[5][i] = mvpMatrix[i][3] - mvpMatrix[i][2];
+
+    bool accept = true;
+    for (int i = 0; i < 6; i++) {
+        frustumPlanes[i] /= length(frustumPlanes[i].xyz);
+        accept = accept && dot(bounds.center, frustumPlanes[i].xyz) + frustumPlanes[i].w + radius >= 0;
+    }
+
+    const vec3 center = vec3(meshInfo.modelMatrix * vec4(bounds.center, 1.0));
+    const vec3 coneAxis = mat3(meshInfo.modelMatrix) * (bounds.coneAxis / 127.0);
+    const float coneCutoff = bounds.coneCutoff / 127.0;
+
+    accept = accept && dot(center - ubo.cameraPosition.xyz, coneAxis) < coneCutoff * length(center - ubo.cameraPosition.xyz) + radius;
+
+    const uvec4 ballot = subgroupBallot(accept);
+    const uint index = subgroupBallotExclusiveBitCount(ballot);
+    if (accept) taskPayload.meshletIndices[index] = meshletIdx;
+
+    if (gl_LocalInvocationID.x == 0) {
         taskPayload.modelMatrix = meshInfo.modelMatrix;
-        taskPayload.meshletOffset = meshletIdx + meshInfo.meshletOffset;
         taskPayload.matIdx = meshInfo.matIdx;
-        EmitMeshTasksEXT(min(meshInfo.meshletCount - meshletIdx, MESHLETS_PER_TASK_SHADER), 1, 1);
+        EmitMeshTasksEXT(subgroupBallotBitCount(ballot), 1, 1);
     }
 }
