@@ -15,7 +15,6 @@
 #include <OpenEXR/ImfRgbaFile.h>
 #include <ktx.h>
 #include <vulkan/vulkan_core.h>
-#define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
 #include <iostream>
@@ -111,61 +110,66 @@ void VulImage::loadCompressedKtxFromFile(const std::string &fileName, KtxCompres
     KtxCompressionFormatProperties ktxFormatProperties = getKtxCompressionFormatProperties(compressionFormat);
     VkFormatProperties formatProperties = getVkFormatProperties(ktxFormatProperties.vkFormat);
 
-    ktxTexture2 *ktxTexture;
-    KTX_error_code result = ktxTexture2_CreateFromNamedFile(fileName.c_str(), KTX_TEXTURE_CREATE_LOAD_IMAGE_DATA_BIT, &ktxTexture); 
-    if (result != KTX_SUCCESS) throw std::runtime_error("Failed to create ktxTexture. File: " + fileName + " Error code: " + std::to_string(result));
+    static double k = 0.0;
+    static double l = 0.0;
 
-    result = ktxTexture2_TranscodeBasis(ktxTexture, ktxFormatProperties.transcodeFormat, 0);
+    double m = glfwGetTime();
+    ktxTexture2 *origTexture;
+    KTX_error_code result = ktxTexture2_CreateFromNamedFile(fileName.c_str(), KTX_TEXTURE_CREATE_NO_FLAGS, &origTexture); 
+    if (result != KTX_SUCCESS) throw std::runtime_error("Failed to create ktxTexture. File: " + fileName + " Error code: " + std::to_string(result));
+    k += glfwGetTime() - m;
+
+    ktxTextureCreateInfo createInfo{};
+    createInfo.baseWidth = origTexture->baseWidth / 64;
+    createInfo.baseHeight = origTexture->baseHeight / 64;
+    createInfo.baseDepth = origTexture->baseDepth;
+    createInfo.numLevels = origTexture->numLevels - 6;
+    createInfo.numFaces = origTexture->numFaces;
+    createInfo.numLayers = origTexture->numLayers;
+    createInfo.numDimensions = origTexture->numDimensions;
+    createInfo.generateMipmaps = origTexture->generateMipmaps;
+    createInfo.pDfd = origTexture->pDfd;
+    ktxTexture2 *texture;
+    ktxTexture2_Create(&createInfo, KTX_TEXTURE_CREATE_ALLOC_STORAGE, &texture);
+    origTexture->dataSize = texture->dataSize;
+    texture->vtbl->LoadImageData(ktxTexture(origTexture), texture->pData, texture->dataSize);
+
+    double c = glfwGetTime();
+    result = ktxTexture2_TranscodeBasis(texture, ktxFormatProperties.transcodeFormat, 0);
     if (result != KTX_SUCCESS) throw std::runtime_error("Failed to transcode ktxTexture to format " +
             std::to_string(ktxFormatProperties.transcodeFormat) + " File: " + fileName + " Error code: " + std::to_string(result));
+    l += glfwGetTime() - c;
 
-    uint32_t width = ktxTexture->baseWidth;
-    uint32_t height = ktxTexture->baseHeight;
-    uint32_t depth = ktxTexture->baseDepth;
-    const uint32_t baseWidth = alignUp(width * std::pow(2, baseOutputMipLevel), formatProperties.sideLengthAlignment);
-    const uint32_t baseHeight = alignUp(height * std::pow(2, baseOutputMipLevel), formatProperties.sideLengthAlignment);
-    const uint32_t baseDepth = depth * std::pow(2, baseOutputMipLevel);
+    std::cout << k << " " << l << "\n";
 
-    uint32_t layerSize = alignUp(width, formatProperties.sideLengthAlignment) *
-        alignUp(height, formatProperties.sideLengthAlignment) * depth * formatProperties.bitsPerTexel / 8;
-    uint8_t *pCopySrc = ktxTexture->pData + ktxTexture->dataSize - layerSize * ktxTexture->numLayers;
-    for (uint32_t i = 0; i < baseInputMipLevel; i++) {
-        width = std::max(width / 2, 1u);
-        height = std::max(height / 2, 1u);
-        depth = std::max(depth / 2, 1u);
-        layerSize = alignUp(width, formatProperties.sideLengthAlignment) *
-            alignUp(height, formatProperties.sideLengthAlignment) * depth * formatProperties.bitsPerTexel / 8;
-        pCopySrc -= layerSize * ktxTexture->numLayers;
-    }
+    const uint32_t baseWidth = alignUp(texture->baseWidth * std::pow(2, baseOutputMipLevel), formatProperties.sideLengthAlignment);
+    const uint32_t baseHeight = alignUp(texture->baseHeight * std::pow(2, baseOutputMipLevel), formatProperties.sideLengthAlignment);
+    const uint32_t baseDepth = texture->baseDepth * std::pow(2, baseOutputMipLevel);
 
-    uint32_t mipLevelCopyCount = std::min(ktxTexture->numLevels - baseInputMipLevel, mipLevelCount);
-    uint32_t arrayLayerCopyCount = std::min(ktxTexture->numLayers - baseInputArrayLayer, arrayLayerCount);
+    uint32_t mipLevelCopyCount = std::min(texture->numLevels - baseInputMipLevel, mipLevelCount);
+    uint32_t arrayLayerCopyCount = std::min(texture->numLayers - baseInputArrayLayer, arrayLayerCount);
     std::vector<std::vector<void *>> data(mipLevelCopyCount);
-    for (uint32_t i = 0; i < mipLevelCopyCount; i++) {
-        width = std::max(width / 2, 1u);
-        height = std::max(height / 2, 1u);
-        depth = std::max(depth / 2, 1u);
-        layerSize = alignUp(width, formatProperties.sideLengthAlignment) *
+    uint8_t *pCopySrc = texture->pData;
+    for (int i = mipLevelCopyCount - 1; i >= 0; i--) {
+        const uint32_t width = std::max(baseWidth / static_cast<uint32_t>(std::pow(2, i + baseOutputMipLevel)), 1u);
+        const uint32_t height = std::max(baseHeight / static_cast<uint32_t>(std::pow(2, i + baseOutputMipLevel)), 1u);
+        const uint32_t depth = std::max(baseDepth / static_cast<uint32_t>(std::pow(2, i + baseOutputMipLevel)), 1u);
+        uint32_t layerSize = alignUp(width, formatProperties.sideLengthAlignment) *
             alignUp(height, formatProperties.sideLengthAlignment) * depth * formatProperties.bitsPerTexel / 8;
 
-        pCopySrc -= layerSize * baseInputArrayLayer;
+        pCopySrc += layerSize * baseInputArrayLayer;
         data[i].resize(arrayLayerCopyCount);
         for (uint32_t j = 0; j < arrayLayerCopyCount; j++) {
             data[i][j] = pCopySrc;
-            pCopySrc -= layerSize;
+            pCopySrc += layerSize;
         } 
 
-        pCopySrc -= layerSize * (ktxTexture->numLayers - baseInputArrayLayer - arrayLayerCopyCount);
+        pCopySrc += layerSize * (texture->numLayers - baseInputArrayLayer - arrayLayerCopyCount);
     }
 
     loadRawFromMemory(baseWidth, baseHeight, baseDepth, data, ktxFormatProperties.vkFormat, baseOutputMipLevel, baseOutputArrayLayer); 
-    free(ktxTexture->pData);
-    free(ktxTexture->pDfd);
-    free(ktxTexture->vvtbl);
-    free(ktxTexture->kvData);
-    free(ktxTexture->_private);
-    free(ktxTexture->_protected);
-    free(ktxTexture);
+    ktxTexture_Destroy(ktxTexture(origTexture));
+    ktxTexture_Destroy(ktxTexture(texture));
 }
 
 void VulImage::loadCubemapFromEXR(const std::string &filename)

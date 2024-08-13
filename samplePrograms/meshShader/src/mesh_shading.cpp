@@ -142,7 +142,7 @@ MeshResources createMeshShadingResources(vul::Scene &scene, const vul::VulRender
     configInfo.depthAttachmentFormat = vulRenderer.getDepthFormat();
     configInfo.setLayouts = {meshResources.descSets[0]->getLayout()->getDescriptorSetLayout()};
 
-    meshResources.pipeline = std::make_unique<vul::VulMeshPipeline>(vulDevice, "mesh.task.spv", "meshletDebug.mesh.spv", "meshletDebug.frag.spv", configInfo);
+    meshResources.pipeline = std::make_unique<vul::VulMeshPipeline>(vulDevice, "mesh.task.spv", "mesh.mesh.spv", "mesh.frag.spv", configInfo);
 
     return meshResources;
 }

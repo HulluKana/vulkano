@@ -23,9 +23,6 @@
 #include<vul_transform.hpp>
 #include <vulkan/vulkan_core.h>
 
-#define STB_IMAGE_WRITE_IMPLEMENTATION
-#define TINYGLTF_IMPLEMENTATION
-#define TINYGLTF_NO_EXTERNAL_IMAGE
 #include <tiny_gltf.h>
 
 
@@ -89,6 +86,7 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
 
     QueueFamilyIndices queueFamilyIndices = device.findPhysicalQueueFamilies();
     std::vector<std::thread> threads(std::thread::hardware_concurrency());
+    //std::vector<std::thread> threads(1);
     std::vector<VkCommandPool> pools(threads.size());
     std::vector<VkCommandBuffer> cmdBufs(pools.size());
     for (size_t i = 0; i < pools.size(); i++) {
@@ -116,8 +114,14 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
 
     std::vector<std::shared_ptr<VulImage>> imgSources(model.images.size());
     std::atomic<uint32_t> atomImgIdx = 0;
+    std::vector<double> loadingFilesTimes(threads.size());
+    std::vector<double> minLoadingFilesTimes(threads.size());
+    std::vector<double> maxLoadingFilesTimes(threads.size());
+    std::vector<uint32_t> loadCounts(threads.size());
     std::function<void(uint32_t)> importTexture = [&](uint32_t threadIdx)
     {
+        minLoadingFilesTimes[threadIdx] = std::numeric_limits<double>::max();
+        maxLoadingFilesTimes[threadIdx] = std::numeric_limits<double>::min();
         while (true) {
             uint32_t imgIdx = atomImgIdx++; 
             if (imgIdx >= imgSources.size()) break;
@@ -130,10 +134,16 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
 
             const tinygltf::Image &image = model.images[imgIdx];
             imgSources[imgIdx] = std::make_shared<VulImage>(device);
+            const double starTime = glfwGetTime();
             imgSources[imgIdx]->loadCompressedKtxFromFileWhole(textureDirectory + image.uri, fromat);
+            const double time = glfwGetTime() - starTime;
             imgSources[imgIdx]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                     VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBufs[threadIdx]);
+            loadingFilesTimes[threadIdx] += time;
+            minLoadingFilesTimes[threadIdx] = std::min(minLoadingFilesTimes[threadIdx], time);
+            maxLoadingFilesTimes[threadIdx] = std::max(maxLoadingFilesTimes[threadIdx], time);
+            loadCounts[threadIdx]++;
         }
     };
 
@@ -162,6 +172,10 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
 
         images[i]->deleteStagingResources();
         images[i]->deleteCpuData();
+    }
+
+    for (size_t i = 0; i < loadingFilesTimes.size(); i++) {
+        std::cout << "Thread " << i << " took " << loadingFilesTimes[i] << " seconds to load " << loadCounts[i] << " files with min time " << minLoadingFilesTimes[i] << " seconds and max time " << maxLoadingFilesTimes[i] << " seconds\n";
     }
 }
 
