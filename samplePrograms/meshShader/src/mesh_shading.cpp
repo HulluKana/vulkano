@@ -40,7 +40,8 @@ MeshResources createMeshShadingResources(vul::Scene &scene, const vul::VulRender
                 scene.vertices.size(), sizeof(glm::vec3), MAX_MESHLET_VERTICES, MAX_MESHLET_TRIANGLES, 0.0f);
 
         meshInfos.emplace_back(MeshInfo{.modelMatrix = node.worldMatrix, .meshletOffset = static_cast<uint32_t>(meshlets.size()),
-                .meshletCount = static_cast<uint32_t>(meshletCount), .matIdx = static_cast<uint32_t>(mesh.materialIndex)});
+                .meshletCount = static_cast<uint32_t>(meshletCount), .matIdx = static_cast<uint32_t>(mesh.materialIndex),
+                .padding1 = 69, .padding2 = {420, 024, 024, 420}, .padding3 = {41, 41, 14, 14}, .padding4 = {12, 345, 67, 890}});
         indirectCommands.emplace_back(VkDrawMeshTasksIndirectCommandEXT{((static_cast<uint32_t>(meshletCount) +
                 (MESHLETS_PER_TASK_SHADER - 1)) & ~(MESHLETS_PER_TASK_SHADER - 1)) / MESHLETS_PER_TASK_SHADER, 1, 1});
 

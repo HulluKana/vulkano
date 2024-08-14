@@ -60,7 +60,7 @@ void VulRenderer::recreateSwapChain()
     m_depthImages.resize(vulSwapChain->imageCount());
     for (size_t i = 0; i < vulSwapChain->imageCount(); i++) {
         m_depthImages[i] = std::make_unique<vul::VulImage>(vulDevice);
-        m_depthImages[i]->keepEmpty(vulSwapChain->getSwapChainExtent().width, vulSwapChain->getSwapChainExtent().height, 1, 1, 1, m_depthFormat, 0, 0);
+        m_depthImages[i]->keepEmpty(vulSwapChain->getSwapChainExtent().width, vulSwapChain->getSwapChainExtent().height, 1, 1, 1, m_depthFormat);
         m_depthImages[i]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, depthUsage,
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, cmdBuf);
         m_depthImages[i]->vulSampler = m_depthImgSampler;

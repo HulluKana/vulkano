@@ -11,6 +11,7 @@ using vec3 = glm::vec3;
 using vec4 = glm::vec4;
 using mat4 = glm::mat4;
 using i8vec3 = glm::vec<3, int8_t>;
+using uvec4 = glm::uvec4;
 #endif
 
 #define MAX_MESHLET_VERTICES 64
@@ -32,6 +33,10 @@ struct MeshInfo {
     uint meshletOffset;
     uint meshletCount;
     uint matIdx;
+    uint padding1;
+    uvec4 padding2;
+    uvec4 padding3;
+    uvec4 padding4;
 };
 
 struct Meshlet {

@@ -93,7 +93,7 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
-        poolInfo.flags = VK_COMMAND_POOL_CREATE_TRANSIENT_BIT;
+        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         assert(vkCreateCommandPool(device.device(), &poolInfo, nullptr, &pools[i]) == VK_SUCCESS);
 
         VkCommandBufferAllocateInfo allocInfo{};
@@ -135,7 +135,7 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
             const tinygltf::Image &image = model.images[imgIdx];
             imgSources[imgIdx] = std::make_shared<VulImage>(device);
             const double starTime = glfwGetTime();
-            imgSources[imgIdx]->loadCompressedKtxFromFileWhole(textureDirectory + image.uri, fromat);
+            imgSources[imgIdx]->loadCompressedKtxFromFile(textureDirectory + image.uri, fromat, 6, 69);
             const double time = glfwGetTime() - starTime;
             imgSources[imgIdx]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
@@ -156,6 +156,46 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
     VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
     vkCmdExecuteCommands(cmdBuf, cmdBufs.size(), cmdBufs.data());
     cmdPool.submitAndWait(cmdBuf);
+
+    atomImgIdx = 0;
+    for (size_t i = 0; i < cmdBufs.size(); i++) {
+        VkCommandBufferInheritanceInfo inheritance{};
+        inheritance.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        beginInfo.pInheritanceInfo = &inheritance;
+        vkBeginCommandBuffer(cmdBufs[i], &beginInfo);
+    }
+    std::function<void(uint32_t)> importTextur = [&](uint32_t threadIdx)
+    {
+        while (true) {
+            uint32_t imgIdx = atomImgIdx++; 
+            if (imgIdx >= imgSources.size()) break;
+
+            VulImage::KtxCompressionFormat fromat{};
+            if (transparentColorTextures.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaNonLinear;
+            else if (opaqueColorTextures.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc1rgbNonLinear;
+            else if (normalMaps.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaLinear;
+            else if (roughnessMetallicTextures.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaLinear;
+
+            const tinygltf::Image &image = model.images[imgIdx];
+            imgSources[imgIdx]->addMipLevelsToStartFromCompressedKtxFile(textureDirectory + image.uri, fromat, 6);
+            imgSources[imgIdx]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBufs[threadIdx]);
+        }
+    };
+    for (size_t i = 0; i < threads.size(); i++) threads[i] = std::thread(importTextur, i);
+    for (size_t i = 0; i < threads.size(); i++) {
+        threads[i].join();
+        vkEndCommandBuffer(cmdBufs[i]);
+    }
+
+    cmdBuf = cmdPool.getPrimaryCommandBuffer();
+    vkCmdExecuteCommands(cmdBuf, cmdBufs.size(), cmdBufs.data());
+    cmdPool.submitAndWait(cmdBuf);
+
     for (size_t i = 0; i < pools.size(); i++) {
         vkFreeCommandBuffers(device.device(), pools[i], 1, &cmdBufs[i]);
         vkDestroyCommandPool(device.device(), pools[i], nullptr);

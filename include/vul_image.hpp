@@ -110,26 +110,21 @@ class VulImage {
 
         void loadCompressedKtxFromFileWhole(const std::string &fileName, KtxCompressionFormat compressionFormat);
         void loadCompressedKtxFromFile(const std::string &fileName, KtxCompressionFormat compressionFormat,
-                uint32_t baseInputMipLevel, uint32_t baseOutputMipLevel, uint32_t mipLevelCount,
-                uint32_t baseInputArrayLayer, uint32_t baseOutputArrayLayer, uint32_t arrayLayerCount);
+                uint32_t inputMipLevel, uint32_t mipLevelCount);
+        void addMipLevelsToStartFromCompressedKtxFile(const std::string &fileName,
+                KtxCompressionFormat compressionFormat, uint32_t mipLevelCount);
 
-        void loadUncompressedFromFileWhole(const std::string &fileName);
-        void loadUncompressedFromFile(const std::string &fileName, uint32_t baseInputMipLevel, uint32_t baseOutputMipLevel,
-                uint32_t mipLevelCount, uint32_t baseInputArrayLayer, uint32_t baseOutputArrayLayer, uint32_t arrayLayerCount);
-
+        void loadUncompressedFromFile(const std::string &fileName);
         void loadCubemapFromEXR(const std::string &filename);
 
-        void loadRegularRaw2d8bitRgbaFromMemoryWhole(const void *data, uint32_t width, uint32_t height);
-        void loadRegularRaw2d32bitRgbaFromMemoryWhole(const void *data, uint32_t width, uint32_t height);
-        void loadRawFromMemoryWhole(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth,
+        void loadRegularRaw2d8bitRgbaFromMemory(const void *data, uint32_t width, uint32_t height);
+        void loadRegularRaw2d32bitRgbaFromMemory(const void *data, uint32_t width, uint32_t height);
+        void loadRawFromMemory(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth,
                 const std::vector<std::vector<void *>> &data, VkFormat format);
-        void loadRawFromMemory(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth, const std::vector<std::vector<void *>>
-                &data, VkFormat format, uint32_t baseOutputMipLevel, uint32_t baseOutputArrayLayer);
 
         void keepRegularRaw2d8bitRgbaEmpty(uint32_t width, uint32_t height);
         void keepRegularRaw2d32bitRgbaEmpty(uint32_t width, uint32_t height);
-        void keepEmpty(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth, uint32_t mipCount, uint32_t arrayCount,
-                VkFormat format, uint32_t baseOutputMipLevel, uint32_t baseOutputArrayLayer);
+        void keepEmpty(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth, uint32_t mipCount, uint32_t arrayCount, VkFormat format);
 
         void createDefaultImage(ImageType type, VkCommandBuffer cmdBuf);
         void createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,

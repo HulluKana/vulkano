@@ -1,6 +1,7 @@
 #include <OpenEXR/ImfRgba.h>
 #include <cassert>
 #include <cmath>
+#include <cstdint>
 #include <cstdlib>
 #include <cstring>
 #include <memory>
@@ -102,28 +103,22 @@ VulImage::~VulImage()
 }
 
 void VulImage::loadCompressedKtxFromFile(const std::string &fileName, KtxCompressionFormat compressionFormat,
-        uint32_t baseInputMipLevel, uint32_t baseOutputMipLevel, uint32_t mipLevelCount,
-        uint32_t baseInputArrayLayer, uint32_t baseOutputArrayLayer, uint32_t arrayLayerCount)
+        uint32_t inputMipLevel, uint32_t mipLevelCount)
 {
-    if (fileName.length() == 0 || mipLevelCount == 0 || arrayLayerCount == 0) return;
+    if (fileName.length() == 0 || mipLevelCount == 0) return;
 
     KtxCompressionFormatProperties ktxFormatProperties = getKtxCompressionFormatProperties(compressionFormat);
     VkFormatProperties formatProperties = getVkFormatProperties(ktxFormatProperties.vkFormat);
 
-    static double k = 0.0;
-    static double l = 0.0;
-
-    double m = glfwGetTime();
     ktxTexture2 *origTexture;
     KTX_error_code result = ktxTexture2_CreateFromNamedFile(fileName.c_str(), KTX_TEXTURE_CREATE_NO_FLAGS, &origTexture); 
     if (result != KTX_SUCCESS) throw std::runtime_error("Failed to create ktxTexture. File: " + fileName + " Error code: " + std::to_string(result));
-    k += glfwGetTime() - m;
 
     ktxTextureCreateInfo createInfo{};
-    createInfo.baseWidth = origTexture->baseWidth / 64;
-    createInfo.baseHeight = origTexture->baseHeight / 64;
+    createInfo.baseWidth = origTexture->baseWidth / std::pow(2, inputMipLevel);
+    createInfo.baseHeight = origTexture->baseHeight / std::pow(2, inputMipLevel);
     createInfo.baseDepth = origTexture->baseDepth;
-    createInfo.numLevels = origTexture->numLevels - 6;
+    createInfo.numLevels = origTexture->numLevels - inputMipLevel;
     createInfo.numFaces = origTexture->numFaces;
     createInfo.numLayers = origTexture->numLayers;
     createInfo.numDimensions = origTexture->numDimensions;
@@ -133,41 +128,34 @@ void VulImage::loadCompressedKtxFromFile(const std::string &fileName, KtxCompres
     ktxTexture2_Create(&createInfo, KTX_TEXTURE_CREATE_ALLOC_STORAGE, &texture);
     origTexture->dataSize = texture->dataSize;
     texture->vtbl->LoadImageData(ktxTexture(origTexture), texture->pData, texture->dataSize);
+    mipLevelCount = std::min(texture->numLevels, mipLevelCount);
 
-    double c = glfwGetTime();
     result = ktxTexture2_TranscodeBasis(texture, ktxFormatProperties.transcodeFormat, 0);
     if (result != KTX_SUCCESS) throw std::runtime_error("Failed to transcode ktxTexture to format " +
             std::to_string(ktxFormatProperties.transcodeFormat) + " File: " + fileName + " Error code: " + std::to_string(result));
-    l += glfwGetTime() - c;
 
-    std::cout << k << " " << l << "\n";
+    const uint32_t baseWidth = alignUp(texture->baseWidth, formatProperties.sideLengthAlignment);
+    const uint32_t baseHeight = alignUp(texture->baseHeight, formatProperties.sideLengthAlignment);
+    const uint32_t baseDepth = texture->baseDepth;
 
-    const uint32_t baseWidth = alignUp(texture->baseWidth * std::pow(2, baseOutputMipLevel), formatProperties.sideLengthAlignment);
-    const uint32_t baseHeight = alignUp(texture->baseHeight * std::pow(2, baseOutputMipLevel), formatProperties.sideLengthAlignment);
-    const uint32_t baseDepth = texture->baseDepth * std::pow(2, baseOutputMipLevel);
-
-    uint32_t mipLevelCopyCount = std::min(texture->numLevels - baseInputMipLevel, mipLevelCount);
-    uint32_t arrayLayerCopyCount = std::min(texture->numLayers - baseInputArrayLayer, arrayLayerCount);
-    std::vector<std::vector<void *>> data(mipLevelCopyCount);
+    std::vector<std::vector<void *>> data(texture->numLevels);
     uint8_t *pCopySrc = texture->pData;
-    for (int i = mipLevelCopyCount - 1; i >= 0; i--) {
-        const uint32_t width = std::max(baseWidth / static_cast<uint32_t>(std::pow(2, i + baseOutputMipLevel)), 1u);
-        const uint32_t height = std::max(baseHeight / static_cast<uint32_t>(std::pow(2, i + baseOutputMipLevel)), 1u);
-        const uint32_t depth = std::max(baseDepth / static_cast<uint32_t>(std::pow(2, i + baseOutputMipLevel)), 1u);
+    for (int i = texture->numLevels - 1; i >= 0; i--) {
+        const uint32_t width = std::max(baseWidth / static_cast<uint32_t>(std::pow(2, i)), 1u);
+        const uint32_t height = std::max(baseHeight / static_cast<uint32_t>(std::pow(2, i)), 1u);
+        const uint32_t depth = std::max(baseDepth / static_cast<uint32_t>(std::pow(2, i)), 1u);
         uint32_t layerSize = alignUp(width, formatProperties.sideLengthAlignment) *
             alignUp(height, formatProperties.sideLengthAlignment) * depth * formatProperties.bitsPerTexel / 8;
 
-        pCopySrc += layerSize * baseInputArrayLayer;
-        data[i].resize(arrayLayerCopyCount);
-        for (uint32_t j = 0; j < arrayLayerCopyCount; j++) {
+        data[i].resize(texture->numLayers);
+        for (uint32_t j = 0; j < texture->numLayers; j++) {
             data[i][j] = pCopySrc;
             pCopySrc += layerSize;
         } 
-
-        pCopySrc += layerSize * (texture->numLayers - baseInputArrayLayer - arrayLayerCopyCount);
     }
+    data.resize(mipLevelCount);
 
-    loadRawFromMemory(baseWidth, baseHeight, baseDepth, data, ktxFormatProperties.vkFormat, baseOutputMipLevel, baseOutputArrayLayer); 
+    loadRawFromMemory(baseWidth, baseHeight, baseDepth, data, ktxFormatProperties.vkFormat); 
     ktxTexture_Destroy(ktxTexture(origTexture));
     ktxTexture_Destroy(ktxTexture(texture));
 }
@@ -186,60 +174,48 @@ void VulImage::loadCubemapFromEXR(const std::string &filename)
     file.readPixels(dataWindow.min.y, dataWindow.max.y);
 
     std::vector<void *> mipLevel(6);
-        mipLevel[0] = pixels.get() + height * width * 0;
-        mipLevel[1] = pixels.get() + height * width * 1;
-        mipLevel[2] = pixels.get() + height * width * 2;
-        mipLevel[3] = pixels.get() + height * width * 3;
-        mipLevel[4] = pixels.get() + height * width * 5;
-        mipLevel[5] = pixels.get() + height * width * 4;
-    loadRawFromMemory(width, height, 1, {mipLevel}, VK_FORMAT_R16G16B16A16_SFLOAT, 0, 0);
+    mipLevel[0] = pixels.get() + height * width * 0;
+    mipLevel[1] = pixels.get() + height * width * 1;
+    mipLevel[2] = pixels.get() + height * width * 2;
+    mipLevel[3] = pixels.get() + height * width * 3;
+    mipLevel[4] = pixels.get() + height * width * 5;
+    mipLevel[5] = pixels.get() + height * width * 4;
+    loadRawFromMemory(width, height, 1, {mipLevel}, VK_FORMAT_R16G16B16A16_SFLOAT);
+}
+
+void VulImage::loadUncompressedFromFile(const std::string &filename)
+{
+    assert(0 && "Not implemented");
 }
 
 void VulImage::loadRawFromMemory(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth,
-        const std::vector<std::vector<void *>> &data, VkFormat format, uint32_t baseOutputMipLevel, uint32_t baseOutputArrayLayer)
+        const std::vector<std::vector<void *>> &data, VkFormat format)
 {
-    if (data.size() == 0) return;
-    size_t arrayCount = data[0].size();
-    uint32_t firstMip = 0;
-    for (size_t i = 0; i < data.size(); i++) {
-        size_t nextArrayCount = data[std::min(i + 1, data.size())].size();
-        if (arrayCount != nextArrayCount || i >= data.size() - 1) {
-            keepEmpty(baseWidth, baseHeight, baseDepth, i - firstMip + 1, arrayCount, format, baseOutputMipLevel + firstMip, baseOutputArrayLayer);
-            arrayCount = nextArrayCount;
-            firstMip = i + 1;
-        }
-    }
+    if (data.size() == 0 || data[0].size() == 0) return;
+
+    keepEmpty(baseWidth, baseHeight, baseDepth, data.size(), data[0].size(), format);
 
     size_t offset = 0;
     for (size_t i = 0; i < data.size(); i++) {
-        uint32_t m_i = i + baseOutputMipLevel;
-        offset += m_mipLevels[m_i].layerSize * baseOutputArrayLayer;
         for (size_t j = 0; j < data[i].size(); j++) {
-            m_mipLevels[m_i].containsData[j] = false;
+            m_mipLevels[i].containsData[j] = false;
             if (data[i][j] != nullptr) {
-                memcpy(m_data.get() + offset, data[i][j], m_mipLevels[m_i].layerSize);
-                m_mipLevels[m_i].containsData[j] = true;
+                memcpy(m_data.get() + offset, data[i][j], m_mipLevels[i].layerSize);
+                m_mipLevels[i].containsData[j] = true;
             }
-            m_mipLevels[m_i].layers[j + baseOutputArrayLayer] = m_data.get() + offset; 
-            offset += m_mipLevels[m_i].layerSize;
+            m_mipLevels[i].layers[j] = m_data.get() + offset; 
+            offset += m_mipLevels[i].layerSize;
         }
     }
 }
 
 void VulImage::keepEmpty(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth, uint32_t mipCount,
-        uint32_t arrayCount, VkFormat format, uint32_t baseOutputMipLevel, uint32_t baseOutputArrayLayer)
+        uint32_t arrayCount, VkFormat format)
 {
     assert(baseWidth > 0);
     assert(baseHeight > 0);
     assert(baseDepth > 0);
-    assert(m_baseWidth == 0 || m_baseWidth == baseWidth);
-    assert(m_baseHeight == 0 || m_baseHeight == baseHeight);
-    assert(m_baseDepth == 0 || m_baseDepth == baseDepth);
     assert(format == m_format || m_format == VK_FORMAT_UNDEFINED);
-    assert(baseOutputMipLevel <= m_mipLevels.size());
-    if (m_mipLevels.size() > 0)
-        for (size_t i = 0; i < m_mipLevels.size(); i++) assert(baseOutputArrayLayer <= m_mipLevels[i].layers.size());
-    else assert(baseOutputArrayLayer == 0);
 
     VkFormatProperties formatProperties = getVkFormatProperties(format);
     m_baseWidth = baseWidth;
@@ -249,73 +225,50 @@ void VulImage::keepEmpty(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseD
     m_bitsPerTexel = formatProperties.bitsPerTexel;
 
     size_t requiredSize = 0; 
-    for (uint32_t i = 0; i < baseOutputMipLevel; i++) {
-        assert(m_mipLevels[i].width > 0);
-        assert(m_mipLevels[i].height > 0);
-        assert(m_mipLevels[i].depth > 0);
-        assert(m_mipLevels[i].layers.size() > 0);
-        requiredSize += m_mipLevels[i].width * m_mipLevels[i].height * m_mipLevels[i].depth *
-            formatProperties.bitsPerTexel / 8 * m_mipLevels[i].layers.size();
-    }
-
-    m_mipLevels.resize(std::max(mipCount + baseOutputMipLevel, static_cast<uint32_t>(m_mipLevels.size())));
+    m_mipLevels.resize(mipCount);
     for (uint32_t i = 0; i < mipCount; i++) {
-        const uint32_t width = std::max(baseWidth / static_cast<uint32_t>(std::pow(2, i + baseOutputMipLevel)), 1u);
-        const uint32_t height = std::max(baseHeight / static_cast<uint32_t>(std::pow(2, i + baseOutputMipLevel)), 1u);
-        const uint32_t depth = std::max(baseDepth / static_cast<uint32_t>(std::pow(2, i + baseOutputMipLevel)), 1u);
-        if (i + baseOutputMipLevel <= m_mipLevels.size() && baseOutputArrayLayer > 0) {
-            assert(m_mipLevels[i + baseOutputMipLevel].width > 0);
-            assert(m_mipLevels[i + baseOutputMipLevel].height > 0);
-            assert(m_mipLevels[i + baseOutputMipLevel].depth > 0);
-            assert(m_mipLevels[i + baseOutputMipLevel].layers.size() > 0);
-            assert(m_mipLevels[i + baseOutputMipLevel].width == width);
-            assert(m_mipLevels[i + baseOutputMipLevel].height == height);
-            assert(m_mipLevels[i + baseOutputMipLevel].depth == depth);
-        }
-        m_mipLevels[i + baseOutputMipLevel].width = width;
-        m_mipLevels[i + baseOutputMipLevel].height = height;
-        m_mipLevels[i + baseOutputMipLevel].depth = depth;
-        m_mipLevels[i + baseOutputMipLevel].layerSize = alignUp(width, formatProperties.sideLengthAlignment)
+        const uint32_t width = std::max(baseWidth / static_cast<uint32_t>(std::pow(2, i)), 1u);
+        const uint32_t height = std::max(baseHeight / static_cast<uint32_t>(std::pow(2, i)), 1u);
+        const uint32_t depth = std::max(baseDepth / static_cast<uint32_t>(std::pow(2, i)), 1u);
+        m_mipLevels[i].width = width;
+        m_mipLevels[i].height = height;
+        m_mipLevels[i].depth = depth;
+        m_mipLevels[i].layerSize = alignUp(width, formatProperties.sideLengthAlignment)
             * alignUp(height, formatProperties.sideLengthAlignment) * depth * formatProperties.bitsPerTexel / 8;
-        requiredSize += m_mipLevels[i + baseOutputMipLevel].layerSize * (baseOutputArrayLayer + arrayCount);
+        requiredSize += m_mipLevels[i].layerSize * arrayCount;
     }
     m_dataSize = requiredSize;
 
-    uint8_t *oldData = nullptr;
-    if (m_data != nullptr) oldData =  m_data.release();
-    if (oldData == nullptr) {
-        assert(baseOutputMipLevel == 0);
-        assert(baseOutputArrayLayer == 0);
-    }
     m_data = std::unique_ptr<uint8_t>(new uint8_t[m_dataSize]());
     assert(m_data != nullptr);
    
-    for (uint32_t i = 0; i < baseOutputMipLevel; i++) {
-        for (size_t j = 0; j < m_mipLevels[i].layers.size(); j++) {
-            if (m_mipLevels[i].layers[j] == nullptr) continue;
-            size_t offset = static_cast<uint8_t *>(m_mipLevels[i].layers[j]) - oldData;
-            memcpy(m_data.get() + offset, oldData + offset, m_mipLevels[i].layerSize);
-            m_mipLevels[i].layers[j] = m_data.get() + m_mipLevels[i].layerSize * j;
-        }
+    for (uint32_t i = 0; i < mipCount; i++) {
+        m_mipLevels[i].layers.resize(arrayCount);
+        m_mipLevels[i].containsData.resize(arrayCount);
     }
-    size_t offset = 0;
-    for (uint32_t i = baseOutputMipLevel; i < baseOutputMipLevel + mipCount; i++) {
-        m_mipLevels[i].layers.resize(std::max(arrayCount + baseOutputArrayLayer, static_cast<uint32_t>(m_mipLevels[i].layers.size())));
-        m_mipLevels[i].containsData.resize(std::max(arrayCount + baseOutputArrayLayer, static_cast<uint32_t>(m_mipLevels[i].layers.size())));
-        for (uint32_t j = 0; j < baseOutputArrayLayer; j++) {
-            m_mipLevels[i].containsData[j] = false;
-            if (m_mipLevels[i].layers[j] != nullptr) {
-                size_t oldOffset = static_cast<uint8_t *>(m_mipLevels[i].layers[j]) - oldData;
-                memcpy(m_data.get() + offset, oldData + oldOffset, m_mipLevels[i].layerSize);
-                m_mipLevels[i].containsData[j] = true;
-            }
-            m_mipLevels[i].layers[j] = m_data.get() + offset;
-            offset += m_mipLevels[i].layerSize;
-        }
-        offset += m_mipLevels[i].layerSize * mipCount;
-    }
+}
 
-    if (oldData != nullptr) delete[] oldData; 
+void VulImage::addMipLevelsToStartFromCompressedKtxFile(const std::string &fileName,
+        KtxCompressionFormat compressionFormat, uint32_t mipLevelCount)
+{
+    const std::unique_ptr<uint8_t> oldData = std::move(m_data);
+    const std::vector<MipLevel> oldMipLevels = m_mipLevels;
+    const size_t oldDataSize = m_dataSize;
+    m_mipLevels.clear();
+    loadCompressedKtxFromFile(fileName, compressionFormat, 0, mipLevelCount);
+    const std::unique_ptr<uint8_t> newData = std::move(m_data);
+    m_dataSize += oldDataSize;
+    m_data = std::unique_ptr<uint8_t>(new uint8_t[m_dataSize]);
+    m_mipLevels.insert(m_mipLevels.end(), oldMipLevels.begin(), oldMipLevels.end());
+    m_mipLevelsCount = m_mipLevels.size();
+    size_t offset = 0;
+    for (MipLevel &mipLevel : m_mipLevels) {
+        for (void *&layer : mipLevel.layers) {
+            memcpy(m_data.get() + offset, layer, mipLevel.layerSize);
+            layer = m_data.get() + offset;
+            offset += mipLevel.layerSize;
+        }
+    }
 }
 
 void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
@@ -339,6 +292,12 @@ void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkI
     uint32_t maxSize = std::max(m_mipLevels[0].width, m_mipLevels[0].height);
     maxSize = std::max(maxSize, m_mipLevels[0].depth);
     m_mipLevelsCount = std::min(static_cast<uint32_t>(m_mipLevels.size()), static_cast<uint32_t>(std::log2(maxSize)));
+
+    m_stagingBuffers.clear();
+    for (VkImageView imageView : m_mipImageViews) vkDestroyImageView(m_vulDevice.device(), imageView, nullptr);
+    if (m_imageView != VK_NULL_HANDLE) vkDestroyImageView(m_vulDevice.device(), m_imageView, nullptr);
+    if (m_image != VK_NULL_HANDLE) vkDestroyImage(m_vulDevice.device(), m_image, nullptr);
+    if (m_imageMemory != VK_NULL_HANDLE) vkFreeMemory(m_vulDevice.device(), m_imageMemory, nullptr);
 
     createVkImage();
     m_imageView = createImageView(0, m_mipLevelsCount);
@@ -518,11 +477,11 @@ std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOne(const vul::V
             img->loadCubemapFromEXR(std::get<std::string>(data));
             break;
         case InputDataType::normieFile:
-            img->loadUncompressedFromFileWhole(std::get<std::string>(data));
+            img->loadUncompressedFromFile(std::get<std::string>(data));
             break;
         case InputDataType::rawData:
             RawImageData rawData = std::get<RawImageData>(data);
-            img->loadRawFromMemoryWhole(rawData.baseWidth, rawData.baseHeight, rawData.baseDepth,
+            img->loadRawFromMemory(rawData.baseWidth, rawData.baseHeight, rawData.baseDepth,
                     rawData.data, std::get<VkFormat>(format));
             break;
     }
@@ -533,28 +492,17 @@ std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOne(const vul::V
 
 void VulImage::loadCompressedKtxFromFileWhole(const std::string &fileName, KtxCompressionFormat compressionFormat)
 {
-    loadCompressedKtxFromFile(fileName, compressionFormat, 0, 0, 69, 0, 0, 69);
-}
-
-void VulImage::loadUncompressedFromFileWhole(const std::string &filename)
-{
-    assert(0 && "Not implemented");
-}
-
-void VulImage::loadRawFromMemoryWhole(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth,
-        const std::vector<std::vector<void *>> &data, VkFormat format)
-{
-    loadRawFromMemory(baseWidth, baseHeight, baseDepth, data, format, 0, 0);
+    loadCompressedKtxFromFile(fileName, compressionFormat, 0, 69);
 }
 
 void VulImage::keepRegularRaw2d8bitRgbaEmpty(uint32_t width, uint32_t height)
 {
-    keepEmpty(width, height, 1, 1, 1, VK_FORMAT_R8G8B8A8_SRGB, 0, 0);
+    keepEmpty(width, height, 1, 1, 1, VK_FORMAT_R8G8B8A8_SRGB);
 }
 
 void VulImage::keepRegularRaw2d32bitRgbaEmpty(uint32_t width, uint32_t height)
 {
-    keepEmpty(width, height, 1, 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT, 0, 0);
+    keepEmpty(width, height, 1, 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT);
 }
 
 void VulImage::createDefaultImage(ImageType type, VkCommandBuffer cmdBuf)
