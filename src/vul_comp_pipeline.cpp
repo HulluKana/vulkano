@@ -45,7 +45,7 @@ VulCompPipeline::VulCompPipeline(const std::string &shaderName, const std::vecto
     if (vkCreateComputePipelines(m_vulDevice.device(), VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_pipeline) != VK_SUCCESS)
         throw std::runtime_error("Failed to create compute pipeline");
 
-    m_cmdPool = std::make_unique<VulCmdPool>(VulCmdPool::QueueFamilyType::ComputeFamily, VK_NULL_HANDLE, 0, 0, m_vulDevice);
+    m_cmdPool = std::make_unique<VulCmdPool>(VulCmdPool::QueueType::compute, 0, 0, m_vulDevice);
 
     VkCommandBufferAllocateInfo allocInfo{};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;

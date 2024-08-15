@@ -96,10 +96,18 @@ VulImage::VulImage(const VulDevice &vulDevice) : m_vulDevice{vulDevice}
 
 VulImage::~VulImage()
 {
+    for (VkImageView imageView : m_mipImageViews) vkDestroyImageView(m_vulDevice.device(), imageView, nullptr);
     if (m_imageView != VK_NULL_HANDLE) vkDestroyImageView(m_vulDevice.device(), m_imageView, nullptr);
     if (m_image != VK_NULL_HANDLE && m_ownsImage) vkDestroyImage(m_vulDevice.device(), m_image, nullptr);
     if (m_imageMemory != VK_NULL_HANDLE) vkFreeMemory(m_vulDevice.device(), m_imageMemory, nullptr);
-    for (VkImageView imageView : m_mipImageViews) vkDestroyImageView(m_vulDevice.device(), imageView, nullptr);
+}
+
+void VulImage::OldVkImageStuff::destoyImageStuff()
+{
+    for (VkImageView mipImageView : mipImageViews) vkDestroyImageView(device, mipImageView, nullptr);
+    if (imageView != VK_NULL_HANDLE) vkDestroyImageView(device, imageView, nullptr);
+    if (image != VK_NULL_HANDLE) vkDestroyImage(device, image, nullptr);
+    if (imageMemory != VK_NULL_HANDLE) vkFreeMemory(device, imageMemory, nullptr);
 }
 
 void VulImage::loadCompressedKtxFromFile(const std::string &fileName, KtxCompressionFormat compressionFormat,
@@ -169,7 +177,7 @@ void VulImage::loadCubemapFromEXR(const std::string &filename)
     assert(height % 6 == 0);
     height /= 6;
 
-    std::unique_ptr<Imf::Rgba> pixels(new Imf::Rgba[width * height * 6]());
+    std::unique_ptr<Imf::Rgba[]> pixels = std::unique_ptr<Imf::Rgba[]>(new Imf::Rgba[width * height * 6]());
     file.setFrameBuffer(pixels.get(), 1, width);
     file.readPixels(dataWindow.min.y, dataWindow.max.y);
 
@@ -191,7 +199,7 @@ void VulImage::loadUncompressedFromFile(const std::string &filename)
 void VulImage::loadRawFromMemory(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth,
         const std::vector<std::vector<void *>> &data, VkFormat format)
 {
-    if (data.size() == 0 || data[0].size() == 0) return;
+    assert(data.size() > 0 && data[0].size() > 0);
 
     keepEmpty(baseWidth, baseHeight, baseDepth, data.size(), data[0].size(), format);
 
@@ -200,10 +208,10 @@ void VulImage::loadRawFromMemory(uint32_t baseWidth, uint32_t baseHeight, uint32
         for (size_t j = 0; j < data[i].size(); j++) {
             m_mipLevels[i].containsData[j] = false;
             if (data[i][j] != nullptr) {
-                memcpy(m_data.get() + offset, data[i][j], m_mipLevels[i].layerSize);
+                memcpy(&m_data[offset], data[i][j], m_mipLevels[i].layerSize);
                 m_mipLevels[i].containsData[j] = true;
             }
-            m_mipLevels[i].layers[j] = m_data.get() + offset; 
+            m_mipLevels[i].layers[j] = offset;
             offset += m_mipLevels[i].layerSize;
         }
     }
@@ -237,11 +245,8 @@ void VulImage::keepEmpty(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseD
             * alignUp(height, formatProperties.sideLengthAlignment) * depth * formatProperties.bitsPerTexel / 8;
         requiredSize += m_mipLevels[i].layerSize * arrayCount;
     }
-    m_dataSize = requiredSize;
 
-    m_data = std::unique_ptr<uint8_t>(new uint8_t[m_dataSize]());
-    assert(m_data != nullptr);
-   
+    m_data.resize(requiredSize);
     for (uint32_t i = 0; i < mipCount; i++) {
         m_mipLevels[i].layers.resize(arrayCount);
         m_mipLevels[i].containsData.resize(arrayCount);
@@ -251,27 +256,19 @@ void VulImage::keepEmpty(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseD
 void VulImage::addMipLevelsToStartFromCompressedKtxFile(const std::string &fileName,
         KtxCompressionFormat compressionFormat, uint32_t mipLevelCount)
 {
-    const std::unique_ptr<uint8_t> oldData = std::move(m_data);
-    const std::vector<MipLevel> oldMipLevels = m_mipLevels;
-    const size_t oldDataSize = m_dataSize;
+    const std::vector<uint8_t> oldData = m_data;
+    std::vector<MipLevel> oldMipLevels = m_mipLevels;
     m_mipLevels.clear();
+    m_data.clear();
     loadCompressedKtxFromFile(fileName, compressionFormat, 0, mipLevelCount);
-    const std::unique_ptr<uint8_t> newData = std::move(m_data);
-    m_dataSize += oldDataSize;
-    m_data = std::unique_ptr<uint8_t>(new uint8_t[m_dataSize]);
-    m_mipLevels.insert(m_mipLevels.end(), oldMipLevels.begin(), oldMipLevels.end());
-    m_mipLevelsCount = m_mipLevels.size();
-    size_t offset = 0;
-    for (MipLevel &mipLevel : m_mipLevels) {
-        for (void *&layer : mipLevel.layers) {
-            memcpy(m_data.get() + offset, layer, mipLevel.layerSize);
-            layer = m_data.get() + offset;
-            offset += mipLevel.layerSize;
-        }
+    for (MipLevel &mipLevel : oldMipLevels) {
+        for (size_t &layer : mipLevel.layers) layer += m_data.size();
     }
+    m_data.insert(m_data.end(), oldData.begin(), oldData.end());
+    m_mipLevels.insert(m_mipLevels.end(), oldMipLevels.begin(), oldMipLevels.end());
 }
 
-void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
+VulImage::OldVkImageStuff VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
         VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf)
 {
     assert(m_mipLevels.size() > 0);
@@ -286,31 +283,33 @@ void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkI
     m_tiling = tiling;
     m_aspect = aspect;
     m_arrayLayersCount = m_mipLevels[0].layers.size();
-    for (uint32_t i = 1; i < m_mipLevelsCount; i++) assert(m_arrayLayersCount == m_mipLevels[i].layers.size());
+    for (uint32_t i = 1; i < m_mipLevels.size(); i++) assert(m_arrayLayersCount == m_mipLevels[i].layers.size());
     assert(m_arrayLayersCount >= 1);
     assert(!(m_arrayLayersCount > 1 && type == VK_IMAGE_VIEW_TYPE_3D));
     uint32_t maxSize = std::max(m_mipLevels[0].width, m_mipLevels[0].height);
     maxSize = std::max(maxSize, m_mipLevels[0].depth);
-    m_mipLevelsCount = std::min(static_cast<uint32_t>(m_mipLevels.size()), static_cast<uint32_t>(std::log2(maxSize)));
+    m_mipLevels.resize(std::min(static_cast<uint32_t>(m_mipLevels.size()), static_cast<uint32_t>(std::log2(maxSize))));
 
+    OldVkImageStuff oldVkImageStuff;
+    oldVkImageStuff.image = m_image;
+    oldVkImageStuff.imageMemory = m_imageMemory;
+    oldVkImageStuff.imageView = m_imageView;
+    oldVkImageStuff.mipImageViews = m_mipImageViews;
+    oldVkImageStuff.device = m_vulDevice.device();
     m_stagingBuffers.clear();
-    for (VkImageView imageView : m_mipImageViews) vkDestroyImageView(m_vulDevice.device(), imageView, nullptr);
-    if (m_imageView != VK_NULL_HANDLE) vkDestroyImageView(m_vulDevice.device(), m_imageView, nullptr);
-    if (m_image != VK_NULL_HANDLE) vkDestroyImage(m_vulDevice.device(), m_image, nullptr);
-    if (m_imageMemory != VK_NULL_HANDLE) vkFreeMemory(m_vulDevice.device(), m_imageMemory, nullptr);
 
     createVkImage();
-    m_imageView = createImageView(0, m_mipLevelsCount);
+    m_imageView = createImageView(0, m_mipLevels.size());
 
     const bool isDeviceLocal = memoryProperties & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     bool containsData = false;
-    for (uint32_t i = 0; i < m_mipLevelsCount; i++) for (size_t j = 0; j < m_mipLevels[i].containsData.size(); j++)
+    for (size_t i = 0; i < m_mipLevels.size(); i++) for (size_t j = 0; j < m_mipLevels[i].containsData.size(); j++)
         containsData = containsData || m_mipLevels[i].containsData[j];
     if (containsData && isDeviceLocal) {
         transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
-        for (size_t i = 0; i < m_mipLevelsCount; i++) {
+        for (size_t i = 0; i < m_mipLevels.size(); i++) {
             m_stagingBuffers.push_back(std::make_unique<vul::VulBuffer>(1, m_mipLevels[i].layerSize * m_arrayLayersCount, false, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, m_vulDevice));
-            m_stagingBuffers[m_stagingBuffers.size() - 1]->writeData(m_mipLevels[i].layers[0], m_stagingBuffers[m_stagingBuffers.size() - 1]->getBufferSize(), 0, VK_NULL_HANDLE);
+            m_stagingBuffers[m_stagingBuffers.size() - 1]->writeData(&m_data[m_mipLevels[i].layers[0]], m_stagingBuffers[m_stagingBuffers.size() - 1]->getBufferSize(), 0, VK_NULL_HANDLE);
             copyBufferToImage(m_stagingBuffers[m_stagingBuffers.size() - 1]->getBuffer(), i, cmdBuf);
 
             VUL_NAME_VK(m_stagingBuffers[m_stagingBuffers.size() - 1]->getBuffer())
@@ -318,6 +317,8 @@ void VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkI
         transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout, cmdBuf);
     }
     else transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, layout, cmdBuf);
+
+    return oldVkImageStuff;
 }
 
 void VulImage::createFromVkImage(VkImage image, VkImageViewType type, VkFormat format, VkImageAspectFlags aspect,
@@ -327,16 +328,16 @@ void VulImage::createFromVkImage(VkImage image, VkImageViewType type, VkFormat f
     m_image = image;
     m_imageViewType = type;
     m_format = format;
-    m_mipLevelsCount = mipLevelCount;
     m_arrayLayersCount = arrayLayerCount;
+    m_mipLevels.resize(1);
     m_aspect = aspect;
-    m_imageView = createImageView(0, m_mipLevelsCount);
+    m_imageView = createImageView(0, m_mipLevels.size());
 }
 
 void VulImage::createImageViewsForMipMaps()
 {
-    m_mipImageViews.resize(m_mipLevelsCount);
-    for (uint32_t i = 0; i < m_mipLevelsCount; i++) {
+    m_mipImageViews.resize(m_mipLevels.size());
+    for (uint32_t i = 0; i < m_mipImageViews.size(); i++) {
         m_mipImageViews[i] = createImageView(i, 1);
     }
 }
@@ -389,12 +390,12 @@ void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newL
     barrier.image = m_image;
     barrier.subresourceRange.aspectMask = m_aspect;
     barrier.subresourceRange.baseMipLevel = 0;
-    barrier.subresourceRange.levelCount = m_mipLevelsCount;
+    barrier.subresourceRange.levelCount = m_mipLevels.size();
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = m_arrayLayersCount;
 
-    VkPipelineStageFlags sourceStage;
-    VkPipelineStageFlags destinationStage;
+    VkPipelineStageFlags sourceStage{};
+    VkPipelineStageFlags destinationStage{};
 
     switch (oldLayout) {
         case VK_IMAGE_LAYOUT_UNDEFINED:
@@ -505,70 +506,72 @@ void VulImage::keepRegularRaw2d32bitRgbaEmpty(uint32_t width, uint32_t height)
     keepEmpty(width, height, 1, 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT);
 }
 
-void VulImage::createDefaultImage(ImageType type, VkCommandBuffer cmdBuf)
+VulImage::OldVkImageStuff VulImage::createDefaultImage(ImageType type, VkCommandBuffer cmdBuf)
 {
     assert(m_mipLevels.size() > 0);
     size_t arrayLayers = m_mipLevels[0].layers.size();
     switch (type) {
         case ImageType::texture1d:
-            if (arrayLayers > 1) createCustomImage(VK_IMAGE_VIEW_TYPE_1D_ARRAY, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT |
+            if (arrayLayers > 1) return createCustomImage(VK_IMAGE_VIEW_TYPE_1D_ARRAY, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT |
                     VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
-            else createCustomImage(VK_IMAGE_VIEW_TYPE_1D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
+            else return createCustomImage(VK_IMAGE_VIEW_TYPE_1D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
             break;
         case ImageType::texture2d:
-            if (arrayLayers > 1) createCustomImage(VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
+            if (arrayLayers > 1) return createCustomImage(VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
-            else createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
+            else return createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
             break;
         case ImageType::texture3d:
-            createCustomImage(VK_IMAGE_VIEW_TYPE_3D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
+            return createCustomImage(VK_IMAGE_VIEW_TYPE_3D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
             break;
         case ImageType::textureCube:
-            if (arrayLayers > 6) createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
+            if (arrayLayers > 6) return createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
-            else createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
+            else return createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
             break;
         case ImageType::storage1d:
-            if (arrayLayers > 1) createCustomImage(VK_IMAGE_VIEW_TYPE_1D_ARRAY, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
+            if (arrayLayers > 1) return createCustomImage(VK_IMAGE_VIEW_TYPE_1D_ARRAY, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
-            else createCustomImage(VK_IMAGE_VIEW_TYPE_1D, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
+            else return createCustomImage(VK_IMAGE_VIEW_TYPE_1D, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
             break;
         case ImageType::storage2d:
-            if (arrayLayers > 1) createCustomImage(VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
+            if (arrayLayers > 1) return createCustomImage(VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
-            else createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
+            else return createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
             break;
         case ImageType::storage3d:
-            createCustomImage(VK_IMAGE_VIEW_TYPE_3D, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
+            return createCustomImage(VK_IMAGE_VIEW_TYPE_3D, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
             break;
         case ImageType::storageCube:
-            if (arrayLayers > 6) createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
+            if (arrayLayers > 6) return createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
-            else createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
+            else return createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_USAGE_STORAGE_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_LINEAR, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
             break;
         case ImageType::hdrCube:
-            if (arrayLayers > 6) createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT 
+            if (arrayLayers > 6) return createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT 
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
-            else createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
+            else return createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_SAMPLED_BIT
                     | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
             break;
         case ImageType::colorAttachment:
-            createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+            return createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
             break;
         case ImageType::depthAttachment:
-            createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+            return createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
                     VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, cmdBuf);
             break;
     }
+
+    return {};
 }
 
 void VulImage::createVkImage()
@@ -584,7 +587,7 @@ void VulImage::createVkImage()
     imageInfo.extent.width = m_baseWidth;
     imageInfo.extent.height = m_baseHeight;
     imageInfo.extent.depth = m_baseDepth;
-    imageInfo.mipLevels = m_mipLevelsCount;
+    imageInfo.mipLevels = m_mipLevels.size();
     imageInfo.arrayLayers = m_arrayLayersCount;
     imageInfo.format = m_format;
     imageInfo.tiling = m_tiling;
@@ -607,7 +610,8 @@ void VulImage::createVkImage()
 
     if (vkAllocateMemory(m_vulDevice.device(), &allocInfo, nullptr, &m_imageMemory) != VK_SUCCESS)
         throw std::runtime_error("failed to allocate image memory in VulImage");
-    vkBindImageMemory(m_vulDevice.device(), m_image, m_imageMemory, 0);
+    if (vkBindImageMemory(m_vulDevice.device(), m_image, m_imageMemory, 0) != VK_SUCCESS)
+        throw std::runtime_error("Failed to bind image memory in VulImage");
 
     VUL_NAME_VK(m_image)
     VUL_NAME_VK(m_imageMemory)

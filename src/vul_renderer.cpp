@@ -20,7 +20,7 @@ namespace vul{
 
 VulRenderer::VulRenderer(VulWindow &window, VulDevice &device, std::shared_ptr<vul::VulSampler> depthImgSampler) : vulWindow{window}, vulDevice{device}
 {
-    m_cmdPool = std::make_unique<VulCmdPool>(VulCmdPool::QueueFamilyType::ComputeFamily, device.computeQueue(), 0, 0, device);
+    m_cmdPool = std::make_unique<VulCmdPool>(VulCmdPool::QueueType::main, 0, 0, device);
     m_depthImgSampler = depthImgSampler;
     recreateSwapChain();
     createCommandBuffers();

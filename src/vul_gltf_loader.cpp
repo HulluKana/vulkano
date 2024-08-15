@@ -1,3 +1,4 @@
+#include "vul_command_pool.hpp"
 #include "vul_device.hpp"
 #include <GLFW/glfw3.h>
 #include <atomic>
@@ -84,44 +85,18 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
         roughnessMetallicTextures.insert(model.textures[mat.pbrMetallicRoughness.metallicRoughnessTexture.index].source);
     }
 
-    QueueFamilyIndices queueFamilyIndices = device.findPhysicalQueueFamilies();
     std::vector<std::thread> threads(std::thread::hardware_concurrency());
-    //std::vector<std::thread> threads(1);
-    std::vector<VkCommandPool> pools(threads.size());
-    std::vector<VkCommandBuffer> cmdBufs(pools.size());
-    for (size_t i = 0; i < pools.size(); i++) {
-        VkCommandPoolCreateInfo poolInfo{};
-        poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-        poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily;
-        poolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-        assert(vkCreateCommandPool(device.device(), &poolInfo, nullptr, &pools[i]) == VK_SUCCESS);
-
-        VkCommandBufferAllocateInfo allocInfo{};
-        allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-        allocInfo.level = VK_COMMAND_BUFFER_LEVEL_SECONDARY;
-        allocInfo.commandPool = pools[i];
-        allocInfo.commandBufferCount = 1;
-        vkAllocateCommandBuffers(device.device(), &allocInfo, &cmdBufs[i]);
-
-        VkCommandBufferInheritanceInfo inheritance{};
-        inheritance.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        beginInfo.pInheritanceInfo = &inheritance;
-        vkBeginCommandBuffer(cmdBufs[i], &beginInfo);
+    std::vector<std::unique_ptr<VulCmdPool>> cmdPools(threads.size());
+    std::vector<VkCommandBuffer> cmdBufs(threads.size());
+    for (size_t i = 0; i < threads.size(); i++) {
+        cmdPools[i] = std::make_unique<VulCmdPool>(vul::VulCmdPool::QueueType::main, 0, 0, device);
+        cmdBufs[i] = cmdPools[i]->getSecondaryCommandBuffer();
     }
 
     std::vector<std::shared_ptr<VulImage>> imgSources(model.images.size());
     std::atomic<uint32_t> atomImgIdx = 0;
-    std::vector<double> loadingFilesTimes(threads.size());
-    std::vector<double> minLoadingFilesTimes(threads.size());
-    std::vector<double> maxLoadingFilesTimes(threads.size());
-    std::vector<uint32_t> loadCounts(threads.size());
     std::function<void(uint32_t)> importTexture = [&](uint32_t threadIdx)
     {
-        minLoadingFilesTimes[threadIdx] = std::numeric_limits<double>::max();
-        maxLoadingFilesTimes[threadIdx] = std::numeric_limits<double>::min();
         while (true) {
             uint32_t imgIdx = atomImgIdx++; 
             if (imgIdx >= imgSources.size()) break;
@@ -134,72 +109,23 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
 
             const tinygltf::Image &image = model.images[imgIdx];
             imgSources[imgIdx] = std::make_shared<VulImage>(device);
-            const double starTime = glfwGetTime();
             imgSources[imgIdx]->loadCompressedKtxFromFile(textureDirectory + image.uri, fromat, 6, 69);
-            const double time = glfwGetTime() - starTime;
             imgSources[imgIdx]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                     VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBufs[threadIdx]);
-            loadingFilesTimes[threadIdx] += time;
-            minLoadingFilesTimes[threadIdx] = std::min(minLoadingFilesTimes[threadIdx], time);
-            maxLoadingFilesTimes[threadIdx] = std::max(maxLoadingFilesTimes[threadIdx], time);
-            loadCounts[threadIdx]++;
+            imgSources[imgIdx]->name = textureDirectory + image.uri;
         }
     };
 
     for (size_t i = 0; i < threads.size(); i++) threads[i] = std::thread(importTexture, i);
     for (size_t i = 0; i < threads.size(); i++) {
         threads[i].join();
-        vkEndCommandBuffer(cmdBufs[i]);
+        cmdPools[i]->endCommandBuffer(cmdBufs[i]);
     }
 
     VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
     vkCmdExecuteCommands(cmdBuf, cmdBufs.size(), cmdBufs.data());
     cmdPool.submitAndWait(cmdBuf);
-
-    atomImgIdx = 0;
-    for (size_t i = 0; i < cmdBufs.size(); i++) {
-        VkCommandBufferInheritanceInfo inheritance{};
-        inheritance.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-        beginInfo.pInheritanceInfo = &inheritance;
-        vkBeginCommandBuffer(cmdBufs[i], &beginInfo);
-    }
-    std::function<void(uint32_t)> importTextur = [&](uint32_t threadIdx)
-    {
-        while (true) {
-            uint32_t imgIdx = atomImgIdx++; 
-            if (imgIdx >= imgSources.size()) break;
-
-            VulImage::KtxCompressionFormat fromat{};
-            if (transparentColorTextures.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaNonLinear;
-            else if (opaqueColorTextures.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc1rgbNonLinear;
-            else if (normalMaps.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaLinear;
-            else if (roughnessMetallicTextures.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaLinear;
-
-            const tinygltf::Image &image = model.images[imgIdx];
-            imgSources[imgIdx]->addMipLevelsToStartFromCompressedKtxFile(textureDirectory + image.uri, fromat, 6);
-            imgSources[imgIdx]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
-                    VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBufs[threadIdx]);
-        }
-    };
-    for (size_t i = 0; i < threads.size(); i++) threads[i] = std::thread(importTextur, i);
-    for (size_t i = 0; i < threads.size(); i++) {
-        threads[i].join();
-        vkEndCommandBuffer(cmdBufs[i]);
-    }
-
-    cmdBuf = cmdPool.getPrimaryCommandBuffer();
-    vkCmdExecuteCommands(cmdBuf, cmdBufs.size(), cmdBufs.data());
-    cmdPool.submitAndWait(cmdBuf);
-
-    for (size_t i = 0; i < pools.size(); i++) {
-        vkFreeCommandBuffers(device.device(), pools[i], 1, &cmdBufs[i]);
-        vkDestroyCommandPool(device.device(), pools[i], nullptr);
-    }
 
     uint32_t prevMips = 0;
     images.resize(model.textures.size());
@@ -211,11 +137,7 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
         } else images[i]->vulSampler = images[i - 1]->vulSampler;
 
         images[i]->deleteStagingResources();
-        images[i]->deleteCpuData();
-    }
-
-    for (size_t i = 0; i < loadingFilesTimes.size(); i++) {
-        std::cout << "Thread " << i << " took " << loadingFilesTimes[i] << " seconds to load " << loadCounts[i] << " files with min time " << minLoadingFilesTimes[i] << " seconds and max time " << maxLoadingFilesTimes[i] << " seconds\n";
+        //images[i]->deleteCpuData();
     }
 }
 

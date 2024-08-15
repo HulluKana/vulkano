@@ -37,7 +37,7 @@ VulGUI::VulGUI(GLFWwindow *window, VkDescriptorPool &descriptorPool, VulRenderer
     info.UseDynamicRendering = true;
     info.ColorAttachmentFormat = vulRenderer.getSwapChainColorFormat();
     info.DepthAttachmentFormat = vulRenderer.getDepthFormat();
-    info.Queue = vulDevice.graphicsQueue();
+    info.Queue = vulDevice.mainQueue();
     ImGui_ImplVulkan_Init(&info, nullptr);
 
     VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();

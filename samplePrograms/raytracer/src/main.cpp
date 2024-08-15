@@ -1,3 +1,8 @@
+#include <atomic>
+#include <functional>
+#include <mutex>
+#include <thread>
+#include <unordered_set>
 #include <vul_GUI.hpp>
 #include <vul_camera.hpp>
 #include <iostream>
@@ -140,7 +145,7 @@ int main() {
     vul::VulDevice vulDevice(vulWindow, false, true);
     vul::VulRenderer vulRenderer(vulWindow, vulDevice, nullptr);
     std::unique_ptr<vul::VulDescriptorPool> descPool = vul::VulDescriptorPool::Builder(vulDevice).setMaxSets(8).setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT).build();
-    vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueFamilyType::GraphicsFamily, vulDevice.graphicsQueue(), 0, 0, vulDevice);
+    vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::main, 0, 0, vulDevice);
     vul::VulGUI vulGui(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice, cmdPool);
     vul::VulCamera camera{};
 
@@ -180,9 +185,41 @@ int main() {
             {"raytrace.rchit.spv"}, {"raytraceShadow.rahit.spv"}, {}, {{0, 0, -1}},
             {descSets[0]->getLayout()->getDescriptorSetLayout()}, cmdPool);
 
+    std::mutex mutex;
+    std::atomic_bool stopUpdatingImages = false;
+    std::function<void()> imgUpdaterFunc = [&vulDevice, &mainScene, &descSets, &mutex, &stopUpdatingImages]() {
+        std::unordered_set<std::string> updatedImagePaths;
+        vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::side, 0, 0, vulDevice, 0);
+        for (size_t i = 0; i < mainScene.images.size() && !stopUpdatingImages; i++) {
+            std::shared_ptr<vul::VulImage> &img = mainScene.images[i];
+            if (updatedImagePaths.find(img->name) != updatedImagePaths.end()) continue;
+            updatedImagePaths.insert(img->name);
+            vul::VulImage::KtxCompressionFormat fromat;
+            if (img->getFormat() == VK_FORMAT_BC1_RGB_SRGB_BLOCK) fromat = vul::VulImage::KtxCompressionFormat::bc1rgbNonLinear;
+            else if (img->getFormat() == VK_FORMAT_BC7_SRGB_BLOCK) fromat = vul::VulImage::KtxCompressionFormat::bc7rgbaNonLinear;
+            else fromat = vul::VulImage::KtxCompressionFormat::bc7rgbaLinear;
+            img->addMipLevelsToStartFromCompressedKtxFile(img->name, fromat, 6);
+            VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
+            vul::VulImage::OldVkImageStuff oldVkImageStuff = img->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                    VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, commandBuffer);
+            cmdPool.submitAndWait(commandBuffer);
+            mutex.lock();
+            for (std::unique_ptr<vul::VulDescriptorSet> &descSet : descSets) {
+                for (size_t j = 0; j < mainScene.images.size(); j++)
+                    descSet->descriptorInfos[9].imageInfos[j] = mainScene.images[j]->getDescriptorInfo();
+                descSet->update();
+            }
+            mutex.unlock();
+        }
+    };
+    mutex.unlock();
+    std::thread imgUpdaterThread(imgUpdaterFunc);
+
     double frameStartTime = glfwGetTime();
     while (!vulWindow.shouldClose()) {
         glfwPollEvents();
+        mutex.lock(); 
         commandBuffer = vulRenderer.beginFrame();
         vulGui.startFrame();
         if (commandBuffer == nullptr) continue;
@@ -208,8 +245,12 @@ int main() {
         vulRenderer.stopRendering(commandBuffer);
 
         vulRenderer.endFrame();
+        vkQueueWaitIdle(vulDevice.mainQueue());
+        mutex.unlock();
         if (vulRenderer.wasSwapChainRecreated()) resizeRtImgs(rtImgs, descSets, vulDevice, vulRenderer.getSwapChainExtent(), cmdPool);
     }
+    stopUpdatingImages = true;
+    imgUpdaterThread.join();
     vulDevice.waitForIdle();
 
     return 0;

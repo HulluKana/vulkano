@@ -7,13 +7,14 @@ namespace vul {
 
 class VulCmdPool {
     public:
-        enum class QueueFamilyType {
-            GraphicsFamily,
-            ComputeFamily,
-            PresentFamily
+        enum class QueueType {
+            main,
+            compute,
+            transfer,
+            side
         };
 
-        VulCmdPool(QueueFamilyType queueFamilyType, VkQueue queue, uint32_t preallocatePrimaryBufferCount, uint32_t preallocateSecondaryBufferCount, const VulDevice &vulDevice);
+        VulCmdPool(QueueType queueType, uint32_t preallocatePrimaryBufferCount, uint32_t preallocateSecondaryBufferCount, const VulDevice &vulDevice, uint32_t sideQueueIndex = 0);
         ~VulCmdPool();
 
         VulCmdPool(const VulCmdPool &) = delete;
@@ -24,6 +25,7 @@ class VulCmdPool {
         VkCommandBuffer getPrimaryCommandBuffer();
         VkCommandBuffer getSecondaryCommandBuffer();
         void submitAndWait(VkCommandBuffer commandBuffer);
+        void endCommandBuffer(VkCommandBuffer commandBuffer);
 
         VkCommandPool getPool() const {return m_pool;}
 

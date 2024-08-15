@@ -143,7 +143,7 @@ Resources createReources(vul::VulCmdPool &cmdPool, const vul::VulDevice &vulDevi
     output.aBuffer = std::make_unique<vul::VulBuffer>(sizeof(ABuffer), 10'000'000, true, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, vulDevice);
 
     output.aBufferHeads = std::make_unique<vul::VulImage>(vulDevice);
-    output.aBufferHeads->keepEmpty(swapChainExtent.width, swapChainExtent.height, 1, 1, 1, VK_FORMAT_R32_UINT, 0, 0);
+    output.aBufferHeads->keepEmpty(swapChainExtent.width, swapChainExtent.height, 1, 1, 1, VK_FORMAT_R32_UINT);
     output.aBufferHeads->createDefaultImage(vul::VulImage::ImageType::storage2d, cmdBuf);
     
     output.aBufferCounter = std::make_unique<vul::VulBuffer>(sizeof(uint32_t), 1, true, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_TRANSFER_SRC_BIT, vulDevice);
@@ -371,7 +371,7 @@ void updateOitResources(const Resources &resources, const vul::VulRenderer &vulR
     }
 
     if (resources.aBuffer->getBufferSize() != requiredABufferSize) {
-        vkQueueWaitIdle(vulDevice.graphicsQueue());
+        vkQueueWaitIdle(vulDevice.mainQueue());
         for (int i = 0; i < vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
             resources.oitDescSets[i]->descriptorInfos[0].bufferInfos[0] = resources.aBufferCounter->getDescriptorInfo();
             resources.oitDescSets[i]->update();
@@ -395,7 +395,7 @@ int main() {
     vul::VulDevice vulDevice(vulWindow, false, false);
     std::shared_ptr<vul::VulSampler> depthImgSampler = vul::VulSampler::createDefaultTexSampler(vulDevice, 1);
     vul::VulRenderer vulRenderer(vulWindow, vulDevice, depthImgSampler);
-    vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueFamilyType::GraphicsFamily, vulDevice.graphicsQueue(), 0, 0, vulDevice);
+    vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::main, 0, 0, vulDevice);
     std::unique_ptr<vul::VulDescriptorPool> descPool = vul::VulDescriptorPool::Builder(vulDevice).setMaxSets(32).setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT).build();
     vul::VulGUI vulGui(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice, cmdPool);
     vul::VulCamera camera{};

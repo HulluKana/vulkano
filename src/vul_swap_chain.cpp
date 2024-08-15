@@ -100,7 +100,7 @@ VkResult VulSwapChain::submitCommandBuffers(
     vkResetFences(device.device(), 1, &inFlightFences[currentFrame]);
     {
         VUL_PROFILE_SCOPE("Submiting the draw command buffer to the graphics queue")
-        if (vkQueueSubmit(device.graphicsQueue(), 1, &submitInfo, inFlightFences[currentFrame]) !=
+        if (vkQueueSubmit(device.mainQueue(), 1, &submitInfo, inFlightFences[currentFrame]) !=
                 VK_SUCCESS) {
             throw std::runtime_error("failed to submit draw command buffer!");
         }
@@ -121,7 +121,7 @@ VkResult VulSwapChain::submitCommandBuffers(
     currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
     {
         VUL_PROFILE_SCOPE("Presenting the swap chain image")
-        return vkQueuePresentKHR(device.presentQueue(), &presentInfo);
+        return vkQueuePresentKHR(device.mainQueue(), &presentInfo);
     }
 }
 
@@ -150,18 +150,9 @@ void VulSwapChain::createSwapChain() {
     createInfo.imageArrayLayers = 1;
     createInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-    QueueFamilyIndices indices = device.findPhysicalQueueFamilies();
-    uint32_t queueFamilyIndices[] = {indices.graphicsFamily, indices.presentFamily};
-
-    if (indices.graphicsFamily != indices.presentFamily) {
-        createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-        createInfo.queueFamilyIndexCount = 2;
-        createInfo.pQueueFamilyIndices = queueFamilyIndices;
-    } else {
-        createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        createInfo.queueFamilyIndexCount = 0;      // Optional
-        createInfo.pQueueFamilyIndices = nullptr;  // Optional
-    }
+    createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    createInfo.queueFamilyIndexCount = 0;      // Optional
+    createInfo.pQueueFamilyIndices = nullptr;  // Optional
 
     createInfo.preTransform = swapChainSupport.capabilities.currentTransform;
     createInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;

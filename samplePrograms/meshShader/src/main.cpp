@@ -23,7 +23,7 @@ int main() {
     std::shared_ptr<vul::VulSampler> depthImgSampler = vul::VulSampler::createDefaultTexSampler(vulDevice, 1);
     vul::VulRenderer vulRenderer(vulWindow, vulDevice, depthImgSampler);
     std::unique_ptr<vul::VulDescriptorPool> descPool = vul::VulDescriptorPool::Builder(vulDevice).setMaxSets(16).setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT).build();
-    vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueFamilyType::GraphicsFamily, vulDevice.graphicsQueue(), 0, 0, vulDevice);
+    vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::main, 0, 0, vulDevice);
     vul::VulGUI vulGui(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice, cmdPool);
     vul::Scene scene(vulDevice);
     scene.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza", {}, cmdPool);

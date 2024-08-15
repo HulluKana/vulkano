@@ -6,16 +6,24 @@
 
 namespace vul {
 
-VulCmdPool::VulCmdPool(QueueFamilyType queueFamilyType, VkQueue queue, uint32_t preallocatePrimaryBufferCount, uint32_t preallocateSecondaryBufferCount, const VulDevice &vulDevice) : m_vulDevice(vulDevice)
+VulCmdPool::VulCmdPool(QueueType queueType, uint32_t preallocatePrimaryBufferCount, uint32_t preallocateSecondaryBufferCount, const VulDevice &vulDevice, uint32_t sideQueueIndex) : m_vulDevice(vulDevice)
 {
-    m_queue = queue;
-
     VkCommandPoolCreateInfo cmdPoolInfo{};
     cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    if (queueFamilyType == QueueFamilyType::GraphicsFamily) cmdPoolInfo.queueFamilyIndex = vulDevice.findPhysicalQueueFamilies().graphicsFamily;
-    else if (queueFamilyType == QueueFamilyType::ComputeFamily) cmdPoolInfo.queueFamilyIndex = vulDevice.findPhysicalQueueFamilies().computeFamily;
-    else if (queueFamilyType == QueueFamilyType::PresentFamily) cmdPoolInfo.queueFamilyIndex = vulDevice.findPhysicalQueueFamilies().presentFamily;
+    if (queueType == QueueType::main) {
+        cmdPoolInfo.queueFamilyIndex = vulDevice.findPhysicalQueueFamilies().mainFamily;
+        m_queue = vulDevice.mainQueue();
+    } else if (queueType == QueueType::compute) {
+        cmdPoolInfo.queueFamilyIndex = vulDevice.findPhysicalQueueFamilies().computeFamily;
+        m_queue = vulDevice.computeQueue();
+    } else if (queueType == QueueType::transfer) {
+        cmdPoolInfo.queueFamilyIndex = vulDevice.findPhysicalQueueFamilies().transferFamily;
+        m_queue = vulDevice.transferQueue();
+    } else if (queueType == QueueType::side) {
+        cmdPoolInfo.queueFamilyIndex = vulDevice.findPhysicalQueueFamilies().mainFamily;
+        m_queue = vulDevice.sideQueues()[sideQueueIndex];
+    }
 
     vkCreateCommandPool(vulDevice.device(), &cmdPoolInfo, nullptr, &m_pool);
 
@@ -33,6 +41,7 @@ VkCommandBuffer VulCmdPool::getPrimaryCommandBuffer()
 {
     VkCommandBufferBeginInfo cmdBufBeginInfo{};
     cmdBufBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmdBufBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
     VkCommandBuffer cmdBuf;
     bool foundFreeCmdBuf = false;
@@ -57,8 +66,13 @@ VkCommandBuffer VulCmdPool::getPrimaryCommandBuffer()
 
 VkCommandBuffer VulCmdPool::getSecondaryCommandBuffer()
 {
+    VkCommandBufferInheritanceInfo inheritanceInfo{};
+    inheritanceInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_INHERITANCE_INFO;
+
     VkCommandBufferBeginInfo cmdBufBeginInfo{};
     cmdBufBeginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    cmdBufBeginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    cmdBufBeginInfo.pInheritanceInfo = &inheritanceInfo;
 
     VkCommandBuffer cmdBuf;
     bool foundFreeCmdBuf = false;
@@ -102,6 +116,30 @@ void VulCmdPool::submitAndWait(VkCommandBuffer commandBuffer)
 
             result = vkWaitForFences(m_vulDevice.device(), 1, &m_primaryFences[i], VK_TRUE, UINT64_MAX);
             assert(result == VK_SUCCESS);
+
+            return;
+        }
+    }
+}
+
+void VulCmdPool::endCommandBuffer(VkCommandBuffer commandBuffer)
+{
+    for (size_t i = 0; i < m_secondaryBuffers.size(); i++) {
+        assert(commandBuffer != m_secondaryBuffers[i] || m_secondaryStatuses[i]);
+        if (commandBuffer == m_secondaryBuffers[i]) {
+            VkResult result = vkEndCommandBuffer(commandBuffer);
+            assert(result == VK_SUCCESS);
+            m_secondaryStatuses[i] = false;
+            return;
+        }
+    }
+    for (size_t i = 0; i < m_primaryBuffers.size(); i++) {
+        assert(commandBuffer != m_primaryBuffers[i] || m_primaryStatuses[i]);
+        if (commandBuffer == m_primaryBuffers[i]) {
+            VkResult result = vkEndCommandBuffer(commandBuffer);
+            assert(result == VK_SUCCESS);
+            m_primaryStatuses[i] = false;
+            return;
         }
     }
 }

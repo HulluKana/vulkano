@@ -94,6 +94,16 @@ class VulImage {
             uint32_t baseDepth;
             std::vector<std::vector<void *>> data;
         };
+        struct OldVkImageStuff {
+            VkImage image = VK_NULL_HANDLE;
+            VkDeviceMemory imageMemory = VK_NULL_HANDLE;
+            VkImageView imageView = VK_NULL_HANDLE;
+            std::vector<VkImageView> mipImageViews;
+            VkDevice device = VK_NULL_HANDLE;
+
+            void destoyImageStuff();
+            ~OldVkImageStuff() {destoyImageStuff();}
+        };
 
         static std::unique_ptr<VulImage> createDefaultWholeImageAllInOne(const VulDevice &vulDevice, std::variant<std::string,
                 RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format, bool addSampler,
@@ -126,8 +136,8 @@ class VulImage {
         void keepRegularRaw2d32bitRgbaEmpty(uint32_t width, uint32_t height);
         void keepEmpty(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth, uint32_t mipCount, uint32_t arrayCount, VkFormat format);
 
-        void createDefaultImage(ImageType type, VkCommandBuffer cmdBuf);
-        void createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
+        OldVkImageStuff createDefaultImage(ImageType type, VkCommandBuffer cmdBuf);
+        OldVkImageStuff createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
                 VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf);
 
         void createFromVkImage(VkImage image, VkImageViewType type, VkFormat format, VkImageAspectFlags aspect,
@@ -142,7 +152,7 @@ class VulImage {
         void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf);
 
         void deleteStagingResources() {m_stagingBuffers.clear();}
-        void deleteCpuData() {m_data.reset(nullptr); m_dataSize = 0;}
+        void deleteCpuData() {m_data.resize(0);}
 
         VkRenderingAttachmentInfo getAttachmentInfo(VkClearValue clearValue) const;
         VkDescriptorImageInfo getDescriptorInfo() const;
@@ -151,11 +161,11 @@ class VulImage {
         uint32_t getBaseWidth() const {return m_baseWidth;}
         uint32_t getBaseHeight() const {return m_baseHeight;}
         uint32_t getBaseDepth() const {return m_baseDepth;}
-        uint32_t getMipCount() const {return m_mipLevelsCount;}
+        uint32_t getMipCount() const {return m_mipLevels.size();}
         VkExtent3D getMipSize(uint32_t mip)const{return{m_mipLevels[mip].width,m_mipLevels[mip].height,m_mipLevels[mip].depth};}
         uint32_t getArrayCount() const {return m_arrayLayersCount;}
         uint32_t getBitsPerTexel() const {return m_bitsPerTexel;}
-        size_t getDataSize() const {return m_dataSize;}
+        size_t getDataSize() const {return m_data.size();}
 
         VkFormat getFormat() const {return m_format;}
         VkMemoryPropertyFlags getMemoryProperties() const {return m_memoryProperties;}
@@ -174,6 +184,7 @@ class VulImage {
         std::shared_ptr<VulSampler> vulSampler = nullptr;
         bool attachmentPreservePreviousContents = false;
         bool attachmentStoreCurrentContents = true;
+        std::string name;
     private:
         struct KtxCompressionFormatProperties {
             ktx_transcode_fmt_e transcodeFormat;
@@ -184,7 +195,7 @@ class VulImage {
             uint32_t sideLengthAlignment;
         };
         struct MipLevel {
-            std::vector<void *> layers;
+            std::vector<size_t> layers;
             std::vector<bool> containsData;
             uint32_t width;
             uint32_t height;
@@ -205,7 +216,6 @@ class VulImage {
         VkFormat m_format = VK_FORMAT_UNDEFINED;
         uint32_t m_bitsPerTexel = 0;
         uint32_t m_arrayLayersCount = 0;
-        uint32_t m_mipLevelsCount = 0;
         VkMemoryPropertyFlags m_memoryProperties = 0;
         VkImageUsageFlags m_usage = 0;
         VkImageLayout m_layout = VK_IMAGE_LAYOUT_UNDEFINED;
@@ -215,8 +225,7 @@ class VulImage {
         VkImageViewType m_imageViewType = VK_IMAGE_VIEW_TYPE_1D;
 
         std::vector<MipLevel> m_mipLevels;
-        std::unique_ptr<uint8_t> m_data;
-        size_t m_dataSize = 0;
+        std::vector<uint8_t> m_data;
         uint32_t m_baseWidth = 0;
         uint32_t m_baseHeight = 0;
         uint32_t m_baseDepth = 0;
