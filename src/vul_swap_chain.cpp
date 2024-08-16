@@ -127,7 +127,7 @@ VkResult VulSwapChain::submitCommandBuffers(
 
 void VulSwapChain::createSwapChain() {
     VUL_PROFILE_FUNC()
-    SwapChainSupportDetails swapChainSupport = device.getSwapChainSupport();
+    VulDevice::SwapChainSupportDetails swapChainSupport = device.getSwapChainSupport();
 
     VkSurfaceFormatKHR surfaceFormat = chooseSwapSurfaceFormat(swapChainSupport.formats);
     VkPresentModeKHR presentMode = chooseSwapPresentMode(swapChainSupport.presentModes);

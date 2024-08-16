@@ -109,7 +109,7 @@ void resizeRtImgs(std::array<std::unique_ptr<vul::VulImage>, vul::VulSwapChain::
         rtImgs[i]->keepRegularRaw2d32bitRgbaEmpty(swapChainExtent.width, swapChainExtent.height);
         rtImgs[i]->createDefaultImage(vul::VulImage::ImageType::storage2d, cmdBuf);
     }
-    cmdPool.submitAndWait(cmdBuf);
+    cmdPool.submit(cmdBuf, true);
     
     for (size_t i = 0; i < rtImgs.size(); i++) {
         descSets[i]->descriptorInfos[0].imageInfos[0].imageView = rtImgs[i]->getImageView();
@@ -142,7 +142,7 @@ void updateUniformBuffer(const std::unique_ptr<vul::VulBuffer> &ubo, const vul::
 
 int main() {
     vul::VulWindow vulWindow(2560, 1440, "Vulkano");
-    vul::VulDevice vulDevice(vulWindow, false, true);
+    vul::VulDevice vulDevice(vulWindow, 1, false, true);
     vul::VulRenderer vulRenderer(vulWindow, vulDevice, nullptr);
     std::unique_ptr<vul::VulDescriptorPool> descPool = vul::VulDescriptorPool::Builder(vulDevice).setMaxSets(8).setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT).build();
     vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::main, 0, 0, vulDevice);
@@ -158,7 +158,7 @@ int main() {
     VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
     std::unique_ptr<vul::VulImage> enviromentMap = vul::VulImage::createDefaultWholeImageAllInOne(vulDevice, "../enviromentMaps/sunsetCube.exr",
             {}, true, vul::VulImage::InputDataType::exrFile, vul::VulImage::ImageType::hdrCube, commandBuffer);
-    cmdPool.submitAndWait(commandBuffer);
+    cmdPool.submit(commandBuffer, true);
 
     std::vector<vul::VulAs::AsNode> asNodes(mainScene.nodes.size());
     for (size_t i = 0; i < mainScene.nodes.size(); i++) asNodes[i] = {.nodeIndex = static_cast<uint32_t>(i), .blasIndex = 0};
@@ -178,7 +178,7 @@ int main() {
         ubos[i] = std::make_unique<vul::VulBuffer>(sizeof(GlobalUbo), 1, false, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, vulDevice);
         descSets[i] = createRtDescSet(mainScene, as, rtImgs[i], ubos[i], enviromentMap, descPool);
     }
-    cmdPool.submitAndWait(commandBuffer);
+    cmdPool.submit(commandBuffer, true);
 
     std::unique_ptr<vul::VulPipeline> pipeline = createPipeline(vulRenderer, descSets, vulDevice);
     vul::VulRtPipeline rtPipeline(vulDevice, "raytrace.rgen.spv", {"raytrace.rmiss.spv", "raytraceShadow.rmiss.spv"},
@@ -189,7 +189,8 @@ int main() {
     std::atomic_bool stopUpdatingImages = false;
     std::function<void()> imgUpdaterFunc = [&vulDevice, &mainScene, &descSets, &mutex, &stopUpdatingImages]() {
         std::unordered_set<std::string> updatedImagePaths;
-        vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::side, 0, 0, vulDevice, 0);
+        vul::VulCmdPool transferCmdPool(vul::VulCmdPool::QueueType::transfer, 0, 0, vulDevice);
+        vul::VulCmdPool sideCmdPool(vul::VulCmdPool::QueueType::side, 0, 0, vulDevice, 0);
         for (size_t i = 0; i < mainScene.images.size() && !stopUpdatingImages; i++) {
             std::shared_ptr<vul::VulImage> &img = mainScene.images[i];
             if (updatedImagePaths.find(img->name) != updatedImagePaths.end()) continue;
@@ -199,11 +200,16 @@ int main() {
             else if (img->getFormat() == VK_FORMAT_BC7_SRGB_BLOCK) fromat = vul::VulImage::KtxCompressionFormat::bc7rgbaNonLinear;
             else fromat = vul::VulImage::KtxCompressionFormat::bc7rgbaLinear;
             img->addMipLevelsToStartFromCompressedKtxFile(img->name, fromat, 6);
-            VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
-            vul::VulImage::OldVkImageStuff oldVkImageStuff = img->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            VkCommandBuffer commandBuffer = transferCmdPool.getPrimaryCommandBuffer();
+            vul::VulImage::OldVkImageStuff oldVkImageStuff = img->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                     VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, commandBuffer);
-            cmdPool.submitAndWait(commandBuffer);
+            img->transitionQueueFamily(vulDevice.getQueueFamilies().transferFamily, vulDevice.getQueueFamilies().mainFamily, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, commandBuffer);
+            VkSemaphore semaphore = transferCmdPool.submitAndSynchronize(commandBuffer, VK_NULL_HANDLE, true, false);
+            commandBuffer = sideCmdPool.getPrimaryCommandBuffer();
+            img->transitionQueueFamily(vulDevice.getQueueFamilies().transferFamily, vulDevice.getQueueFamilies().mainFamily, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, commandBuffer);
+            img->transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+            sideCmdPool.submitAndSynchronize(commandBuffer, semaphore, false, true);
             mutex.lock();
             for (std::unique_ptr<vul::VulDescriptorSet> &descSet : descSets) {
                 for (size_t j = 0; j < mainScene.images.size(); j++)

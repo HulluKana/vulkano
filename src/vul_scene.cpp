@@ -426,7 +426,7 @@ void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vect
         } else primInfoBuffer->appendVector(primInfos, cmdPool);
         VUL_NAME_VK(primInfoBuffer->getBuffer())
     }
-    cmdPool.submitAndWait(cmdBuf);
+    cmdPool.submit(cmdBuf, true);
 }
 
 }

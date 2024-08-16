@@ -314,7 +314,7 @@ VulImage::OldVkImageStuff VulImage::createCustomImage(VkImageViewType type, VkIm
 
             VUL_NAME_VK(m_stagingBuffers[m_stagingBuffers.size() - 1]->getBuffer())
         }
-        transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout, cmdBuf);
+        if (layout != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout, cmdBuf);
     }
     else transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, layout, cmdBuf);
 
@@ -463,6 +463,23 @@ void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newL
 
     vkCmdPipelineBarrier(cmdBuf, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
     m_layout = newLayout;
+}
+
+void VulImage::transitionQueueFamily(uint32_t srcFamilyIdx, uint32_t dstFamilyIdx, VkPipelineStageFlags accessMask, VkCommandBuffer cmdBuf)
+{
+    VkImageMemoryBarrier barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    barrier.oldLayout = m_layout;
+    barrier.newLayout = m_layout;
+    barrier.srcQueueFamilyIndex = srcFamilyIdx;
+    barrier.dstQueueFamilyIndex = dstFamilyIdx;
+    barrier.image = m_image;
+    barrier.subresourceRange.aspectMask = m_aspect;
+    barrier.subresourceRange.baseMipLevel = 0;
+    barrier.subresourceRange.levelCount = m_mipLevels.size();
+    barrier.subresourceRange.baseArrayLayer = 0;
+    barrier.subresourceRange.layerCount = m_arrayLayersCount;
+    vkCmdPipelineBarrier(cmdBuf, accessMask, accessMask, 0, 0, nullptr, 0, nullptr, 1, &barrier);
 }
 
 std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOne(const vul::VulDevice &vulDevice, std::variant<std::string,

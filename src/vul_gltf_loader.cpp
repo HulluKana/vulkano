@@ -125,7 +125,7 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
 
     VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
     vkCmdExecuteCommands(cmdBuf, cmdBufs.size(), cmdBufs.data());
-    cmdPool.submitAndWait(cmdBuf);
+    cmdPool.submit(cmdBuf, true);
 
     uint32_t prevMips = 0;
     images.resize(model.textures.size());

@@ -150,6 +150,7 @@ class VulImage {
         void readImage(std::vector<DataSection> &readSections, VkCommandBuffer cmdBuf);
 
         void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf);
+        void transitionQueueFamily(uint32_t srcFamilyIdx, uint32_t dstFamilyIdx, VkPipelineStageFlags accessMask, VkCommandBuffer cmdBuf);
 
         void deleteStagingResources() {m_stagingBuffers.clear();}
         void deleteCpuData() {m_data.resize(0);}

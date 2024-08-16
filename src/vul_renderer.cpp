@@ -65,7 +65,7 @@ void VulRenderer::recreateSwapChain()
                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, cmdBuf);
         m_depthImages[i]->vulSampler = m_depthImgSampler;
     }
-    m_cmdPool->submitAndWait(cmdBuf);
+    m_cmdPool->submit(cmdBuf, true);
 }
 
 void VulRenderer::createCommandBuffers() 

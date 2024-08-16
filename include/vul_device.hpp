@@ -7,22 +7,6 @@
 
 namespace vul {
 
-struct SwapChainSupportDetails {
-    VkSurfaceCapabilitiesKHR capabilities;
-    std::vector<VkSurfaceFormatKHR> formats;
-    std::vector<VkPresentModeKHR> presentModes;
-};
-
-struct QueueFamilyIndices {
-    uint32_t mainFamily;
-    uint32_t computeFamily;
-    uint32_t transferFamily;
-    bool hasMainFamily = false;
-    bool hasSeparateComputeFamily = false;
-    bool hasSeparateTransferFamily = false;
-    uint32_t sideQueueCount;
-};
-
 class VulDevice {
     public:
 #ifdef NDEBUG
@@ -31,7 +15,7 @@ class VulDevice {
         const bool enableValidationLayers = true;
 #endif
 
-        VulDevice(VulWindow &window, bool enableMeshShading, bool enableRayTracing);
+        VulDevice(VulWindow &window, uint32_t maxSideQueueCount, bool enableMeshShading, bool enableRayTracing);
         ~VulDevice();
 
         VulDevice(const VulDevice &) = delete;
@@ -48,9 +32,25 @@ class VulDevice {
         std::vector<VkQueue> sideQueues() const { return m_sideQueues; }
         VkInstance getInstace() const {return instance;}
 
-        SwapChainSupportDetails getSwapChainSupport() { return querySwapChainSupport(physicalDevice); }
+        struct SwapChainSupportDetails {
+            VkSurfaceCapabilitiesKHR capabilities;
+            std::vector<VkSurfaceFormatKHR> formats;
+            std::vector<VkPresentModeKHR> presentModes;
+        };
+
+        struct QueueFamilyIndices {
+            uint32_t mainFamily;
+            uint32_t computeFamily;
+            uint32_t transferFamily;
+            bool hasMainFamily = false;
+            bool hasSeparateComputeFamily = false;
+            bool hasSeparateTransferFamily = false;
+            uint32_t sideQueueCount;
+        };
+
+        SwapChainSupportDetails getSwapChainSupport() { return m_swapChainSupportDetails; }
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
-        QueueFamilyIndices findPhysicalQueueFamilies() const { return findQueueFamilies(physicalDevice); }
+        QueueFamilyIndices getQueueFamilies() const { return m_queueFamilyIndices; }
         VkFormat findSupportedFormat(
                 const std::vector<VkFormat> &candidates, VkImageTiling tiling, VkFormatFeatureFlags features);
 
@@ -63,7 +63,7 @@ class VulDevice {
         void setupDebugMessenger();
         void createSurface();
         void pickPhysicalDevice();
-        void createLogicalDevice(bool enableMeshShading, bool enableRaytracing);
+        void createLogicalDevice(uint32_t maxSideQueueCount, bool enableMeshShading, bool enableRayTracing);
 
         bool isDeviceSuitable(VkPhysicalDevice device);
         std::vector<const char *> getRequiredExtensions();
@@ -85,6 +85,9 @@ class VulDevice {
         VkQueue m_computeQueue;
         VkQueue m_transferQueue;
         std::vector<VkQueue> m_sideQueues;
+
+        SwapChainSupportDetails m_swapChainSupportDetails;
+        QueueFamilyIndices m_queueFamilyIndices;
 
         const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};
         std::vector<const char *> deviceExtensions = {VK_KHR_SWAPCHAIN_EXTENSION_NAME};

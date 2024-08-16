@@ -84,7 +84,7 @@ RtResources createRaytracingResources(const vul::VulRenderer &vulRenderer, const
 
         res.descSets[i] = vul::VulDescriptorSet::createDescriptorSet(descriptors, descPool);
     }
-    cmdPool.submitAndWait(cmdBuf);
+    cmdPool.submit(cmdBuf, true);
 
     vul::VulPipeline::PipelineConfigInfo pipConf{};
     pipConf.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32_SFLOAT, 0}};
@@ -135,7 +135,7 @@ void resizeRtImgs(RtResources &res, const vul::VulRenderer &vulRenderer, vul::Vu
         res.rtImgs[i]->keepRegularRaw2d32bitRgbaEmpty(vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height);
         res.rtImgs[i]->createDefaultImage(vul::VulImage::ImageType::storage2d, cmdBuf);
     }
-    cmdPool.submitAndWait(cmdBuf);
+    cmdPool.submit(cmdBuf, true);
 
     for (size_t i = 0; i < res.rtImgs.size(); i++) {
         res.descSets[i]->descriptorInfos[0].imageInfos[0].imageView = res.rtImgs[i]->getImageView();

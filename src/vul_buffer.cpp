@@ -119,7 +119,7 @@ VkResult VulBuffer::readData(void *data, VkDeviceSize size, VkDeviceSize offset,
         if (result != VK_SUCCESS) return result;
         VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
         m_stagingBuffer->copyDataFromBuffer(*this, size, offset, 0, cmdBuf);
-        cmdPool.submitAndWait(cmdBuf);
+        cmdPool.submit(cmdBuf, true);
         memcpy(data, m_stagingBuffer->getMappedMemory(), size);
     } else {
         VkResult result = map(size, offset);
@@ -222,7 +222,7 @@ VkResult VulBuffer::appendData(const void *data, uint32_t elementCount, VulCmdPo
 
     VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
     result = resizeBufferWithData(newData.get(), m_elementSize, elementCount + m_elementCount, cmdBuf);
-    cmdPool.submitAndWait(cmdBuf);
+    cmdPool.submit(cmdBuf, true);
     return result;
 }
 

@@ -12,16 +12,16 @@ VulCmdPool::VulCmdPool(QueueType queueType, uint32_t preallocatePrimaryBufferCou
     cmdPoolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     cmdPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
     if (queueType == QueueType::main) {
-        cmdPoolInfo.queueFamilyIndex = vulDevice.findPhysicalQueueFamilies().mainFamily;
+        cmdPoolInfo.queueFamilyIndex = vulDevice.getQueueFamilies().mainFamily;
         m_queue = vulDevice.mainQueue();
     } else if (queueType == QueueType::compute) {
-        cmdPoolInfo.queueFamilyIndex = vulDevice.findPhysicalQueueFamilies().computeFamily;
+        cmdPoolInfo.queueFamilyIndex = vulDevice.getQueueFamilies().computeFamily;
         m_queue = vulDevice.computeQueue();
     } else if (queueType == QueueType::transfer) {
-        cmdPoolInfo.queueFamilyIndex = vulDevice.findPhysicalQueueFamilies().transferFamily;
+        cmdPoolInfo.queueFamilyIndex = vulDevice.getQueueFamilies().transferFamily;
         m_queue = vulDevice.transferQueue();
     } else if (queueType == QueueType::side) {
-        cmdPoolInfo.queueFamilyIndex = vulDevice.findPhysicalQueueFamilies().mainFamily;
+        cmdPoolInfo.queueFamilyIndex = vulDevice.getQueueFamilies().mainFamily;
         m_queue = vulDevice.sideQueues()[sideQueueIndex];
     }
 
@@ -33,7 +33,8 @@ VulCmdPool::VulCmdPool(QueueType queueType, uint32_t preallocatePrimaryBufferCou
 
 VulCmdPool::~VulCmdPool()
 {
-    for (VkFence fence : m_primaryFences) vkDestroyFence(m_vulDevice.device(), fence, nullptr);
+    for (VkFence fence : m_fences) vkDestroyFence(m_vulDevice.device(), fence, nullptr);
+    for (VkSemaphore semaphore : m_semaphores) vkDestroySemaphore(m_vulDevice.device(), semaphore, nullptr);
     if (m_pool != VK_NULL_HANDLE) vkDestroyCommandPool(m_vulDevice.device(), m_pool, nullptr);
 }
 
@@ -46,7 +47,7 @@ VkCommandBuffer VulCmdPool::getPrimaryCommandBuffer()
     VkCommandBuffer cmdBuf;
     bool foundFreeCmdBuf = false;
     for (size_t i = 0; i < m_primaryBuffers.size(); i++) {
-        if (!m_primaryStatuses[i] && vkGetFenceStatus(m_vulDevice.device(), m_primaryFences[i]) == VK_SUCCESS) {
+        if (!m_primaryStatuses[i] && vkGetFenceStatus(m_vulDevice.device(), m_fences[i]) == VK_SUCCESS) {
             cmdBuf = m_primaryBuffers[i];
             m_primaryStatuses[i] = true;
             foundFreeCmdBuf = true;
@@ -95,15 +96,15 @@ VkCommandBuffer VulCmdPool::getSecondaryCommandBuffer()
     return cmdBuf;
 }
 
-void VulCmdPool::submitAndWait(VkCommandBuffer commandBuffer)
+void VulCmdPool::submit(VkCommandBuffer commandBuffer, bool wait)
 {
     for (size_t i = 0; i < m_primaryBuffers.size(); i++) {
-        assert(commandBuffer != m_primaryBuffers[i] || (vkGetFenceStatus(m_vulDevice.device(), m_primaryFences[i]) == VK_SUCCESS && m_primaryStatuses[i]));
+        assert(commandBuffer != m_primaryBuffers[i] || (vkGetFenceStatus(m_vulDevice.device(), m_fences[i]) == VK_SUCCESS && m_primaryStatuses[i]));
         if (commandBuffer == m_primaryBuffers[i]) {
             VkResult result = vkEndCommandBuffer(commandBuffer);
             assert(result == VK_SUCCESS);
 
-            result = vkResetFences(m_vulDevice.device(), 1, &m_primaryFences[i]);
+            result = vkResetFences(m_vulDevice.device(), 1, &m_fences[i]);
             assert(result == VK_SUCCESS);
             m_primaryStatuses[i] = false;
 
@@ -111,15 +112,69 @@ void VulCmdPool::submitAndWait(VkCommandBuffer commandBuffer)
             submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
             submitInfo.commandBufferCount = 1;
             submitInfo.pCommandBuffers = &commandBuffer;
-            result = vkQueueSubmit(m_queue, 1, &submitInfo, m_primaryFences[i]);
+            result = vkQueueSubmit(m_queue, 1, &submitInfo, m_fences[i]);
             assert(result == VK_SUCCESS);
 
-            result = vkWaitForFences(m_vulDevice.device(), 1, &m_primaryFences[i], VK_TRUE, UINT64_MAX);
-            assert(result == VK_SUCCESS);
+            if (wait) {
+                result = vkWaitForFences(m_vulDevice.device(), 1, &m_fences[i], VK_TRUE, UINT64_MAX);
+                assert(result == VK_SUCCESS);
+            }
 
             return;
         }
     }
+}
+
+VkSemaphore VulCmdPool::submitAndSynchronize(VkCommandBuffer commandBuffer, VkSemaphore waitSemaphore, bool returnSignaledSemaphore, bool wait)
+{
+    for (size_t i = 0; i < m_primaryBuffers.size(); i++) {
+        assert(commandBuffer != m_primaryBuffers[i] || (vkGetFenceStatus(m_vulDevice.device(), m_fences[i]) == VK_SUCCESS && m_primaryStatuses[i]));
+        if (commandBuffer == m_primaryBuffers[i]) {
+            VkResult result = vkEndCommandBuffer(commandBuffer);
+            assert(result == VK_SUCCESS);
+
+            result = vkResetFences(m_vulDevice.device(), 1, &m_fences[i]);
+            assert(result == VK_SUCCESS);
+            m_primaryStatuses[i] = false;
+
+            VkSemaphore signaledSemaphore = VK_NULL_HANDLE;
+            if (returnSignaledSemaphore) {
+                if (m_cmdBufToSemaphoresMap[i] < 0) {
+                    VkSemaphoreCreateInfo semaphoreCreateInfo{};
+                    semaphoreCreateInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+                    vkCreateSemaphore(m_vulDevice.device(), &semaphoreCreateInfo, nullptr, &signaledSemaphore);
+                    m_cmdBufToSemaphoresMap[i] = m_semaphores.size();
+                    m_semaphores.push_back(signaledSemaphore);
+                } else signaledSemaphore = m_semaphores[m_cmdBufToSemaphoresMap[i]];
+            }
+
+            VkPipelineStageFlags waitStageMask = VK_PIPELINE_STAGE_ALL_COMMANDS_BIT;
+
+            VkSubmitInfo submitInfo{};
+            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+            submitInfo.commandBufferCount = 1;
+            submitInfo.pCommandBuffers = &commandBuffer;
+            if (waitSemaphore != VK_NULL_HANDLE) {
+                submitInfo.pWaitSemaphores = &waitSemaphore;
+                submitInfo.pWaitDstStageMask = &waitStageMask;
+                submitInfo.waitSemaphoreCount = 1;
+            }
+            if (returnSignaledSemaphore) {
+                submitInfo.pSignalSemaphores = &signaledSemaphore;
+                submitInfo.signalSemaphoreCount = 1;
+            }
+            result = vkQueueSubmit(m_queue, 1, &submitInfo, m_fences[i]);
+            assert(result == VK_SUCCESS);
+
+            if (wait) {
+                result = vkWaitForFences(m_vulDevice.device(), 1, &m_fences[i], VK_TRUE, UINT64_MAX);
+                assert(result == VK_SUCCESS);
+            }
+
+            return signaledSemaphore;
+        }
+    }
+    return VK_NULL_HANDLE;
 }
 
 void VulCmdPool::endCommandBuffer(VkCommandBuffer commandBuffer)
@@ -164,11 +219,14 @@ void VulCmdPool::allocateCommandBuffers(VkCommandBufferLevel cmdBufLevel, uint32
         assert(result == VK_SUCCESS);
 
         m_primaryStatuses.resize(m_primaryBuffers.size());
-        m_primaryFences.resize(m_primaryBuffers.size());
-        for (size_t i = m_primaryFences.size() - commandBufferCount; i < m_primaryFences.size(); i++) {
-            VkResult result = vkCreateFence(m_vulDevice.device(), &fenceCreateInfo, nullptr, &m_primaryFences[i]);
+        m_fences.resize(m_primaryBuffers.size());
+        for (size_t i = m_fences.size() - commandBufferCount; i < m_fences.size(); i++) {
+            VkResult result = vkCreateFence(m_vulDevice.device(), &fenceCreateInfo, nullptr, &m_fences[i]);
             assert(result == VK_SUCCESS);
         }
+        m_cmdBufToSemaphoresMap.resize(m_primaryBuffers.size());
+        for (size_t i = m_cmdBufToSemaphoresMap.size() - commandBufferCount; i < m_cmdBufToSemaphoresMap.size(); i++)
+            m_cmdBufToSemaphoresMap[i] = -1;
     } else {
         m_secondaryBuffers.resize(m_secondaryBuffers.size() + commandBufferCount);
         VkResult result = vkAllocateCommandBuffers(m_vulDevice.device(), &cmdBufAllocInfo, &m_secondaryBuffers[m_secondaryBuffers.size() - commandBufferCount]);

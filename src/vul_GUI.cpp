@@ -42,7 +42,7 @@ VulGUI::VulGUI(GLFWwindow *window, VkDescriptorPool &descriptorPool, VulRenderer
 
     VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
     ImGui_ImplVulkan_CreateFontsTexture(commandBuffer);
-    cmdPool.submitAndWait(commandBuffer);
+    cmdPool.submit(commandBuffer, true);
 
     vkDeviceWaitIdle(vulDevice.device());
     ImGui_ImplVulkan_DestroyFontUploadObjects();

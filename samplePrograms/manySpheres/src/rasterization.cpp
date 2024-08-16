@@ -31,7 +31,7 @@ RasResources createRasterizationResources(const vul::VulRenderer &vulRenderer, c
     VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
     res.objDataBuf = std::make_unique<vul::VulBuffer>(sizeof(*objDatas.data()), objDatas.size(), true, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT, vulDevice);
     res.objDataBuf->writeVector(objDatas, 0, cmdBuf);
-    cmdPool.submitAndWait(cmdBuf);
+    cmdPool.submit(cmdBuf, true);
 
     res.scene = std::make_unique<vul::Scene>(vulDevice);
     res.scene->loadCubes({{{0.0f, 0.0f, 0.0f}, {0.3f, 0.3f, 0.3f}}}, {{}}, {}, cmdPool);

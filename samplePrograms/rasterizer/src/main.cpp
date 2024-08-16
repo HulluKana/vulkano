@@ -156,7 +156,7 @@ Resources createReources(vul::VulCmdPool &cmdPool, const vul::VulDevice &vulDevi
         VUL_NAME_VK(output.ubos[i]->getBuffer())
         VUL_NAME_VK(output.ubos[i]->getMemory())
     }
-    cmdPool.submitAndWait(cmdBuf);
+    cmdPool.submit(cmdBuf, true);
 
     VUL_NAME_VK(output.multipleBounce2dImage->getImage())
     VUL_NAME_VK(output.multipleBounce1dImage->getImage())
@@ -392,7 +392,7 @@ void GuiStuff(double frameTime) {
 
 int main() {
     vul::VulWindow vulWindow(2560, 1440, "Vulkano");
-    vul::VulDevice vulDevice(vulWindow, false, false);
+    vul::VulDevice vulDevice(vulWindow, 0, false, false);
     std::shared_ptr<vul::VulSampler> depthImgSampler = vul::VulSampler::createDefaultTexSampler(vulDevice, 1);
     vul::VulRenderer vulRenderer(vulWindow, vulDevice, depthImgSampler);
     vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::main, 0, 0, vulDevice);

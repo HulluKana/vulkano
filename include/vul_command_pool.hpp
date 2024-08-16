@@ -24,7 +24,9 @@ class VulCmdPool {
 
         VkCommandBuffer getPrimaryCommandBuffer();
         VkCommandBuffer getSecondaryCommandBuffer();
-        void submitAndWait(VkCommandBuffer commandBuffer);
+
+        void submit(VkCommandBuffer commandBuffer, bool wait);
+        VkSemaphore submitAndSynchronize(VkCommandBuffer commandBuffer, VkSemaphore waitSemaphore, bool returnSignaledSemaphore, bool wait);
         void endCommandBuffer(VkCommandBuffer commandBuffer);
 
         VkCommandPool getPool() const {return m_pool;}
@@ -36,7 +38,9 @@ class VulCmdPool {
         std::vector<bool> m_secondaryStatuses;
         std::vector<VkCommandBuffer> m_primaryBuffers;
         std::vector<VkCommandBuffer> m_secondaryBuffers;
-        std::vector<VkFence> m_primaryFences;
+        std::vector<VkFence> m_fences;
+        std::vector<int> m_cmdBufToSemaphoresMap;
+        std::vector<VkSemaphore> m_semaphores;
         VkCommandPool m_pool;
         VkQueue m_queue;
 

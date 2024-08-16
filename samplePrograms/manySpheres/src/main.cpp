@@ -29,7 +29,7 @@ void GuiStuff(double frameTime, RenderingStyle &renderingStyle) {
 
 int main() {
     vul::VulWindow vulWindow(2560, 1440, "Vulkano");
-    vul::VulDevice vulDevice(vulWindow, true, true);
+    vul::VulDevice vulDevice(vulWindow, 0, true, true);
     std::shared_ptr<vul::VulSampler> depthImgSampler = vul::VulSampler::createDefaultTexSampler(vulDevice, 1);
     vul::VulRenderer vulRenderer(vulWindow, vulDevice, depthImgSampler);
     std::unique_ptr<vul::VulDescriptorPool> descPool = vul::VulDescriptorPool::Builder(vulDevice).setMaxSets(16).setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT).build();
@@ -41,7 +41,7 @@ int main() {
 
     VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
     MeshResources meshRes = createMeshShadingResources(vulRenderer, *descPool.get(), commandBuffer, vulDevice);
-    cmdPool.submitAndWait(commandBuffer);
+    cmdPool.submit(commandBuffer, true);
     RtResources rtRes = createRaytracingResources(vulRenderer, *descPool.get(), cmdPool, vulDevice);
     RasResources rasRes = createRasterizationResources(vulRenderer, *descPool.get(), cmdPool, vulDevice);
 

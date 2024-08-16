@@ -192,7 +192,7 @@ void VulRtPipeline::createSBT(uint32_t missCount, uint32_t hitCount, VulCmdPool 
     
     VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
     m_SBTBuffer->writeData(pSbtData, sbtSize, 0, commandBuffer);
-    cmdPool.submitAndWait(commandBuffer);
+    cmdPool.submit(commandBuffer, true);
     delete[] pSbtData;
 
     VUL_NAME_VK(m_SBTBuffer->getBuffer())

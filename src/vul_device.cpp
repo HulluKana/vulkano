@@ -57,12 +57,12 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance,
 }
 
 // class member functions
-VulDevice::VulDevice(vul::VulWindow &window, bool enableMeshShading, bool enableRayTracing) : window{window} {
+VulDevice::VulDevice(VulWindow &window, uint32_t maxSideQueueCount, bool enableMeshShading, bool enableRayTracing) : window{window} {
     createInstance();
     setupDebugMessenger();
     createSurface();
     pickPhysicalDevice();
-    createLogicalDevice(enableMeshShading, enableRayTracing);
+    createLogicalDevice(maxSideQueueCount, enableMeshShading, enableRayTracing);
 
     DebugNamer::initialize(*this);
     VUL_NAME_VK(instance)
@@ -140,6 +140,8 @@ void VulDevice::pickPhysicalDevice() {
     for (const auto &device : devices) {
         if (isDeviceSuitable(device)) {
             physicalDevice = device;
+            m_swapChainSupportDetails = querySwapChainSupport(device);
+            m_queueFamilyIndices = findQueueFamilies(device);
             break;
         }
     }
@@ -152,20 +154,20 @@ void VulDevice::pickPhysicalDevice() {
     // std::cout << "physical device: " << properties.deviceName << std::endl;
 }
 
-void VulDevice::createLogicalDevice(bool enableMeshShading, bool enableRayTracing) {
-    QueueFamilyIndices indices = findQueueFamilies(physicalDevice);
-
+void VulDevice::createLogicalDevice(uint32_t maxSideQueueCount, bool enableMeshShading, bool enableRayTracing)
+{
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
-        indices.mainFamily, indices.computeFamily, indices.transferFamily};
+        m_queueFamilyIndices.mainFamily, m_queueFamilyIndices.computeFamily, m_queueFamilyIndices.transferFamily};
+    m_queueFamilyIndices.sideQueueCount = std::min(m_queueFamilyIndices.sideQueueCount, maxSideQueueCount);
 
-    std::vector<float> queuePriorities(indices.sideQueueCount + 1);
+    std::vector<float> queuePriorities(m_queueFamilyIndices.sideQueueCount + 1);
     std::fill(queuePriorities.begin(), queuePriorities.end(), 1.0f);
     for (uint32_t queueFamily : uniqueQueueFamilies) {
         VkDeviceQueueCreateInfo queueCreateInfo = {};
         queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
         queueCreateInfo.queueFamilyIndex = queueFamily;
-        queueCreateInfo.queueCount = queueFamily == indices.mainFamily ? indices.sideQueueCount + 1 : 1;
+        queueCreateInfo.queueCount = queueFamily == m_queueFamilyIndices.mainFamily ? m_queueFamilyIndices.sideQueueCount + 1 : 1;
         queueCreateInfo.pQueuePriorities = queuePriorities.data();
         queueCreateInfos.push_back(queueCreateInfo);
     }
@@ -242,11 +244,11 @@ void VulDevice::createLogicalDevice(bool enableMeshShading, bool enableRayTracin
         throw std::runtime_error("failed to create logical device!");
     }
 
-    vkGetDeviceQueue(device_, indices.mainFamily, 0, &m_mainQueue);
-    vkGetDeviceQueue(device_, indices.computeFamily, 0, &m_computeQueue);
-    vkGetDeviceQueue(device_, indices.transferFamily, 0, &m_transferQueue);
-    m_sideQueues.resize(indices.sideQueueCount);
-    for (uint32_t i = 0; i < indices.sideQueueCount; i++) vkGetDeviceQueue(device_, indices.mainFamily, i + 1, &m_sideQueues[i]);
+    vkGetDeviceQueue(device_, m_queueFamilyIndices.mainFamily, 0, &m_mainQueue);
+    vkGetDeviceQueue(device_, m_queueFamilyIndices.computeFamily, 0, &m_computeQueue);
+    vkGetDeviceQueue(device_, m_queueFamilyIndices.transferFamily, 0, &m_transferQueue);
+    m_sideQueues.resize(m_queueFamilyIndices.sideQueueCount);
+    for (uint32_t i = 0; i < m_queueFamilyIndices.sideQueueCount; i++) vkGetDeviceQueue(device_, m_queueFamilyIndices.mainFamily, i + 1, &m_sideQueues[i]);
 
     if (enableRayTracing) {
         extensions::addAccelerationStructure(device_, vkGetDeviceProcAddr);
@@ -387,7 +389,7 @@ bool VulDevice::checkDeviceExtensionSupport(VkPhysicalDevice device) {
     return requiredExtensions.empty();
 }
 
-QueueFamilyIndices VulDevice::findQueueFamilies(VkPhysicalDevice device) const {
+VulDevice::QueueFamilyIndices VulDevice::findQueueFamilies(VkPhysicalDevice device) const {
     QueueFamilyIndices indices{};
 
     uint32_t queueFamilyCount = 0;
@@ -426,8 +428,7 @@ QueueFamilyIndices VulDevice::findQueueFamilies(VkPhysicalDevice device) const {
     return indices;
 }
 
-SwapChainSupportDetails
-    VulDevice::querySwapChainSupport(VkPhysicalDevice device) {
+VulDevice::SwapChainSupportDetails VulDevice::querySwapChainSupport(VkPhysicalDevice device) {
         SwapChainSupportDetails details;
         vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface_,
                 &details.capabilities);

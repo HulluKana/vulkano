@@ -179,7 +179,7 @@ void VulAs::buildTlas(const std::vector<VkAccelerationStructureInstanceKHR> &asI
 
     vkCmdBuildAccelerationStructuresKHR(cmdBuf, 1, &buildInfo, &pBuildRangeInf);
 
-    cmdPool.submitAndWait(cmdBuf);
+    cmdPool.submit(cmdBuf, true);
 }
 
 void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAccelerationStructureFlagsKHR flags, VulCmdPool &cmdPool)
@@ -259,7 +259,7 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
                 VUL_NAME_VK_IDX(m_blases[idx].as, idx)
                 VUL_NAME_VK_IDX(m_blases[idx].buffer->getBuffer(), idx)
             }
-            cmdPool.submitAndWait(cmdBuf);
+            cmdPool.submit(cmdBuf, true);
 
             if (queryPool) {
                 std::vector<VkDeviceSize> compactSizes(indices.size());
@@ -289,7 +289,7 @@ void VulAs::buildBlases(const std::vector<BlasInput> &blasInputs, VkBuildAcceler
                     VUL_NAME_VK_IDX(m_blases[idx].as, idx)
                     VUL_NAME_VK_IDX(m_blases[idx].buffer->getBuffer(), idx)
                 }
-                cmdPool.submitAndWait(cmdBuf);
+                cmdPool.submit(cmdBuf, true);
                 for (As &as : bigAses) vkDestroyAccelerationStructureKHR(m_vulDevice.device(), as.as, nullptr);
             }
 
