@@ -268,7 +268,7 @@ void VulImage::addMipLevelsToStartFromCompressedKtxFile(const std::string &fileN
     m_mipLevels.insert(m_mipLevels.end(), oldMipLevels.begin(), oldMipLevels.end());
 }
 
-VulImage::OldVkImageStuff VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
+std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
         VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf)
 {
     assert(m_mipLevels.size() > 0);
@@ -290,12 +290,12 @@ VulImage::OldVkImageStuff VulImage::createCustomImage(VkImageViewType type, VkIm
     maxSize = std::max(maxSize, m_mipLevels[0].depth);
     m_mipLevels.resize(std::min(static_cast<uint32_t>(m_mipLevels.size()), static_cast<uint32_t>(std::log2(maxSize))));
 
-    OldVkImageStuff oldVkImageStuff;
-    oldVkImageStuff.image = m_image;
-    oldVkImageStuff.imageMemory = m_imageMemory;
-    oldVkImageStuff.imageView = m_imageView;
-    oldVkImageStuff.mipImageViews = m_mipImageViews;
-    oldVkImageStuff.device = m_vulDevice.device();
+    std::unique_ptr<OldVkImageStuff> oldVkImageStuff = std::make_unique<OldVkImageStuff>();
+    oldVkImageStuff->image = m_image;
+    oldVkImageStuff->imageMemory = m_imageMemory;
+    oldVkImageStuff->imageView = m_imageView;
+    oldVkImageStuff->mipImageViews = m_mipImageViews;
+    oldVkImageStuff->device = m_vulDevice.device();
     m_stagingBuffers.clear();
 
     createVkImage();
@@ -523,7 +523,7 @@ void VulImage::keepRegularRaw2d32bitRgbaEmpty(uint32_t width, uint32_t height)
     keepEmpty(width, height, 1, 1, 1, VK_FORMAT_R32G32B32A32_SFLOAT);
 }
 
-VulImage::OldVkImageStuff VulImage::createDefaultImage(ImageType type, VkCommandBuffer cmdBuf)
+std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createDefaultImage(ImageType type, VkCommandBuffer cmdBuf)
 {
     assert(m_mipLevels.size() > 0);
     size_t arrayLayers = m_mipLevels[0].layers.size();

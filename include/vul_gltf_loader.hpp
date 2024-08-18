@@ -3,8 +3,11 @@
 #include "vul_command_pool.hpp"
 #include "vul_device.hpp"
 #include"vul_image.hpp"
+#include <atomic>
 #include <cstdint>
+#include <mutex>
 #include <string>
+#include <thread>
 #include <unordered_map>
 #include <memory>
 #include <vulkan/vulkan_core.h>
@@ -24,6 +27,8 @@ namespace vul
 class GltfLoader
 {
     public:
+        GltfLoader(std::string fileName);
+
         enum class GltfAttributes : uint8_t{
                 NoAttribs = 0,
                 Position = 1,
@@ -106,27 +111,38 @@ class GltfLoader
         std::vector<Material> materials;
         std::vector<std::shared_ptr<VulImage>> images;
 
-        void importMaterials(const tinygltf::Model &model);
-        void importTextures(const tinygltf::Model &model, const std::string &textureDirectory, const VulDevice &device, VulCmdPool &cmdPool);
-        void importDrawableNodes(const tinygltf::Model &model, GltfAttributes requestedAttributes);
+        struct AsyncImageLoadingInfo {
+            std::atomic_uint32_t fullyProcessedImageCount;
+            std::vector<std::unique_ptr<vul::VulImage::OldVkImageStuff>> oldVkImageStuff;
+            std::thread asyncLoadingThread;
+            std::mutex pauseMutex;
+            std::atomic_bool stopLoadingImagesSignal;
+        };
+
+        void importMaterials();
+        void importFullTexturesSync(const std::string &textureDirectory, const VulDevice &device, VulCmdPool &cmdPool);
+        void importPartialTexturesAsync(AsyncImageLoadingInfo &asyncImageLoadingInfo, const std::string &textureDirectory, uint32_t maxMipCount, const VulDevice &device, VulCmdPool &transferPool, VulCmdPool &destinationPool);
+        void importDrawableNodes(GltfAttributes requestedAttributes);
 
     private:
-        void processMesh(   const tinygltf::Model &model, const tinygltf::Primitive &mesh, 
-                            GltfAttributes requestedAttributes, const std::string &name);
-        void processNode(const tinygltf::Model &model, int nodeIdx, const glm::vec3 &parentPos, const glm::quat &parentRot, const glm::vec3 &parentScale);
+        void processMesh(const tinygltf::Primitive &mesh, GltfAttributes requestedAttributes, const std::string &name);
+        void processNode(int nodeIdx, const glm::vec3 &parentPos, const glm::quat &parentRot, const glm::vec3 &parentScale);
 
         void createTangents(size_t amount);
 
+        void importTextures(std::string textureDirectory, uint32_t mipCount, uint32_t threadCount, const VulDevice &device, VulCmdPool &cmdPool);
 
         float getFloat(const tinygltf::Value &value, const std::string &name);
 
         template<class T>
-        void copyAccessorData(  std::vector<T> &outData, size_t outFirstElement, const tinygltf::Model &model, 
+        void copyAccessorData(  std::vector<T> &outData, size_t outFirstElement, 
                                 const tinygltf::Accessor &accessor, size_t accessorFirstElement, size_t numElementsToCopy);
         template<class T>
-        bool getAccessorData(const tinygltf::Model &model, const tinygltf::Accessor &accessor, std::vector<T> &attribVec);
+        bool getAccessorData(const tinygltf::Accessor &accessor, std::vector<T> &attribVec);
         template <typename T>
-        bool getAttribute(const tinygltf::Model &model, const tinygltf::Primitive &primitive, std::vector<T> &attribVec, const std::string &attribName);
+        bool getAttribute(const tinygltf::Primitive &primitive, std::vector<T> &attribVec, const std::string &attribName);
+
+        tinygltf::Model m_model;
         
         std::unordered_map<int, std::vector<uint32_t>> m_meshToPrimMesh;
         std::unordered_map<std::string, GltfPrimMesh> m_cachePrimMesh;

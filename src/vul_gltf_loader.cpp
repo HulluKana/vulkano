@@ -2,6 +2,7 @@
 #include "vul_device.hpp"
 #include <GLFW/glfw3.h>
 #include <atomic>
+#include <chrono>
 #include <cstddef>
 #include <cstdlib>
 #include <glm/ext/matrix_transform.hpp>
@@ -11,6 +12,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <ratio>
 #include <set>
 #include <functional>
 #include <sstream>
@@ -20,6 +22,7 @@
 #include <future>
 
 #include <thread>
+#include <unordered_set>
 #include<vul_gltf_loader.hpp>
 #include<vul_transform.hpp>
 #include <vulkan/vulkan_core.h>
@@ -30,11 +33,20 @@
 namespace vul
 {
 
-void GltfLoader::importMaterials(const tinygltf::Model &model)
+GltfLoader::GltfLoader(std::string fileName)
 {
-    materials.reserve(model.materials.size());
+    tinygltf::TinyGLTF context;
+    std::string warn, err;
+    
+    if (!context.LoadASCIIFromFile(&m_model, &err, &warn, fileName)) 
+        throw std::runtime_error("Failed to load scene from file: " + err);
+}
 
-    for (const tinygltf::Material &tmat : model.materials){
+void GltfLoader::importMaterials()
+{
+    materials.reserve(m_model.materials.size());
+
+    for (const tinygltf::Material &tmat : m_model.materials){
         Material omat{};
         omat.name = tmat.name;
         if (tmat.alphaMode == "OPAQUE" || tmat.alphaMode.length() == 0) omat.alphaMode = GltfAlphaMode::opaque;
@@ -70,22 +82,72 @@ void GltfLoader::importMaterials(const tinygltf::Model &model)
     }
 }
 
-void GltfLoader::importTextures(const tinygltf::Model &model, const std::string &textureDirectory, const VulDevice &device, VulCmdPool &cmdPool)
+void GltfLoader::importFullTexturesSync(const std::string &textureDirectory, const VulDevice &device, VulCmdPool &cmdPool)
 {
-    if (model.images.size() == 0) return;
+    if (m_model.images.size() == 0) return;
+    importTextures(textureDirectory, 69, std::thread::hardware_concurrency(), device, cmdPool);
+    for (size_t i = 0; i < images.size(); i++) images[i]->deleteCpuData();
+}
+
+void GltfLoader::importPartialTexturesAsync(AsyncImageLoadingInfo &asyncImageLoadingInfo, const std::string &textureDirectory, uint32_t maxMipCount, const VulDevice &device, VulCmdPool &transferPool, VulCmdPool &destinationPool)
+{
+    if (m_model.images.size() == 0) return;
+    importTextures(textureDirectory, maxMipCount, std::thread::hardware_concurrency(), device, destinationPool);
+
+    asyncImageLoadingInfo.oldVkImageStuff.reserve(images.size());
+    std::atomic_bool stopUpdatingImages = false;
+    std::function<void(std::vector<std::shared_ptr<vul::VulImage>> &)> imgUpdaterFunc = [&device, &transferPool, &destinationPool, &maxMipCount, &asyncImageLoadingInfo]
+        (std::vector<std::shared_ptr<vul::VulImage>> &images) {
+
+        std::unordered_set<std::string> updatedImagePaths;
+        for (size_t i = 0; i < images.size() && !asyncImageLoadingInfo.stopLoadingImagesSignal; i++) {
+            asyncImageLoadingInfo.pauseMutex.lock();
+            std::shared_ptr<vul::VulImage> &img = images[i];
+            if (updatedImagePaths.find(img->name) == updatedImagePaths.end()) {
+                updatedImagePaths.insert(img->name);
+                vul::VulImage::KtxCompressionFormat fromat;
+                if (img->getFormat() == VK_FORMAT_BC1_RGB_SRGB_BLOCK) fromat = vul::VulImage::KtxCompressionFormat::bc1rgbNonLinear;
+                else if (img->getFormat() == VK_FORMAT_BC7_SRGB_BLOCK) fromat = vul::VulImage::KtxCompressionFormat::bc7rgbaNonLinear;
+                else fromat = vul::VulImage::KtxCompressionFormat::bc7rgbaLinear;
+                img->addMipLevelsToStartFromCompressedKtxFile(img->name, fromat, maxMipCount);
+                VkCommandBuffer commandBuffer = transferPool.getPrimaryCommandBuffer();
+                asyncImageLoadingInfo.oldVkImageStuff.push_back(img->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+                            VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, commandBuffer));
+                img->transitionQueueFamily(device.getQueueFamilies().transferFamily, device.getQueueFamilies().mainFamily, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, commandBuffer);
+                VkSemaphore semaphore = transferPool.submitAndSynchronize(commandBuffer, VK_NULL_HANDLE, true, false);
+                commandBuffer = destinationPool.getPrimaryCommandBuffer();
+                img->transitionQueueFamily(device.getQueueFamilies().transferFamily, device.getQueueFamilies().mainFamily, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, commandBuffer);
+                img->transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
+                destinationPool.submitAndSynchronize(commandBuffer, semaphore, false, true);
+            }
+            asyncImageLoadingInfo.fullyProcessedImageCount++;
+            asyncImageLoadingInfo.pauseMutex.unlock();
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(50ms);
+        }
+    };
+
+    asyncImageLoadingInfo.pauseMutex.unlock();
+    asyncImageLoadingInfo.asyncLoadingThread = std::thread(imgUpdaterFunc, std::ref(images));
+}
+
+void GltfLoader::importTextures(std::string textureDirectory, uint32_t mipCount, uint32_t threadCount, const VulDevice &device, VulCmdPool &cmdPool)
+{
+    if (textureDirectory[textureDirectory.length() - 1] != '/') textureDirectory += '/';
 
     std::set<int> transparentColorTextures;
     std::set<int> opaqueColorTextures;
     std::set<int> normalMaps;
     std::set<int> roughnessMetallicTextures;
-    for (const tinygltf::Material &mat : model.materials) {
-        if (mat.alphaMode == "OPAQUE") opaqueColorTextures.insert(model.textures[mat.pbrMetallicRoughness.baseColorTexture.index].source);
-        else transparentColorTextures.insert(model.textures[mat.pbrMetallicRoughness.baseColorTexture.index].source);
-        normalMaps.insert(model.textures[mat.normalTexture.index].source);
-        roughnessMetallicTextures.insert(model.textures[mat.pbrMetallicRoughness.metallicRoughnessTexture.index].source);
+    for (const tinygltf::Material &mat : m_model.materials) {
+        if (mat.alphaMode == "OPAQUE") opaqueColorTextures.insert(m_model.textures[mat.pbrMetallicRoughness.baseColorTexture.index].source);
+        else transparentColorTextures.insert(m_model.textures[mat.pbrMetallicRoughness.baseColorTexture.index].source);
+        normalMaps.insert(m_model.textures[mat.normalTexture.index].source);
+        roughnessMetallicTextures.insert(m_model.textures[mat.pbrMetallicRoughness.metallicRoughnessTexture.index].source);
     }
 
-    std::vector<std::thread> threads(std::thread::hardware_concurrency());
+    std::vector<std::thread> threads(threadCount);
     std::vector<std::unique_ptr<VulCmdPool>> cmdPools(threads.size());
     std::vector<VkCommandBuffer> cmdBufs(threads.size());
     for (size_t i = 0; i < threads.size(); i++) {
@@ -93,7 +155,7 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
         cmdBufs[i] = cmdPools[i]->getSecondaryCommandBuffer();
     }
 
-    std::vector<std::shared_ptr<VulImage>> imgSources(model.images.size());
+    std::vector<std::shared_ptr<VulImage>> imgSources(m_model.images.size());
     std::atomic<uint32_t> atomImgIdx = 0;
     std::function<void(uint32_t)> importTexture = [&](uint32_t threadIdx)
     {
@@ -107,9 +169,9 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
             else if (normalMaps.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaLinear;
             else if (roughnessMetallicTextures.count(imgIdx) > 0) fromat = VulImage::KtxCompressionFormat::bc7rgbaLinear;
 
-            const tinygltf::Image &image = model.images[imgIdx];
+            const tinygltf::Image &image = m_model.images[imgIdx];
             imgSources[imgIdx] = std::make_shared<VulImage>(device);
-            imgSources[imgIdx]->loadCompressedKtxFromFile(textureDirectory + image.uri, fromat, 6, 69);
+            imgSources[imgIdx]->loadCompressedKtxFromFile(textureDirectory + image.uri, fromat, mipCount, 69);
             imgSources[imgIdx]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                     VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBufs[threadIdx]);
@@ -128,28 +190,27 @@ void GltfLoader::importTextures(const tinygltf::Model &model, const std::string 
     cmdPool.submit(cmdBuf, true);
 
     uint32_t prevMips = 0;
-    images.resize(model.textures.size());
+    images.resize(m_model.textures.size());
     for (size_t i = 0; i < images.size(); i++) {
-        images[i] = imgSources[model.textures[i].source];
+        images[i] = imgSources[m_model.textures[i].source];
         if (images[i]->getMipCount() != prevMips) {
             prevMips = images[i]->getMipCount();
             images[i]->vulSampler = VulSampler::createDefaultTexSampler(device, prevMips);
         } else images[i]->vulSampler = images[i - 1]->vulSampler;
 
         images[i]->deleteStagingResources();
-        //images[i]->deleteCpuData();
     }
 }
 
-void GltfLoader::importDrawableNodes(const tinygltf::Model &model, GltfAttributes requestedAttributes)
+void GltfLoader::importDrawableNodes(GltfAttributes requestedAttributes)
 {
-    const int defaultScene = model.defaultScene > -1 ? model.defaultScene : 0;    
-    const auto &scene = model.scenes[defaultScene];
+    const int defaultScene = m_model.defaultScene > -1 ? m_model.defaultScene : 0;    
+    const auto &scene = m_model.scenes[defaultScene];
 
     std::set<uint32_t> usedMeshes;
     std::function<void(int)> findUsedMeshes = [&] (int nodeIdx)
     {
-        const tinygltf::Node node = model.nodes[nodeIdx];
+        const tinygltf::Node node = m_model.nodes[nodeIdx];
         if (node.mesh >= 0) usedMeshes.insert(node.mesh);
         for (int childIdx : node.children) findUsedMeshes(childIdx);
     };
@@ -160,16 +221,16 @@ void GltfLoader::importDrawableNodes(const tinygltf::Model &model, GltfAttribute
     uint32_t indexCnt = 0;
     uint32_t primCnt = 0;
     for (uint32_t meshIdx : usedMeshes){
-        tinygltf::Mesh mesh = model.meshes[meshIdx]; 
+        tinygltf::Mesh mesh = m_model.meshes[meshIdx]; 
         std::vector<uint32_t> primitives;
         for (tinygltf::Primitive prim: mesh.primitives){
             if (prim.mode != 4) throw std::runtime_error("Why is the primitive mode not 4? Find an answer to that."); // I think the mode 4 is triangle
             if (prim.indices > -1){
-                tinygltf::Accessor indexAccessor = model.accessors[prim.indices];
+                tinygltf::Accessor indexAccessor = m_model.accessors[prim.indices];
                 indexCnt += static_cast<uint32_t>(indexAccessor.count);
             } else{
                 throw std::runtime_error("Is this okay? I dunno, figure it out");
-                tinygltf::Accessor posAccessor = model.accessors[prim.attributes.find("POSITION")->second];
+                tinygltf::Accessor posAccessor = m_model.accessors[prim.attributes.find("POSITION")->second];
                 indexCnt += static_cast<uint32_t>(posAccessor.count); 
             }
             primitives.push_back(primCnt);
@@ -179,9 +240,9 @@ void GltfLoader::importDrawableNodes(const tinygltf::Model &model, GltfAttribute
     }
     indices.reserve(indexCnt);
     for (uint32_t meshIdx : usedMeshes){
-        tinygltf::Mesh mesh = model.meshes[meshIdx];
+        tinygltf::Mesh mesh = m_model.meshes[meshIdx];
         for (tinygltf::Primitive prim : mesh.primitives){
-            processMesh(model, prim, requestedAttributes, mesh.name);
+            processMesh(prim, requestedAttributes, mesh.name);
         }
     }
 
@@ -191,14 +252,14 @@ void GltfLoader::importDrawableNodes(const tinygltf::Model &model, GltfAttribute
         quat.y = 0.0f;
         quat.z = 0.0f;
         quat.w = 1.0f;
-        processNode(model, nodeIdx, {0.0f, 0.0f, 0.0f}, quat, {1.0f, 1.0f, 1.0f});
+        processNode(nodeIdx, {0.0f, 0.0f, 0.0f}, quat, {1.0f, 1.0f, 1.0f});
     }
 
     m_meshToPrimMesh.clear();
     m_cachePrimMesh.clear();
 }
 
-void GltfLoader::processMesh(const tinygltf::Model &model, const tinygltf::Primitive &mesh, GltfAttributes requestedAttributes, const std::string &name)
+void GltfLoader::processMesh(const tinygltf::Primitive &mesh, GltfAttributes requestedAttributes, const std::string &name)
 {
     if (mesh.mode != 4) return; 
 
@@ -223,25 +284,25 @@ void GltfLoader::processMesh(const tinygltf::Model &model, const tinygltf::Primi
     }
 
     if (mesh.indices > -1){
-        const tinygltf::Accessor &indexAccessor = model.accessors[mesh.indices];
+        const tinygltf::Accessor &indexAccessor = m_model.accessors[mesh.indices];
         resultMesh.indexCount = static_cast<uint32_t>(indexAccessor.count);
 
         switch (indexAccessor.componentType) {
             case TINYGLTF_PARAMETER_TYPE_UNSIGNED_INT:{
                 std::vector<uint32_t> primitiveIndices(indexAccessor.count);
-                copyAccessorData(primitiveIndices, 0, model, indexAccessor, 0, indexAccessor.count);
+                copyAccessorData(primitiveIndices, 0, indexAccessor, 0, indexAccessor.count);
                 indices.insert(indices.end(), primitiveIndices.begin(), primitiveIndices.end());
                 break;
             }
             case TINYGLTF_PARAMETER_TYPE_UNSIGNED_SHORT:{
                 std::vector<uint16_t> primitiveIndices(indexAccessor.count);
-                copyAccessorData(primitiveIndices, 0, model, indexAccessor, 0, indexAccessor.count);
+                copyAccessorData(primitiveIndices, 0, indexAccessor, 0, indexAccessor.count);
                 indices.insert(indices.end(), primitiveIndices.begin(), primitiveIndices.end());
                 break;
             }
             case TINYGLTF_PARAMETER_TYPE_UNSIGNED_BYTE:{
                 std::vector<uint8_t> primitiveIndices(indexAccessor.count);
-                copyAccessorData(primitiveIndices, 0, model, indexAccessor, 0, indexAccessor.count);
+                copyAccessorData(primitiveIndices, 0, indexAccessor, 0, indexAccessor.count);
                 indices.insert(indices.end(), primitiveIndices.begin(), primitiveIndices.end());
                 break;
             }
@@ -250,7 +311,7 @@ void GltfLoader::processMesh(const tinygltf::Model &model, const tinygltf::Primi
         }
     }
     else{
-        const tinygltf::Accessor accessor = model.accessors[mesh.attributes.find("POSITION")->second];
+        const tinygltf::Accessor accessor = m_model.accessors[mesh.attributes.find("POSITION")->second];
         for (size_t i = 0; i < accessor.count; i++){
             indices.push_back(i);
         }
@@ -258,10 +319,10 @@ void GltfLoader::processMesh(const tinygltf::Model &model, const tinygltf::Primi
     }
 
     if (!primMeshCached){
-        const bool hadPosition = getAttribute<glm::vec3>(model, mesh, positions, "POSITION");
+        const bool hadPosition = getAttribute<glm::vec3>(mesh, positions, "POSITION");
         if (!hadPosition) throw std::runtime_error("The mesh doesnt have position");
 
-        const tinygltf::Accessor accessor = model.accessors[mesh.attributes.find("POSITION")->second];
+        const tinygltf::Accessor accessor = m_model.accessors[mesh.attributes.find("POSITION")->second];
         resultMesh.vertexCount = static_cast<uint32_t>(accessor.count);
         if (!accessor.minValues.empty()){
             resultMesh.posMin = glm::vec3(accessor.minValues[0], accessor.minValues[1], accessor.minValues[2]);
@@ -281,23 +342,23 @@ void GltfLoader::processMesh(const tinygltf::Model &model, const tinygltf::Primi
         }
 
         if (gltfAttribAnd(requestedAttributes, GltfAttributes::Normal) == GltfAttributes::Normal){
-            bool normalCreated = getAttribute<glm::vec3>(model, mesh, normals, "NORMAL");
+            bool normalCreated = getAttribute<glm::vec3>(mesh, normals, "NORMAL");
             if (!normalCreated) throw std::runtime_error("The mesh doesnt have normals");
         }
         if (gltfAttribAnd(requestedAttributes, GltfAttributes::Tangent) == GltfAttributes::Tangent) {
-            if (!getAttribute<glm::vec4>(model, mesh, tangents, "TANGENT")) {
+            if (!getAttribute<glm::vec4>(mesh, tangents, "TANGENT")) {
                 std::cout << "The mesh doesnt have tangents. Name: " << name << "\n";
                 createTangents(resultMesh.vertexCount);
             }
         }
         if (gltfAttribAnd(requestedAttributes, GltfAttributes::TexCoord) == GltfAttributes::TexCoord){
-            bool texCoordCreated = getAttribute<glm::vec2>(model, mesh, uvCoords, "TEXCOORD_0");
+            bool texCoordCreated = getAttribute<glm::vec2>(mesh, uvCoords, "TEXCOORD_0");
             if (!texCoordCreated)
-                texCoordCreated = getAttribute<glm::vec2>(model, mesh, uvCoords, "TEXCOORD");
+                texCoordCreated = getAttribute<glm::vec2>(mesh, uvCoords, "TEXCOORD");
             if (!texCoordCreated) throw std::runtime_error("The mesh doesnt have tex coords");
         }
         if (gltfAttribAnd(requestedAttributes, GltfAttributes::Color) == GltfAttributes::Color){
-            bool colorCreated = getAttribute<glm::vec4>(model, mesh, colors, "COLOR_0");
+            bool colorCreated = getAttribute<glm::vec4>(mesh, colors, "COLOR_0");
             if (!colorCreated) throw std::runtime_error("The mesh doesnt have colors");
         }
     }
@@ -306,9 +367,9 @@ void GltfLoader::processMesh(const tinygltf::Model &model, const tinygltf::Primi
     primMeshes.emplace_back(resultMesh);
 }
 
-void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const glm::vec3 &parentPos, const glm::quat &parentRot, const glm::vec3 &parentScale)
+void GltfLoader::processNode(int nodeIdx, const glm::vec3 &parentPos, const glm::quat &parentRot, const glm::vec3 &parentScale)
 {
-    const tinygltf::Node &node = model.nodes[nodeIdx];
+    const tinygltf::Node &node = m_model.nodes[nodeIdx];
 
     transform3D transform{};
     transform.pos = parentPos;
@@ -344,7 +405,7 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
     }
     else if (node.camera > -1) throw std::runtime_error("The node is a camera. Do something about it");
     else if (node.extensions.find("KHR_lights_punctual") != node.extensions.end()){
-        const tinygltf::Light &light = model.lights[node.light];
+        const tinygltf::Light &light = m_model.lights[node.light];
         GltfLight gltfLight{};
         gltfLight.name = light.name;
         gltfLight.position = transform.pos;
@@ -356,7 +417,7 @@ void GltfLoader::processNode(const tinygltf::Model &model, int nodeIdx, const gl
     }
 
     for (int child : node.children){
-        processNode(model, child, transform.pos, rotationQuaternion, transform.scale);
+        processNode(child, transform.pos, rotationQuaternion, transform.scale);
     }
 }
 
@@ -377,14 +438,14 @@ float GltfLoader::getFloat(const tinygltf::Value &value, const std::string &name
 }
 
 template<class T>
-void GltfLoader::copyAccessorData(  std::vector<T> &outData, size_t outFirstElement, const tinygltf::Model &model, 
+void GltfLoader::copyAccessorData(  std::vector<T> &outData, size_t outFirstElement, 
                         const tinygltf::Accessor &accessor, size_t accessorFirstElement, size_t numElementsToCopy)
 {
     if (outFirstElement >= outData.size()) throw std::runtime_error("Invalid outFirstElement");
     if (accessorFirstElement >= accessor.count) throw std::runtime_error("Invalid accessorFirstElement");
 
-    const tinygltf::BufferView &bufferView = model.bufferViews[accessor.bufferView];
-    const uint8_t *buffer = &model.buffers[bufferView.buffer].data[accessor.byteOffset + bufferView.byteOffset];
+    const tinygltf::BufferView &bufferView = m_model.bufferViews[accessor.bufferView];
+    const uint8_t *buffer = &m_model.buffers[bufferView.buffer].data[accessor.byteOffset + bufferView.byteOffset];
 
     const size_t maxSafeCopySize = std::min(accessor.count - accessorFirstElement, outData.size() - outFirstElement);
     numElementsToCopy = std::min(numElementsToCopy, maxSafeCopySize);
@@ -401,14 +462,14 @@ void GltfLoader::copyAccessorData(  std::vector<T> &outData, size_t outFirstElem
 };
 
 template<class T>
-bool GltfLoader::getAccessorData(const tinygltf::Model &model, const tinygltf::Accessor &accessor, std::vector<T> &attribVec)
+bool GltfLoader::getAccessorData(const tinygltf::Accessor &accessor, std::vector<T> &attribVec)
 {
     const size_t elemCnt = accessor.count;
     const size_t oldElemCnt = attribVec.size();
     attribVec.resize(oldElemCnt + elemCnt);
     
     if (accessor.componentType == TINYGLTF_COMPONENT_TYPE_FLOAT){
-        copyAccessorData<T>(attribVec, oldElemCnt, model, accessor, 0, accessor.count);
+        copyAccessorData<T>(attribVec, oldElemCnt, accessor, 0, accessor.count);
     }
     else{
         throw std::runtime_error(std::string("Yo, the accessor type isnt float. Do something about it. Its type btw is ") + std::to_string(accessor.componentType));
@@ -417,12 +478,12 @@ bool GltfLoader::getAccessorData(const tinygltf::Model &model, const tinygltf::A
     return true;
 }
 template <typename T>
-bool GltfLoader::getAttribute(const tinygltf::Model &model, const tinygltf::Primitive &primitive, std::vector<T> &attribVec, const std::string &attribName)
+bool GltfLoader::getAttribute(const tinygltf::Primitive &primitive, std::vector<T> &attribVec, const std::string &attribName)
 {
     const auto &it = primitive.attributes.find(attribName);
     if (it == primitive.attributes.end()) return false;
-    const tinygltf::Accessor &accessor = model.accessors[it->second];
-    return getAccessorData(model, accessor, attribVec);
+    const tinygltf::Accessor &accessor = m_model.accessors[it->second];
+    return getAccessorData(accessor, attribVec);
 }
 
 }

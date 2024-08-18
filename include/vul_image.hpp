@@ -136,8 +136,8 @@ class VulImage {
         void keepRegularRaw2d32bitRgbaEmpty(uint32_t width, uint32_t height);
         void keepEmpty(uint32_t baseWidth, uint32_t baseHeight, uint32_t baseDepth, uint32_t mipCount, uint32_t arrayCount, VkFormat format);
 
-        OldVkImageStuff createDefaultImage(ImageType type, VkCommandBuffer cmdBuf);
-        OldVkImageStuff createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
+        std::unique_ptr<OldVkImageStuff> createDefaultImage(ImageType type, VkCommandBuffer cmdBuf);
+        std::unique_ptr<OldVkImageStuff> createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
                 VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf);
 
         void createFromVkImage(VkImage image, VkImageViewType type, VkFormat format, VkImageAspectFlags aspect,

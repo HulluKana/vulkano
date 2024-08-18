@@ -49,13 +49,12 @@ class Scene
         void loadCubes(const std::vector<Cube> &cubes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
         void loadSpheres(const std::vector<Sphere> &spheres, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
         void loadPlanes(const std::vector<Plane> &planes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
-        void loadScene(const std::string &fileName, std::string textureDirectory, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
+        vul::GltfLoader loadScene(const std::string &fileName, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
 
         std::vector<GltfLoader::GltfLight> lights;
         std::vector<GltfLoader::GltfNode> nodes;
         std::vector<GltfLoader::GltfPrimMesh> meshes;
         std::vector<GltfLoader::Material> materials;
-        std::vector<std::shared_ptr<VulImage>> images;
 
         std::vector<glm::vec3> vertices;
         std::vector<glm::vec3> normals;
