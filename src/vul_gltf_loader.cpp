@@ -85,7 +85,7 @@ void GltfLoader::importMaterials()
 void GltfLoader::importFullTexturesSync(const std::string &textureDirectory, const VulDevice &device, VulCmdPool &cmdPool)
 {
     if (m_model.images.size() == 0) return;
-    importTextures(textureDirectory, 69, std::thread::hardware_concurrency(), device, cmdPool);
+    importTextures(textureDirectory, 0, std::thread::hardware_concurrency(), device, cmdPool);
     for (size_t i = 0; i < images.size(); i++) images[i]->deleteCpuData();
 }
 
@@ -96,12 +96,11 @@ void GltfLoader::importPartialTexturesAsync(AsyncImageLoadingInfo &asyncImageLoa
 
     asyncImageLoadingInfo.oldVkImageStuff.reserve(images.size());
     std::atomic_bool stopUpdatingImages = false;
-    std::function<void(std::vector<std::shared_ptr<vul::VulImage>> &)> imgUpdaterFunc = [&device, &transferPool, &destinationPool, &maxMipCount, &asyncImageLoadingInfo]
+    std::function<void(std::vector<std::shared_ptr<vul::VulImage>> &)> imgUpdaterFunc = [&device, &transferPool, &destinationPool, maxMipCount, &asyncImageLoadingInfo]
         (std::vector<std::shared_ptr<vul::VulImage>> &images) {
 
         std::unordered_set<std::string> updatedImagePaths;
         for (size_t i = 0; i < images.size() && !asyncImageLoadingInfo.stopLoadingImagesSignal; i++) {
-            asyncImageLoadingInfo.pauseMutex.lock();
             std::shared_ptr<vul::VulImage> &img = images[i];
             if (updatedImagePaths.find(img->name) == updatedImagePaths.end()) {
                 updatedImagePaths.insert(img->name);
@@ -111,6 +110,7 @@ void GltfLoader::importPartialTexturesAsync(AsyncImageLoadingInfo &asyncImageLoa
                 else fromat = vul::VulImage::KtxCompressionFormat::bc7rgbaLinear;
                 img->addMipLevelsToStartFromCompressedKtxFile(img->name, fromat, maxMipCount);
                 VkCommandBuffer commandBuffer = transferPool.getPrimaryCommandBuffer();
+                asyncImageLoadingInfo.pauseMutex.lock();
                 asyncImageLoadingInfo.oldVkImageStuff.push_back(img->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                             VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, commandBuffer));
@@ -120,12 +120,12 @@ void GltfLoader::importPartialTexturesAsync(AsyncImageLoadingInfo &asyncImageLoa
                 img->transitionQueueFamily(device.getQueueFamilies().transferFamily, device.getQueueFamilies().mainFamily, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, commandBuffer);
                 img->transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
                 destinationPool.submitAndSynchronize(commandBuffer, semaphore, false, true);
+                asyncImageLoadingInfo.pauseMutex.unlock();
             }
             asyncImageLoadingInfo.fullyProcessedImageCount++;
-            asyncImageLoadingInfo.pauseMutex.unlock();
-            using namespace std::chrono_literals;
-            std::this_thread::sleep_for(50ms);
+            std::cout << "Loaded image " << i + 1 << " of " << images.size() << " called " << img->name << " with size of " << img->getBaseWidth() << "x" << img->getBaseHeight() << " and mip count of " << img->getMipCount() << "\n";
         }
+        std::cout << "All loaded\n";
     };
 
     asyncImageLoadingInfo.pauseMutex.unlock();
@@ -171,11 +171,11 @@ void GltfLoader::importTextures(std::string textureDirectory, uint32_t mipCount,
 
             const tinygltf::Image &image = m_model.images[imgIdx];
             imgSources[imgIdx] = std::make_shared<VulImage>(device);
+            imgSources[imgIdx]->name = textureDirectory + image.uri;
             imgSources[imgIdx]->loadCompressedKtxFromFile(textureDirectory + image.uri, fromat, mipCount, 69);
             imgSources[imgIdx]->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                     VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBufs[threadIdx]);
-            imgSources[imgIdx]->name = textureDirectory + image.uri;
         }
     };
 
@@ -189,15 +189,11 @@ void GltfLoader::importTextures(std::string textureDirectory, uint32_t mipCount,
     vkCmdExecuteCommands(cmdBuf, cmdBufs.size(), cmdBufs.data());
     cmdPool.submit(cmdBuf, true);
 
-    uint32_t prevMips = 0;
     images.resize(m_model.textures.size());
+    std::shared_ptr<VulSampler> sampler = VulSampler::createDefaultTexSampler(device);
     for (size_t i = 0; i < images.size(); i++) {
         images[i] = imgSources[m_model.textures[i].source];
-        if (images[i]->getMipCount() != prevMips) {
-            prevMips = images[i]->getMipCount();
-            images[i]->vulSampler = VulSampler::createDefaultTexSampler(device, prevMips);
-        } else images[i]->vulSampler = images[i - 1]->vulSampler;
-
+        images[i]->vulSampler = sampler;
         images[i]->deleteStagingResources();
     }
 }

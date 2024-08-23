@@ -115,10 +115,8 @@ void VulCmdPool::submit(VkCommandBuffer commandBuffer, bool wait)
             result = vkQueueSubmit(m_queue, 1, &submitInfo, m_fences[i]);
             assert(result == VK_SUCCESS);
 
-            if (wait) {
                 result = vkWaitForFences(m_vulDevice.device(), 1, &m_fences[i], VK_TRUE, UINT64_MAX);
                 assert(result == VK_SUCCESS);
-            }
 
             return;
         }

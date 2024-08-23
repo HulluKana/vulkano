@@ -3,8 +3,10 @@
 #include "vul_command_pool.hpp"
 #include "vul_descriptors.hpp"
 #include "vul_device.hpp"
+#include "vul_gltf_loader.hpp"
 #include "vul_image.hpp"
 #include <GLFW/glfw3.h>
+#include <thread>
 #include <vulkan/vulkan_core.h>
 #include <host_device.hpp>
 
@@ -19,18 +21,22 @@ void GuiStuff(double frameTime) {
 
 int main() {
     vul::VulWindow vulWindow(2560, 1440, "Vulkano");
-    vul::VulDevice vulDevice(vulWindow, 0, true, false);
-    std::shared_ptr<vul::VulSampler> depthImgSampler = vul::VulSampler::createDefaultTexSampler(vulDevice, 1);
+    vul::VulDevice vulDevice(vulWindow, 1, true, false);
+    std::shared_ptr<vul::VulSampler> depthImgSampler = vul::VulSampler::createDefaultTexSampler(vulDevice);
     vul::VulRenderer vulRenderer(vulWindow, vulDevice, depthImgSampler);
     std::unique_ptr<vul::VulDescriptorPool> descPool = vul::VulDescriptorPool::Builder(vulDevice).setMaxSets(16).setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT).build();
     vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::main, 0, 0, vulDevice);
+    vul::VulCmdPool sideCmdPool(vul::VulCmdPool::QueueType::side, 0, 0, vulDevice, 0);
+    vul::VulCmdPool transferCmdPool(vul::VulCmdPool::QueueType::transfer, 0, 0, vulDevice);
     vul::VulGUI vulGui(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice, cmdPool);
     vul::Scene scene(vulDevice);
-    scene.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza", {}, cmdPool);
+    vul::GltfLoader gltfLoader = scene.loadScene("../Models/sponza/sponza.gltf", {}, cmdPool);
+    gltfLoader.importFullTexturesSync("../Models/sponza/", vulDevice, cmdPool);
+    using namespace std::chrono_literals;
     vul::VulCamera camera{};
 
     VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
-    MeshResources meshRes = createMeshShadingResources(scene, vulRenderer, *descPool.get(), commandBuffer, vulDevice);
+    MeshResources meshRes = createMeshShadingResources(scene, gltfLoader.images, vulRenderer, *descPool.get(), commandBuffer, vulDevice);
     cmdPool.submit(commandBuffer, true);
 
     double frameStartTime = glfwGetTime();

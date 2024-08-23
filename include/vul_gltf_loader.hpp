@@ -112,11 +112,11 @@ class GltfLoader
         std::vector<std::shared_ptr<VulImage>> images;
 
         struct AsyncImageLoadingInfo {
-            std::atomic_uint32_t fullyProcessedImageCount;
+            std::atomic_uint32_t fullyProcessedImageCount = 0;
             std::vector<std::unique_ptr<vul::VulImage::OldVkImageStuff>> oldVkImageStuff;
             std::thread asyncLoadingThread;
             std::mutex pauseMutex;
-            std::atomic_bool stopLoadingImagesSignal;
+            std::atomic_bool stopLoadingImagesSignal = false;
         };
 
         void importMaterials();

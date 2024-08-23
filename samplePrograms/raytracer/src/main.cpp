@@ -228,7 +228,7 @@ int main() {
             vkQueueWaitIdle(vulDevice.mainQueue());
             for (size_t i = 0; i < descSets.size(); i++) {
                 for (size_t j = 0; j < mainSceneLoader.images.size(); j++)
-                    descSets[i]->descriptorInfos[9].imageInfos[j] = mainSceneLoader.images[j]->getDescriptorInfo();
+                    descSets[i]->descriptorInfos[9].imageInfos[j].imageView = mainSceneLoader.images[j]->getImageView();
                 descSets[i]->update();
             }
             asyncImageLoadingInfo.oldVkImageStuff.clear();

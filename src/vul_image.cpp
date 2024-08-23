@@ -64,13 +64,13 @@ VulSampler::~VulSampler()
     if (m_sampler != VK_NULL_HANDLE) vkDestroySampler(m_vulDevice.device(), m_sampler, nullptr);
 }
 
-std::shared_ptr<VulSampler> VulSampler::createDefaultTexSampler(const vul::VulDevice &vulDevice, uint32_t mipLevels)
+std::shared_ptr<VulSampler> VulSampler::createDefaultTexSampler(const vul::VulDevice &vulDevice)
 {
     std::shared_ptr<VulSampler> sampler;
     sampler.reset(new VulSampler{vulDevice, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
             vulDevice.properties.limits.maxSamplerAnisotropy, VK_BORDER_COLOR_INT_OPAQUE_BLACK,
             VK_SAMPLER_MIPMAP_MODE_LINEAR, false, VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE,
-            0.0f, 0.0f, static_cast<float>(mipLevels)});
+            0.0f, 0.0f, 69.0f});
     return sampler;
 }
 
@@ -288,7 +288,7 @@ std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImage(VkImageVi
     assert(!(m_arrayLayersCount > 1 && type == VK_IMAGE_VIEW_TYPE_3D));
     uint32_t maxSize = std::max(m_mipLevels[0].width, m_mipLevels[0].height);
     maxSize = std::max(maxSize, m_mipLevels[0].depth);
-    m_mipLevels.resize(std::min(static_cast<uint32_t>(m_mipLevels.size()), static_cast<uint32_t>(std::log2(maxSize))));
+    m_mipLevels.resize(std::min(static_cast<uint32_t>(m_mipLevels.size()), static_cast<uint32_t>(std::log2(maxSize) + 1)));
 
     std::unique_ptr<OldVkImageStuff> oldVkImageStuff = std::make_unique<OldVkImageStuff>();
     oldVkImageStuff->image = m_image;
@@ -504,7 +504,7 @@ std::unique_ptr<VulImage> VulImage::createDefaultWholeImageAllInOne(const vul::V
             break;
     }
     img->createDefaultImage(imageType, cmdBuf);
-    if (addSampler) img->vulSampler = VulSampler::createDefaultTexSampler(vulDevice, img->getMipCount());
+    if (addSampler) img->vulSampler = VulSampler::createDefaultTexSampler(vulDevice);
     return img;
 }
 
@@ -630,8 +630,14 @@ void VulImage::createVkImage()
     if (vkBindImageMemory(m_vulDevice.device(), m_image, m_imageMemory, 0) != VK_SUCCESS)
         throw std::runtime_error("Failed to bind image memory in VulImage");
 
-    VUL_NAME_VK(m_image)
-    VUL_NAME_VK(m_imageMemory)
+    if (name.length() > 0) {
+        VUL_NAME_VK_MANUAL(m_image, (name + "   image").c_str())
+        VUL_NAME_VK_MANUAL(m_imageMemory, (name + "   image memory").c_str())
+    }
+    else {
+        VUL_NAME_VK(m_image)
+        VUL_NAME_VK(m_imageMemory)
+    }
 }
 
 VkImageView VulImage::createImageView(uint32_t baseMipLevel, uint32_t mipLevelCount)
@@ -651,7 +657,8 @@ VkImageView VulImage::createImageView(uint32_t baseMipLevel, uint32_t mipLevelCo
     if (vkCreateImageView(m_vulDevice.device(), &viewInfo, nullptr, &imageView) != VK_SUCCESS)
         throw std::runtime_error("failed to create image view");
 
-    VUL_NAME_VK(imageView);
+    if (name.length() > 0 ) {VUL_NAME_VK_MANUAL(imageView, (name + "   image view").c_str())}
+    else VUL_NAME_VK(imageView)
     return imageView;
 }
 

@@ -10,7 +10,7 @@
 #include <vulkan/vulkan_core.h>
 #include <meshoptimizer/src/meshoptimizer.h>
 
-MeshResources createMeshShadingResources(vul::Scene &scene, const vul::VulRenderer &vulRenderer, const vul::VulDescriptorPool &descPool, VkCommandBuffer cmdBuf, const vul::VulDevice &vulDevice)
+MeshResources createMeshShadingResources(vul::Scene &scene, const std::vector<std::shared_ptr<vul::VulImage>> &images, const vul::VulRenderer &vulRenderer, const vul::VulDescriptorPool &descPool, VkCommandBuffer cmdBuf, const vul::VulDevice &vulDevice)
 {
     MeshResources meshResources;
 
@@ -100,8 +100,8 @@ MeshResources createMeshShadingResources(vul::Scene &scene, const vul::VulRender
 
         desc.type = vul::VulDescriptorSet::DescriptorType::spCombinedImgSampler;
         desc.stages = VK_SHADER_STAGE_FRAGMENT_BIT;
-        desc.count = scene.images.size();
-        desc.content = scene.images.data();
+        desc.count = images.size();
+        desc.content = images.data();
         descs.push_back(desc);
 
         desc.type = vul::VulDescriptorSet::DescriptorType::storageBuffer;

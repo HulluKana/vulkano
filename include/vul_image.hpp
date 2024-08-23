@@ -17,7 +17,7 @@ class VulSampler {
         VulSampler &operator=(const VulSampler &) = delete;
         VulSampler(VulSampler &&) = default;
 
-        static std::shared_ptr<VulSampler> createDefaultTexSampler(const VulDevice &vulDevice, uint32_t mipLevels);
+        static std::shared_ptr<VulSampler> createDefaultTexSampler(const VulDevice &vulDevice);
         static std::shared_ptr<VulSampler> createCustomSampler(const VulDevice &vulDevice, VkFilter filter,
                 VkSamplerAddressMode addressMode, float maxAnisotropy, VkBorderColor borderColor,
                 VkSamplerMipmapMode mipMapMode, bool enableSamplerReduction, VkSamplerReductionMode samplerReductionMode,
