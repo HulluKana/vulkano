@@ -12,6 +12,7 @@
 #include <limits>
 #include <map>
 #include <memory>
+#include <mutex>
 #include <ratio>
 #include <set>
 #include <functional>
@@ -96,21 +97,54 @@ void GltfLoader::importPartialTexturesAsync(AsyncImageLoadingInfo &asyncImageLoa
 
     asyncImageLoadingInfo.oldVkImageStuff.reserve(images.size());
     std::atomic_bool stopUpdatingImages = false;
-    std::function<void(std::vector<std::shared_ptr<vul::VulImage>> &)> imgUpdaterFunc = [&device, &transferPool, &destinationPool, maxMipCount, &asyncImageLoadingInfo]
-        (std::vector<std::shared_ptr<vul::VulImage>> &images) {
+    std::function<void(std::vector<std::shared_ptr<vul::VulImage>>)> imgUpdaterFunc = [&device, &transferPool, &destinationPool, maxMipCount, &asyncImageLoadingInfo]
+        (std::vector<std::shared_ptr<vul::VulImage>> images) {
 
-        std::unordered_set<std::string> updatedImagePaths;
-        for (size_t i = 0; i < images.size() && !asyncImageLoadingInfo.stopLoadingImagesSignal; i++) {
-            std::shared_ptr<vul::VulImage> &img = images[i];
-            if (updatedImagePaths.find(img->name) == updatedImagePaths.end()) {
-                updatedImagePaths.insert(img->name);
+        std::unordered_set<std::string> uniqueImagePaths;
+        for (std::shared_ptr<vul::VulImage> &img : images) {
+            if (uniqueImagePaths.find(img->name) != uniqueImagePaths.end()) img = nullptr;
+            else uniqueImagePaths.insert(img->name);
+        }
+
+        std::atomic_uint32_t imgIdx = 0;
+        std::vector<std::atomic_bool> imgHasFinished(images.size());
+        std::function<void(std::stop_token)> loadData = [maxMipCount, &imgIdx, &images, &imgHasFinished](std::stop_token stoken) {
+            while (!stoken.stop_requested()) {
+                const uint32_t idx = imgIdx++;
+                if (idx >= images.size()) break;
+                const std::shared_ptr<vul::VulImage> &img = images[idx];
+                if (img == nullptr) {
+                    imgHasFinished[idx] = true;
+                    continue;
+                }
                 vul::VulImage::KtxCompressionFormat fromat;
                 if (img->getFormat() == VK_FORMAT_BC1_RGB_SRGB_BLOCK) fromat = vul::VulImage::KtxCompressionFormat::bc1rgbNonLinear;
                 else if (img->getFormat() == VK_FORMAT_BC7_SRGB_BLOCK) fromat = vul::VulImage::KtxCompressionFormat::bc7rgbaNonLinear;
                 else fromat = vul::VulImage::KtxCompressionFormat::bc7rgbaLinear;
                 img->addMipLevelsToStartFromCompressedKtxFile(img->name, fromat, maxMipCount);
+                imgHasFinished[idx] = true;
+            }
+        };
+        std::vector<std::jthread> threads(std::max(std::jthread::hardware_concurrency() - 2, 1u));
+        for (size_t i = 0; i < threads.size(); i++) threads[i] = std::jthread(loadData);
+
+        uint32_t finishedImgCount = 0;
+        while (!asyncImageLoadingInfo.stopLoadingImagesSignal && finishedImgCount < images.size()) {
+            int idx = -1;
+            for (size_t i = 0; i < imgHasFinished.size(); i++) if (imgHasFinished[i]) {
+                imgHasFinished[i] = false;
+                idx = i;
+                break;
+            }
+            if (idx < 0) {
+                using namespace std::chrono_literals;
+                std::this_thread::sleep_for(10ms);
+                continue;
+            }
+            std::shared_ptr<vul::VulImage> &img = images[idx];
+            if (img != nullptr) {
+                std::scoped_lock lock(asyncImageLoadingInfo.pauseMutex);
                 VkCommandBuffer commandBuffer = transferPool.getPrimaryCommandBuffer();
-                asyncImageLoadingInfo.pauseMutex.lock();
                 asyncImageLoadingInfo.oldVkImageStuff.push_back(img->createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
                             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
                             VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, commandBuffer));
@@ -120,16 +154,14 @@ void GltfLoader::importPartialTexturesAsync(AsyncImageLoadingInfo &asyncImageLoa
                 img->transitionQueueFamily(device.getQueueFamilies().transferFamily, device.getQueueFamilies().mainFamily, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, commandBuffer);
                 img->transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, commandBuffer);
                 destinationPool.submitAndSynchronize(commandBuffer, semaphore, false, true);
-                asyncImageLoadingInfo.pauseMutex.unlock();
             }
             asyncImageLoadingInfo.fullyProcessedImageCount++;
-            std::cout << "Loaded image " << i + 1 << " of " << images.size() << " called " << img->name << " with size of " << img->getBaseWidth() << "x" << img->getBaseHeight() << " and mip count of " << img->getMipCount() << "\n";
+            finishedImgCount++;
         }
-        std::cout << "All loaded\n";
     };
 
     asyncImageLoadingInfo.pauseMutex.unlock();
-    asyncImageLoadingInfo.asyncLoadingThread = std::thread(imgUpdaterFunc, std::ref(images));
+    asyncImageLoadingInfo.asyncLoadingThread = std::thread(imgUpdaterFunc, images);
 }
 
 void GltfLoader::importTextures(std::string textureDirectory, uint32_t mipCount, uint32_t threadCount, const VulDevice &device, VulCmdPool &cmdPool)
