@@ -197,6 +197,12 @@ void VulCmdPool::endCommandBuffer(VkCommandBuffer commandBuffer)
     }
 }
 
+void VulCmdPool::waitForAllCommandBuffers()
+{
+    VkResult result = vkWaitForFences(m_vulDevice.device(), m_fences.size(), m_fences.data(), VK_TRUE, UINT64_MAX);
+    assert(result == VK_SUCCESS);
+}
+
 void VulCmdPool::allocateCommandBuffers(VkCommandBufferLevel cmdBufLevel, uint32_t commandBufferCount)
 {
     if (commandBufferCount == 0) return;

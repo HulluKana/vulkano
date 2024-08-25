@@ -30,8 +30,7 @@ void GuiStuff(double frameTime, RenderingStyle &renderingStyle) {
 int main() {
     vul::VulWindow vulWindow(2560, 1440, "Vulkano");
     vul::VulDevice vulDevice(vulWindow, 0, true, true);
-    std::shared_ptr<vul::VulSampler> depthImgSampler = vul::VulSampler::createDefaultTexSampler(vulDevice, 1);
-    vul::VulRenderer vulRenderer(vulWindow, vulDevice, depthImgSampler);
+    vul::VulRenderer vulRenderer(vulWindow, vulDevice, nullptr);
     std::unique_ptr<vul::VulDescriptorPool> descPool = vul::VulDescriptorPool::Builder(vulDevice).setMaxSets(16).setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT).build();
     vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::main, 0, 0, vulDevice);
     vul::VulGUI vulGui(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice, cmdPool);

@@ -70,8 +70,7 @@ class GltfLoader
             float ior = 1.5f;
         };
         struct GltfPrimMesh{
-            uint32_t firstIndex = 0;
-            uint32_t indexCount = 0;
+            uint32_t firstIndex = 0; uint32_t indexCount = 0;
             uint32_t vertexOffset = 0;
             uint32_t vertexCount = 0;
             int materialIndex = 0;
@@ -114,14 +113,13 @@ class GltfLoader
         struct AsyncImageLoadingInfo {
             std::atomic_uint32_t fullyProcessedImageCount = 0;
             std::vector<std::unique_ptr<vul::VulImage::OldVkImageStuff>> oldVkImageStuff;
-            std::thread asyncLoadingThread;
+            std::jthread asyncLoadingThread;
             std::mutex pauseMutex;
-            std::atomic_bool stopLoadingImagesSignal = false;
         };
 
         void importMaterials();
         void importFullTexturesSync(const std::string &textureDirectory, const VulDevice &device, VulCmdPool &cmdPool);
-        void importPartialTexturesAsync(AsyncImageLoadingInfo &asyncImageLoadingInfo, const std::string &textureDirectory, uint32_t maxMipCount, const VulDevice &device, VulCmdPool &transferPool, VulCmdPool &destinationPool);
+        std::unique_ptr<AsyncImageLoadingInfo> importPartialTexturesAsync(const std::string &textureDirectory, uint32_t asyncMipLoadCount, const VulDevice &device, VulCmdPool &transferPool, VulCmdPool &destinationPool);
         void importDrawableNodes(GltfAttributes requestedAttributes);
 
     private:
@@ -130,7 +128,7 @@ class GltfLoader
 
         void createTangents(size_t amount);
 
-        void importTextures(std::string textureDirectory, uint32_t mipCount, uint32_t threadCount, const VulDevice &device, VulCmdPool &cmdPool);
+        void importTextures(std::string textureDirectory, uint32_t mipOffset, uint32_t threadCount, const VulDevice &device, VulCmdPool &cmdPool);
 
         float getFloat(const tinygltf::Value &value, const std::string &name);
 

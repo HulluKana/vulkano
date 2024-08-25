@@ -49,12 +49,15 @@ class Scene
         void loadCubes(const std::vector<Cube> &cubes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
         void loadSpheres(const std::vector<Sphere> &spheres, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
         void loadPlanes(const std::vector<Plane> &planes, const std::vector<GltfLoader::Material> &mats, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
-        vul::GltfLoader loadScene(const std::string &fileName, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
+        void loadSceneSync(const std::string &fileName, const std::string &textureDir, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
+        std::unique_ptr<GltfLoader::AsyncImageLoadingInfo> loadSceneAsync(const std::string &fileName, const std::string &textureDir,
+                uint32_t asyncMipLoadCount, WantedBuffers wantedBuffers, VulCmdPool &mainCmdPool, VulCmdPool &transferCmdPool, VulCmdPool &destinationCmdPool);
 
         std::vector<GltfLoader::GltfLight> lights;
         std::vector<GltfLoader::GltfNode> nodes;
         std::vector<GltfLoader::GltfPrimMesh> meshes;
         std::vector<GltfLoader::Material> materials;
+        std::vector<std::shared_ptr<vul::VulImage>> images;
 
         std::vector<glm::vec3> vertices;
         std::vector<glm::vec3> normals;
@@ -104,6 +107,7 @@ class Scene
     private:
         const VulDevice &m_vulDevice; 
 
+        void moveGltfStuffToScene(GltfLoader &gltfLoader, WantedBuffers wantedBuffers, VulCmdPool &cmdPool);
         void createBuffers(const std::vector<uint32_t> &lIndices, const std::vector<glm::vec3> &lVertices,
                 const std::vector<glm::vec3> &lNormals, const std::vector<glm::vec4> &lTangents, const std::vector<glm::vec2> &lUvs,
                 const std::vector<GltfLoader::Material> &mats, const std::vector<GltfLoader::GltfNode> &nods,

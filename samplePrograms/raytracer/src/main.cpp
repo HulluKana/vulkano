@@ -25,7 +25,7 @@ void GuiStuff(double frameTime) {
     ImGui::End();
 }
 
-std::unique_ptr<vul::VulDescriptorSet> createRtDescSet(const vul::Scene &scene, const std::vector<std::shared_ptr<vul::VulImage>> &imgs, const vul::VulAs &as,
+std::unique_ptr<vul::VulDescriptorSet> createRtDescSet(const vul::Scene &scene, const vul::VulAs &as,
         const std::unique_ptr<vul::VulImage> &rtImg, const std::unique_ptr<vul::VulBuffer> &ubo, const std::unique_ptr<vul::VulImage> &enviromentMap,
         const std::unique_ptr<vul::VulDescriptorPool> &descPool)
 {
@@ -67,8 +67,8 @@ std::unique_ptr<vul::VulDescriptorSet> createRtDescSet(const vul::Scene &scene, 
     descriptors.push_back(desc);
 
     desc.type = vul::VulDescriptorSet::DescriptorType::spCombinedImgSampler;
-    desc.content = imgs.data();
-    desc.count = imgs.size();
+    desc.content = scene.images.data();
+    desc.count = scene.images.size();
     descriptors.push_back(desc);
 
     desc.type = vul::VulDescriptorSet::DescriptorType::combinedImgSampler;
@@ -104,6 +104,7 @@ void resizeRtImgs(std::array<std::unique_ptr<vul::VulImage>, vul::VulSwapChain::
         std::array<std::unique_ptr<vul::VulDescriptorSet>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> &descSets,
         const vul::VulDevice &vulDevice, VkExtent2D swapChainExtent, vul::VulCmdPool &cmdPool)
 {
+    vkQueueWaitIdle(vulDevice.mainQueue());
     VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
     for (size_t i = 0; i < rtImgs.size(); i++) {
         rtImgs[i] = std::make_unique<vul::VulImage>(vulDevice);
@@ -153,9 +154,8 @@ int main() {
     vul::VulCamera camera{};
 
     vul::Scene mainScene(vulDevice);
-    vul::GltfLoader mainSceneLoader = mainScene.loadScene("../Models/sponza/sponza.gltf", {.primInfo = true, .enableAddressTaking = true, .enableUsageForAccelerationStructures = true}, cmdPool);
-    vul::GltfLoader::AsyncImageLoadingInfo asyncImageLoadingInfo{};
-    mainSceneLoader.importPartialTexturesAsync(asyncImageLoadingInfo, "../Models/sponza/", 6, vulDevice, transferCmdPool, sideCmdPool);
+    std::unique_ptr<vul::GltfLoader::AsyncImageLoadingInfo> asyncImageLoadingInfo = mainScene.loadSceneAsync("../Models/sponza/sponza.gltf",
+            "../Models/sponza/", 6, {.primInfo = true, .enableAddressTaking = true, .enableUsageForAccelerationStructures = true}, cmdPool, transferCmdPool, sideCmdPool);
 
     vul::Scene fullScreenQuad(vulDevice);
     fullScreenQuad.loadPlanes({{{-1.0f, -1.0f, 0.5f}, {1.0f, -1.0f, 0.5f}, {-1.0f, 1.0f, 0.5f}, {1.0f, 1.0f, 0.5f}, 0}}, {}, {.normal = false, .tangent = false, .material = false}, cmdPool);
@@ -174,7 +174,7 @@ int main() {
     std::array<std::unique_ptr<vul::VulImage>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> rtImgs;
     std::array<std::unique_ptr<vul::VulBuffer>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> ubos;
     std::array<std::unique_ptr<vul::VulDescriptorSet>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> descSets;
-    asyncImageLoadingInfo.pauseMutex.lock();
+    asyncImageLoadingInfo->pauseMutex.lock();
     commandBuffer = cmdPool.getPrimaryCommandBuffer();
     for (int i = 0; i < vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT; i++) {
         rtImgs[i] = std::make_unique<vul::VulImage>(vulDevice);
@@ -182,10 +182,10 @@ int main() {
         rtImgs[i]->createDefaultImage(vul::VulImage::ImageType::storage2d, commandBuffer);
 
         ubos[i] = std::make_unique<vul::VulBuffer>(sizeof(GlobalUbo), 1, false, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT, vulDevice);
-        descSets[i] = createRtDescSet(mainScene, mainSceneLoader.images, as, rtImgs[i], ubos[i], enviromentMap, descPool);
+        descSets[i] = createRtDescSet(mainScene, as, rtImgs[i], ubos[i], enviromentMap, descPool);
     }
     cmdPool.submit(commandBuffer, true);
-    asyncImageLoadingInfo.pauseMutex.unlock();
+    asyncImageLoadingInfo->pauseMutex.unlock();
 
     std::unique_ptr<vul::VulPipeline> pipeline = createPipeline(vulRenderer, descSets, vulDevice);
     vul::VulRtPipeline rtPipeline(vulDevice, "raytrace.rgen.spv", {"raytrace.rmiss.spv", "raytraceShadow.rmiss.spv"},
@@ -197,8 +197,8 @@ int main() {
     while (!vulWindow.shouldClose()) {
         glfwPollEvents();
         commandBuffer = vulRenderer.beginFrame();
-        vulGui.startFrame();
         if (commandBuffer == nullptr) continue;
+        vulGui.startFrame();
         int frameIdx = vulRenderer.getFrameIndex();
 
         const double frameTime = glfwGetTime() - frameStartTime;
@@ -224,20 +224,18 @@ int main() {
         if (vulRenderer.wasSwapChainRecreated()) resizeRtImgs(rtImgs, descSets, vulDevice, vulRenderer.getSwapChainExtent(), cmdPool);
 
         if (frameCounter % 200 == 0) {
-            asyncImageLoadingInfo.pauseMutex.lock();
+            asyncImageLoadingInfo->pauseMutex.lock();
             vkQueueWaitIdle(vulDevice.mainQueue());
             for (size_t i = 0; i < descSets.size(); i++) {
-                for (size_t j = 0; j < mainSceneLoader.images.size(); j++)
-                    descSets[i]->descriptorInfos[9].imageInfos[j].imageView = mainSceneLoader.images[j]->getImageView();
+                for (size_t j = 0; j < mainScene.images.size(); j++)
+                    descSets[i]->descriptorInfos[9].imageInfos[j].imageView = mainScene.images[j]->getImageView();
                 descSets[i]->update();
             }
-            asyncImageLoadingInfo.oldVkImageStuff.clear();
-            asyncImageLoadingInfo.pauseMutex.unlock();
+            asyncImageLoadingInfo->oldVkImageStuff.clear();
+            asyncImageLoadingInfo->pauseMutex.unlock();
         }
         frameCounter++;
     }
-    asyncImageLoadingInfo.stopLoadingImagesSignal = true;
-    asyncImageLoadingInfo.asyncLoadingThread.join();
     vulDevice.waitForIdle();
 
     return 0;

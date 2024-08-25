@@ -48,7 +48,7 @@ class VulDevice {
             uint32_t sideQueueCount;
         };
 
-        SwapChainSupportDetails getSwapChainSupport() { return m_swapChainSupportDetails; }
+        SwapChainSupportDetails getSwapChainSupport() { return querySwapChainSupport(physicalDevice); }
         uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) const;
         QueueFamilyIndices getQueueFamilies() const { return m_queueFamilyIndices; }
         VkFormat findSupportedFormat(
@@ -86,7 +86,6 @@ class VulDevice {
         VkQueue m_transferQueue;
         std::vector<VkQueue> m_sideQueues;
 
-        SwapChainSupportDetails m_swapChainSupportDetails;
         QueueFamilyIndices m_queueFamilyIndices;
 
         const std::vector<const char *> validationLayers = {"VK_LAYER_KHRONOS_validation"};

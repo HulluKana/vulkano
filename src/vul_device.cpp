@@ -71,7 +71,8 @@ VulDevice::VulDevice(VulWindow &window, uint32_t maxSideQueueCount, bool enableM
     VUL_NAME_VK(surface_)
     VUL_NAME_VK(m_mainQueue)
     VUL_NAME_VK(m_computeQueue)
-    VUL_NAME_VK(m_transferQueue)
+    VUL_NAME_VK(m_transferQueue);
+    for (size_t i = 0; i < m_sideQueues.size(); i++) VUL_NAME_VK_IDX(m_sideQueues[i], i)
 }
 
 VulDevice::~VulDevice() {
@@ -140,7 +141,6 @@ void VulDevice::pickPhysicalDevice() {
     for (const auto &device : devices) {
         if (isDeviceSuitable(device)) {
             physicalDevice = device;
-            m_swapChainSupportDetails = querySwapChainSupport(device);
             m_queueFamilyIndices = findQueueFamilies(device);
             break;
         }

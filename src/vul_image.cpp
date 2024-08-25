@@ -296,7 +296,7 @@ std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImage(VkImageVi
     oldVkImageStuff->imageView = m_imageView;
     oldVkImageStuff->mipImageViews = m_mipImageViews;
     oldVkImageStuff->device = m_vulDevice.device();
-    m_stagingBuffers.clear();
+    deleteStagingResources();
 
     createVkImage();
     m_imageView = createImageView(0, m_mipLevels.size());
@@ -307,14 +307,20 @@ std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImage(VkImageVi
         containsData = containsData || m_mipLevels[i].containsData[j];
     if (containsData && isDeviceLocal) {
         transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, cmdBuf);
+        size_t totalSize = 0;
+        for (size_t i = 0; i < m_mipLevels.size(); i++) totalSize += m_mipLevels[i].layerSize * m_arrayLayersCount;
+        m_stagingBuffer = std::make_unique<vul::VulBuffer>(1, totalSize, false, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, m_vulDevice);
+        size_t offset = 0;
         for (size_t i = 0; i < m_mipLevels.size(); i++) {
-            m_stagingBuffers.push_back(std::make_unique<vul::VulBuffer>(1, m_mipLevels[i].layerSize * m_arrayLayersCount, false, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, m_vulDevice));
-            m_stagingBuffers[m_stagingBuffers.size() - 1]->writeData(&m_data[m_mipLevels[i].layers[0]], m_stagingBuffers[m_stagingBuffers.size() - 1]->getBufferSize(), 0, VK_NULL_HANDLE);
-            copyBufferToImage(m_stagingBuffers[m_stagingBuffers.size() - 1]->getBuffer(), i, cmdBuf);
+            m_stagingBuffer->writeData(&m_data[m_mipLevels[i].layers[0]], m_mipLevels[i].layerSize * m_arrayLayersCount, offset, VK_NULL_HANDLE);
+            copyBufferToImage(m_stagingBuffer->getBuffer(), offset, i, cmdBuf);
+            offset += m_mipLevels[i].layerSize * m_arrayLayersCount;
 
-            VUL_NAME_VK(m_stagingBuffers[m_stagingBuffers.size() - 1]->getBuffer())
         }
         if (layout != VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) transitionImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, layout, cmdBuf);
+        VUL_NAME_VK(m_stagingBuffer->getBuffer())
+        VUL_NAME_VK(m_stagingBuffer->getMemory())
+        
     }
     else transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, layout, cmdBuf);
 
@@ -662,10 +668,10 @@ VkImageView VulImage::createImageView(uint32_t baseMipLevel, uint32_t mipLevelCo
     return imageView;
 }
 
-void VulImage::copyBufferToImage(VkBuffer buffer, uint32_t mipLevel, VkCommandBuffer cmdBuf) 
+void VulImage::copyBufferToImage(VkBuffer buffer, VkDeviceSize offset, uint32_t mipLevel, VkCommandBuffer cmdBuf) 
 {
     VkBufferImageCopy region{};
-    region.bufferOffset = 0;
+    region.bufferOffset = offset;
     region.bufferRowLength = 0;
     region.bufferImageHeight = 0;
 

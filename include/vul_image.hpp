@@ -152,7 +152,7 @@ class VulImage {
         void transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf);
         void transitionQueueFamily(uint32_t srcFamilyIdx, uint32_t dstFamilyIdx, VkPipelineStageFlags accessMask, VkCommandBuffer cmdBuf);
 
-        void deleteStagingResources() {m_stagingBuffers.clear();}
+        void deleteStagingResources() {m_stagingBuffer.reset(nullptr);}
         void deleteCpuData() {m_data.resize(0);}
 
         VkRenderingAttachmentInfo getAttachmentInfo(VkClearValue clearValue) const;
@@ -206,7 +206,7 @@ class VulImage {
 
         void createVkImage();
         VkImageView createImageView(uint32_t baseMipLevel, uint32_t mipLevelCount);
-        void copyBufferToImage(VkBuffer buffer, uint32_t mipLevel, VkCommandBuffer cmdBuf);
+        void copyBufferToImage(VkBuffer buffer, VkDeviceSize offset, uint32_t mipLevel, VkCommandBuffer cmdBuf);
 
         uint32_t alignUp(uint32_t alignee, uint32_t aligner);
 
@@ -230,7 +230,7 @@ class VulImage {
         uint32_t m_baseWidth = 0;
         uint32_t m_baseHeight = 0;
         uint32_t m_baseDepth = 0;
-        std::vector<std::unique_ptr<VulBuffer>> m_stagingBuffers;
+        std::unique_ptr<VulBuffer> m_stagingBuffer;
 
         VkImage m_image = VK_NULL_HANDLE;
         VkImageView m_imageView = VK_NULL_HANDLE;

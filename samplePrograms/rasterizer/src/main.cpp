@@ -1,5 +1,4 @@
 #include "vul_GUI.hpp"
-#include "vul_acceleration_structure.hpp"
 #include "vul_camera.hpp"
 #include "vul_descriptors.hpp"
 #include "vul_device.hpp"
@@ -393,7 +392,7 @@ void GuiStuff(double frameTime) {
 int main() {
     vul::VulWindow vulWindow(2560, 1440, "Vulkano");
     vul::VulDevice vulDevice(vulWindow, 0, false, false);
-    std::shared_ptr<vul::VulSampler> depthImgSampler = vul::VulSampler::createDefaultTexSampler(vulDevice, 1);
+    std::shared_ptr<vul::VulSampler> depthImgSampler = vul::VulSampler::createDefaultTexSampler(vulDevice);
     vul::VulRenderer vulRenderer(vulWindow, vulDevice, depthImgSampler);
     vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::main, 0, 0, vulDevice);
     std::unique_ptr<vul::VulDescriptorPool> descPool = vul::VulDescriptorPool::Builder(vulDevice).setMaxSets(32).setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT).build();
@@ -401,10 +400,10 @@ int main() {
     vul::VulCamera camera{};
 
     vul::Scene mainScene(vulDevice);
-    mainScene.loadScene("../Models/room/Room.gltf", "../Models/room", {}, cmdPool);
+    mainScene.loadSceneSync("../Models/room/Room.gltf", "../Models/room", {}, cmdPool);
     mainScene.loadSpheres({{{-3.0f, 3.0f, 2.0f}, 2.5f, 4, 0}, {{4.0f, 8.0f, 3.0f}, 3.5f, 2, 0}}, {{}}, {}, cmdPool);
     mainScene.loadCubes({{{7.0f, 5.0f, -4.0f}, {1.0f, 1.0f, 1.0f}, 0}, {{-5.5f, 9.0f, 0.0f}, {2.0f, 1.5f, 0.7f}, 0}}, {{}}, {}, cmdPool);
-    mainScene.loadScene("../Models/sponza/sponza.gltf", "../Models/sponza", {}, cmdPool);
+    mainScene.loadSceneSync("../Models/sponza/sponza.gltf", "../Models/sponza", {}, cmdPool);
     vul::Scene fullScreenQuad(vulDevice);
     fullScreenQuad.loadPlanes({{{-1.0f, -1.0f, 0.5f}, {1.0f, -1.0f, 0.5f}, {-1.0f, 1.0f, 0.5f}, {1.0f, 1.0f, 0.5f}, 0}}, {}, {.normal = false, .tangent = false, .material = false}, cmdPool);
 

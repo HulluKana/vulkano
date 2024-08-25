@@ -29,6 +29,8 @@ class VulCmdPool {
         VkSemaphore submitAndSynchronize(VkCommandBuffer commandBuffer, VkSemaphore waitSemaphore, bool returnSignaledSemaphore, bool wait);
         void endCommandBuffer(VkCommandBuffer commandBuffer);
 
+        void waitForAllCommandBuffers();
+
         VkCommandPool getPool() const {return m_pool;}
 
     private:

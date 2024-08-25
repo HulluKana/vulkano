@@ -1,4 +1,5 @@
 #include "vul_image.hpp"
+#include <algorithm>
 #include <vul_debug_tools.hpp>
 #include <memory>
 #include<vul_swap_chain.hpp>
@@ -250,12 +251,8 @@ VkExtent2D VulSwapChain::chooseSwapExtent(const VkSurfaceCapabilitiesKHR &capabi
         return capabilities.currentExtent;
     } else {
         VkExtent2D actualExtent = windowExtent;
-        actualExtent.width = std::max(
-                capabilities.minImageExtent.width,
-                std::min(capabilities.maxImageExtent.width, actualExtent.width));
-        actualExtent.height = std::max(
-                capabilities.minImageExtent.height,
-                std::min(capabilities.maxImageExtent.height, actualExtent.height));
+        actualExtent.width = std::clamp(actualExtent.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+        actualExtent.height = std::clamp(actualExtent.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
 
         return actualExtent;
     }

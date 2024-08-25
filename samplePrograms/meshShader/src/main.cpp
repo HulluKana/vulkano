@@ -30,21 +30,20 @@ int main() {
     vul::VulCmdPool transferCmdPool(vul::VulCmdPool::QueueType::transfer, 0, 0, vulDevice);
     vul::VulGUI vulGui(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice, cmdPool);
     vul::Scene scene(vulDevice);
-    vul::GltfLoader gltfLoader = scene.loadScene("../Models/sponza/sponza.gltf", {}, cmdPool);
-    gltfLoader.importFullTexturesSync("../Models/sponza/", vulDevice, cmdPool);
+    scene.loadSceneSync("../Models/sponza/sponza.gltf", "../Models/sponza/", {}, cmdPool);
     using namespace std::chrono_literals;
     vul::VulCamera camera{};
 
     VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
-    MeshResources meshRes = createMeshShadingResources(scene, gltfLoader.images, vulRenderer, *descPool.get(), commandBuffer, vulDevice);
+    MeshResources meshRes = createMeshShadingResources(scene, vulRenderer, *descPool.get(), commandBuffer, vulDevice);
     cmdPool.submit(commandBuffer, true);
 
     double frameStartTime = glfwGetTime();
     while (!vulWindow.shouldClose()) {
         glfwPollEvents();
         commandBuffer = vulRenderer.beginFrame();
-        vulGui.startFrame();
         if (commandBuffer == nullptr) continue;
+        vulGui.startFrame();
 
         const double frameTime = glfwGetTime() - frameStartTime;
         frameStartTime = glfwGetTime();

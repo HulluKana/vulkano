@@ -283,32 +283,55 @@ void Scene::loadPlanes(const std::vector<Plane> &planes, const std::vector<GltfL
     createBuffers(lIndices, lVertices, uselessNormals, uselessTangents, lUvs, mats, nods, wantedBuffers, cmdPool);
 }
 
-vul::GltfLoader Scene::loadScene(const std::string &fileName, WantedBuffers wantedBuffers, VulCmdPool &cmdPool)
+void Scene::loadSceneSync(const std::string &fileName, const std::string &textureDir, WantedBuffers wantedBuffers, VulCmdPool &cmdPool)
 {
     GltfLoader gltfLoader(fileName);
     gltfLoader.importMaterials();
     gltfLoader.importDrawableNodes(GltfLoader::gltfAttribOr(GltfLoader::gltfAttribOr(GltfLoader::GltfAttributes::Normal,
                     GltfLoader::GltfAttributes::Tangent), GltfLoader::GltfAttributes::TexCoord));
+    gltfLoader.importFullTexturesSync(textureDir, m_vulDevice, cmdPool);
+    moveGltfStuffToScene(gltfLoader, wantedBuffers, cmdPool);
+}
 
+std::unique_ptr<GltfLoader::AsyncImageLoadingInfo> Scene::loadSceneAsync(const std::string &fileName, const std::string &textureDir,
+                uint32_t asyncMipLoadCount, WantedBuffers wantedBuffers, VulCmdPool &mainCmdPool, VulCmdPool &transferCmdPool, VulCmdPool &destinationCmdPool)
+{
+    GltfLoader gltfLoader(fileName);
+    gltfLoader.importMaterials();
+    gltfLoader.importDrawableNodes(GltfLoader::gltfAttribOr(GltfLoader::gltfAttribOr(GltfLoader::GltfAttributes::Normal,
+                    GltfLoader::GltfAttributes::Tangent), GltfLoader::GltfAttributes::TexCoord));
+    std::unique_ptr<GltfLoader::AsyncImageLoadingInfo> asyncImageLoadingInfo =
+        gltfLoader.importPartialTexturesAsync(textureDir, asyncMipLoadCount, m_vulDevice, transferCmdPool, destinationCmdPool);
+    moveGltfStuffToScene(gltfLoader, wantedBuffers, mainCmdPool);
+    return asyncImageLoadingInfo;
+}
+
+void Scene::moveGltfStuffToScene(GltfLoader &gltfLoader, WantedBuffers wantedBuffers, VulCmdPool &cmdPool)
+{
     const uint32_t oldIdxCount = indexBuffer.get() ? indexBuffer->getBufferSize() / sizeof(uint32_t) : 0;
     const uint32_t oldVertCount = vertexBuffer.get() ? vertexBuffer->getBufferSize() / sizeof(glm::vec3) : 0;
     const uint32_t oldMatCount = materials.size();
     const uint32_t oldMeshCount = meshes.size();
+    const uint32_t oldImageCount = images.size();
     for (GltfLoader::GltfPrimMesh &mesh : gltfLoader.primMeshes) {
         mesh.firstIndex += oldIdxCount;
         mesh.vertexOffset += oldVertCount;
         mesh.materialIndex += oldMatCount;
     }
     for (GltfLoader::GltfNode &node : gltfLoader.nodes) node.primMesh += oldMeshCount;
+    for (GltfLoader::Material &mat : gltfLoader.materials) {
+        mat.colorTextureIndex += oldImageCount;
+        mat.normalTextureIndex += oldImageCount;
+        mat.roughnessMetallinessTextureIndex += oldImageCount;
+    }
 
     lights.insert(lights.end(), gltfLoader.lights.begin(), gltfLoader.lights.end());
     nodes.insert(nodes.end(), gltfLoader.nodes.begin(), gltfLoader.nodes.end());
     meshes.insert(meshes.end(), gltfLoader.primMeshes.begin(), gltfLoader.primMeshes.end());
     materials.insert(materials.end(), gltfLoader.materials.begin(), gltfLoader.materials.end());
+    images.insert(images.end(), gltfLoader.images.begin(), gltfLoader.images.end());
 
     createBuffers(gltfLoader.indices, gltfLoader.positions, gltfLoader.normals, gltfLoader.tangents, gltfLoader.uvCoords, gltfLoader.materials, gltfLoader.nodes, wantedBuffers, cmdPool);
-
-    return gltfLoader;
 }
 
 void Scene::createBuffers(const std::vector<uint32_t> &lIndices, const std::vector<glm::vec3> &lVertices,
