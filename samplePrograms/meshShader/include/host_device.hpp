@@ -28,29 +28,9 @@ struct Ubo {
     uint lightCount;
 };
 
-struct MeshInfo {
-    mat4 modelMatrix;
-    uint meshletOffset;
-    uint meshletCount;
-    uint matIdx;
-    uint padding1;
-    uvec4 padding2;
-    uvec4 padding3;
-    uvec4 padding4;
-};
-
-struct Meshlet {
-    uint triangleOffset;
-    uint vertexOffset;
-    uint16_t vertexCount;
-    uint16_t triangleCount;
-};
-
-struct MeshletBounds {
-    vec3 center;
-    float radius;
-    i8vec3 coneAxis;
-    int8_t coneCutoff;
+struct CubeMapPushConstant {
+    mat4 projectionMatrix;
+    mat4 originViewMatrix;
 };
 
 #endif

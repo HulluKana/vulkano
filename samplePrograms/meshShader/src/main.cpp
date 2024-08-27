@@ -1,14 +1,12 @@
-#include "mesh_shading.hpp"
-#include "vul_GUI.hpp"
-#include "vul_command_pool.hpp"
-#include "vul_descriptors.hpp"
-#include "vul_device.hpp"
-#include "vul_gltf_loader.hpp"
+#include "host_device.hpp"
 #include "vul_image.hpp"
-#include <GLFW/glfw3.h>
-#include <thread>
-#include <vulkan/vulkan_core.h>
-#include <host_device.hpp>
+#include <vul_window.hpp>
+#include <vul_device.hpp>
+#include <vul_renderer.hpp>
+#include <vul_descriptors.hpp>
+#include <vul_GUI.hpp>
+#include <vul_meshlet_scene.hpp>
+#include <mesh_shading.hpp>
 
 #include<imgui.h>
 #include <iostream>
@@ -29,13 +27,18 @@ int main() {
     vul::VulCmdPool sideCmdPool(vul::VulCmdPool::QueueType::side, 0, 0, vulDevice, 0);
     vul::VulCmdPool transferCmdPool(vul::VulCmdPool::QueueType::transfer, 0, 0, vulDevice);
     vul::VulGUI vulGui(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice, cmdPool);
-    vul::Scene scene(vulDevice);
-    scene.loadSceneSync("../Models/sponza/sponza.gltf", "../Models/sponza/", {}, cmdPool);
-    using namespace std::chrono_literals;
     vul::VulCamera camera{};
+    vul::VulMeshletScene scene;
+    scene.loadGltf("../Models/sponza/sponza.gltf", "../Models/sponza/", MAX_MESHLET_TRIANGLES, MAX_MESHLET_VERTICES, MESHLETS_PER_TASK_SHADER, {}, cmdPool, vulDevice);
+    vul::Scene cube(vulDevice);
+    cube.loadCubes({vul::Scene::Cube{.centerPos = glm::vec3(0.0f), .dimensions = glm::vec3(1.0f), .matIdx = 0}}, {}, {.normal = false, .tangent = false, .uv = false, .material = false}, cmdPool);
+    vul::VulImage cubeMap(vulDevice);
 
     VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
-    MeshResources meshRes = createMeshShadingResources(scene, vulRenderer, *descPool.get(), commandBuffer, vulDevice);
+    cubeMap.loadCubemapFromEXR( "../enviromentMaps/sunsetCube.exr");
+    cubeMap.createDefaultImage(vul::VulImage::ImageType::hdrCube, commandBuffer);
+    cubeMap.vulSampler = vul::VulSampler::createDefaultTexSampler(vulDevice);
+    MeshResources meshRes = createMeshShadingResources(scene, cubeMap, vulRenderer, *descPool.get(), commandBuffer, vulDevice);
     cmdPool.submit(commandBuffer, true);
 
     double frameStartTime = glfwGetTime();
@@ -55,7 +58,7 @@ int main() {
 
         constexpr glm::vec4 ambientLightColor(0.529f, 0.808f, 0.922f, 1.0f);
         updateMeshUbo(meshRes, scene, camera, vulRenderer, ambientLightColor);
-        meshShade(meshRes, scene, vulRenderer, ambientLightColor, commandBuffer);
+        meshShade(meshRes, scene, cube, camera, vulRenderer, ambientLightColor, commandBuffer);
 
         vulGui.endFrame(commandBuffer); 
         vulRenderer.stopRendering(commandBuffer);

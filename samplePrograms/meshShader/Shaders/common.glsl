@@ -2,6 +2,7 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int8 : enable
 
 #include "../include/host_device.hpp"
+#include "../../../include/vul_meshlet_scene.hpp"
 
 struct TaskPayload {
     uint meshletIndices[MESHLETS_PER_TASK_SHADER];
