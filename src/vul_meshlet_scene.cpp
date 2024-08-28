@@ -2,12 +2,11 @@
 #include <functional>
 #include <thread>
 #include <vul_meshlet_scene.hpp>
-#include <vul_scene.hpp>
 #include <meshoptimizer/src/meshoptimizer.h>
 
 namespace vul {
 
-void VulMeshletScene::loadGltf(const std::string &fileName, const std::string &textureDir, uint32_t maxTriangles,
+void VulMeshletScene::loadGltfSync(const std::string &fileName, const std::string &textureDir, uint32_t maxTriangles,
         uint32_t maxVertices, uint32_t maxMeshletsPerWorkgroup, const WantedBuffers &wantedBuffers,
         VulCmdPool &cmdPool, const VulDevice &vulDevice)
 {
@@ -16,10 +15,29 @@ void VulMeshletScene::loadGltf(const std::string &fileName, const std::string &t
             .index = true, .normal = wantedBuffers.normal, .tangent = wantedBuffers.tangent,
             .uv = wantedBuffers.uv, .material = wantedBuffers.material, .primInfo = false,
             .enableAddressTaking = false, .enableUsageForAccelerationStructures = false}, cmdPool);
+    createMeshletsFromScene(scene, maxTriangles, maxVertices, maxMeshletsPerWorkgroup, wantedBuffers, cmdPool, vulDevice);
+}
 
-    std::vector<uint32_t> indices = scene.indices;
+std::unique_ptr<GltfLoader::AsyncImageLoadingInfo> VulMeshletScene::loadGltfAsync(const std::string &fileName,
+        const std::string &textureDir, uint32_t maxTriangles, uint32_t maxVertices, uint32_t maxMeshletsPerWorkgroup,
+        uint32_t asyncMipLoadCount, const WantedBuffers &wantedBuffers, VulCmdPool &cmdPool, VulCmdPool &transferCmdPool,
+        VulCmdPool &dstCmdPool, const VulDevice &vulDevice)
+{
+    vul::Scene scene(vulDevice); 
+    std::unique_ptr<GltfLoader::AsyncImageLoadingInfo> asyncImageLoadingInfo = scene.loadSceneAsync(fileName, textureDir,
+            asyncMipLoadCount, vul::Scene::WantedBuffers{.vertex = true, .index = true, .normal = wantedBuffers.normal,
+            .tangent = wantedBuffers.tangent, .uv = wantedBuffers.uv, .material = wantedBuffers.material, .primInfo = false,
+            .enableAddressTaking = false, .enableUsageForAccelerationStructures = false}, cmdPool, transferCmdPool, dstCmdPool);
+    createMeshletsFromScene(scene, maxTriangles, maxVertices, maxMeshletsPerWorkgroup, wantedBuffers, cmdPool, vulDevice);
+    return asyncImageLoadingInfo;
+}
+
+void VulMeshletScene::createMeshletsFromScene(vul::Scene &scene, uint32_t maxTriangles, uint32_t maxVertices,
+                uint32_t maxMeshletsPerWorkgroup, const WantedBuffers &wantedBuffers, VulCmdPool &cmdPool,
+                const VulDevice &vulDevice)
+{
     for (const vul::GltfLoader::GltfPrimMesh &mesh : scene.meshes)
-        for (uint32_t i = mesh.firstIndex; i < mesh.firstIndex + mesh.indexCount; i++) indices[i] += mesh.vertexOffset;
+        for (uint32_t i = mesh.firstIndex; i < mesh.firstIndex + mesh.indexCount; i++) scene.indices[i] += mesh.vertexOffset;
 
     size_t maxMeshlets = 0;
     size_t maxMeshletsInSingleMesh = 0;
@@ -55,7 +73,7 @@ void VulMeshletScene::loadGltf(const std::string &fileName, const std::string &t
             const vul::GltfLoader::GltfPrimMesh &mesh = scene.meshes[node.primMesh];
 
             const size_t meshletCount = meshopt_buildMeshlets(localMeshlets.data(), localMeshletVertices.data(), localMeshletTriangles.data(),
-                    indices.data() + mesh.firstIndex, mesh.indexCount, reinterpret_cast<const float *>(scene.vertices.data()),
+                    scene.indices.data() + mesh.firstIndex, mesh.indexCount, reinterpret_cast<const float *>(scene.vertices.data()),
                     scene.vertices.size(), sizeof(glm::vec3), maxVertices, maxTriangles, 0.0f);
 
             const uint32_t meshletIdx = atomicMeshletIdx.fetch_add(meshletCount);

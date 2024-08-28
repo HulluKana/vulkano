@@ -55,5 +55,12 @@ target_include_directories("ImGui" PUBLIC ${IMGUI_PATH})
 target_link_libraries(vulkanoRaytracer ImGui)
 target_link_libraries(debugVulkanoRaytracer ImGui)
 
+set(MESH_OPTIMIZER_PATH "../../../3rdParty/meshoptimizer")
+file(GLOB MESH_OPTIMIZER_SOURCES ${MESH_OPTIMIZER_PATH}/src/*.cpp) 
+add_library("MeshOptimizer" STATIC ${MESH_OPTIMIZER_SOURCES})
+target_compile_options(MeshOptimizer PRIVATE "-O3")
+target_link_libraries(vulkanoRaytracer MeshOptimizer)
+target_link_libraries(debugVulkanoRaytracer MeshOptimizer)
+
 target_include_directories(vulkanoRaytracer PUBLIC "../include" "../../../3rdParty/" "../../../include/")
 target_include_directories(debugVulkanoRaytracer PUBLIC "../include" "../../../3rdParty/"  "../../../include/")

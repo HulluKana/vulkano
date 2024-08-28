@@ -56,5 +56,12 @@ target_include_directories("ImGui" PUBLIC ${IMGUI_PATH})
 target_link_libraries(vulkanoManySpheres ImGui)
 target_link_libraries(debugVulkanoManySpheres ImGui)
 
+set(MESH_OPTIMIZER_PATH "../../../3rdParty/meshoptimizer")
+file(GLOB MESH_OPTIMIZER_SOURCES ${MESH_OPTIMIZER_PATH}/src/*.cpp) 
+add_library("MeshOptimizer" STATIC ${MESH_OPTIMIZER_SOURCES})
+target_compile_options(MeshOptimizer PRIVATE "-O3")
+target_link_libraries(vulkanoManySpheres MeshOptimizer)
+target_link_libraries(debugVulkanoManySpheres MeshOptimizer)
+
 target_include_directories(vulkanoManySpheres PUBLIC "../include" "../../../3rdParty/" "../../../include/")
 target_include_directories(debugVulkanoManySpheres PUBLIC "../include" "../../../3rdParty/"  "../../../include/")

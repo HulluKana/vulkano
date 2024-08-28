@@ -18,7 +18,7 @@
 /samplePrograms/rasterizer/build/CMakeCache.txt
 /samplePrograms/rasterizer/build/compile_commands.json
 /samplePrograms/rasterizer/build/Makefile
-/samplePrograms/rasterizer/build/libImGui.a
+/samplePrograms/rasterizer/build/*.a
 /samplePrograms/rasterizer/c
 /samplePrograms/rasterizer/r
 /samplePrograms/rasterizer/cr
@@ -35,7 +35,7 @@
 /samplePrograms/raytracer/build/CMakeCache.txt
 /samplePrograms/raytracer/build/compile_commands.json
 /samplePrograms/raytracer/build/Makefile
-/samplePrograms/raytracer/build/libImGui.a
+/samplePrograms/raytracer/build/*.a
 /samplePrograms/raytracer/c
 /samplePrograms/raytracer/r
 /samplePrograms/raytracer/cr
@@ -50,7 +50,7 @@
 /samplePrograms/manySpheres/build/CMakeCache.txt
 /samplePrograms/manySpheres/build/compile_commands.json
 /samplePrograms/manySpheres/build/Makefile
-/samplePrograms/manySpheres/build/libImGui.a
+/samplePrograms/manySpheres/build/*.a
 /samplePrograms/manySpheres/c
 /samplePrograms/manySpheres/r
 /samplePrograms/manySpheres/cr
@@ -66,8 +66,7 @@
 /samplePrograms/meshShader/build/CMakeCache.txt
 /samplePrograms/meshShader/build/compile_commands.json
 /samplePrograms/meshShader/build/Makefile
-/samplePrograms/meshShader/build/libImGui.a
-/samplePrograms/meshShader/build/libMeshOptimizer.a
+/samplePrograms/meshShader/build/*.a
 /samplePrograms/meshShader/c
 /samplePrograms/meshShader/r
 /samplePrograms/meshShader/cr

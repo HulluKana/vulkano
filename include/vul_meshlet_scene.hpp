@@ -1,5 +1,6 @@
 #ifndef VUL_MESHLET_SCENE_H
 #define VUL_MESHLET_SCENE_H
+#include "vul_scene.hpp"
 #ifdef __cplusplus
 
 #include <vul_command_pool.hpp>
@@ -23,8 +24,12 @@ class VulMeshletScene {
             bool indirectDrawCommands = true;
         };
 
-        void loadGltf(const std::string &fileName, const std::string &textureDir, uint32_t maxTriangles, uint32_t maxVertices,
+        void loadGltfSync(const std::string &fileName, const std::string &textureDir, uint32_t maxTriangles, uint32_t maxVertices,
                 uint32_t maxMeshletsPerWorkgroup, const WantedBuffers &wantedBuffers, VulCmdPool &cmdPool,
+                const VulDevice &vulDevice);
+        std::unique_ptr<GltfLoader::AsyncImageLoadingInfo> loadGltfAsync(const std::string &fileName, const std::string &textureDir,
+                uint32_t maxTriangles, uint32_t maxVertices, uint32_t maxMeshletsPerWorkgroup, uint32_t asyncMipLoadCount,
+                const WantedBuffers &wantedBuffers, VulCmdPool &cmdPool, VulCmdPool &transferCmdPool, VulCmdPool &dstCmdPool,
                 const VulDevice &vulDevice);
 
         using vec3 = glm::vec3;
@@ -83,6 +88,11 @@ class VulMeshletScene {
         std::unique_ptr<VulBuffer> meshletBoundsBuffer;
         std::unique_ptr<VulBuffer> meshBuffer;
         std::unique_ptr<VulBuffer> indirectDrawCommandsBuffer;
+
+    private:
+        void createMeshletsFromScene(vul::Scene &scene, uint32_t maxTriangles, uint32_t maxVertices,
+                uint32_t maxMeshletsPerWorkgroup, const WantedBuffers &wantedBuffers, VulCmdPool &cmdPool,
+                const VulDevice &vulDevice);
 };
 
 }
