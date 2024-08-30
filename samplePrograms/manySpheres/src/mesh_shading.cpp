@@ -91,7 +91,7 @@ void updateMeshUbo(const MeshResources &res, const vul::VulCamera &camera, const
 
 void meshShade(const MeshResources &res, const vul::VulRenderer &vulRenderer, VkCommandBuffer cmdBuf)
 {
-    vulRenderer.beginRendering(cmdBuf, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent,
-            vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 1.0f, 0, 0);
+    vulRenderer.beginRendering(cmdBuf, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent,
+            vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent, {}, {}, glm::vec4(0.0f, 0.0f, 0.0f, 1.0f), 1.0f, 0, 0, 1);
     res.renderPipeline->meshShade(VOLUME_VOLUME / CUBES_PER_MESH / MESH_PER_TASK, 1, 1, nullptr, 0, {res.renderDescSets[vulRenderer.getFrameIndex()]->getSet()}, cmdBuf);
 }

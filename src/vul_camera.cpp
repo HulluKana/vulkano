@@ -134,9 +134,10 @@ void VulCamera::applyInputs(GLFWwindow *window, float dt, uint32_t screenHeight)
 
     rot.x = glm::mod(rot.x, glm::two_pi<float>());
     rot.y = glm::mod(rot.y, glm::two_pi<float>());
+    rot.z = glm::mod(rot.z, glm::two_pi<float>());
 
 
-    float yaw = -rot.y;
+    float yaw = rot.y;
     const glm::vec3 forwardDir = glm::vec3(sin(yaw), 0.0f, cos(yaw));
     const glm::vec3 rightDir = glm::vec3(-forwardDir.z, 0.0f, forwardDir.x);
     const glm::vec3 upDir = glm::vec3(0.0f, 1.0f, 0.0f);

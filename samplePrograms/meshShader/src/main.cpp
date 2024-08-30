@@ -45,9 +45,9 @@ int main() {
     cubeMap.loadCubemapFromEXR( "../enviromentMaps/sunsetCube.exr");
     cubeMap.createDefaultImage(vul::VulImage::ImageType::hdrCube, commandBuffer);
     */
-    cubeMap.keepEmpty(1024, 1024, 1, 1, 6, VK_FORMAT_R16G16B16A16_SFLOAT);
-    cubeMap.createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, commandBuffer);
+    cubeMap.keepEmpty(1024, 1024, 1, 1, 6, VK_FORMAT_D32_SFLOAT);
+    cubeMap.createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, commandBuffer);
     cubeMap.vulSampler = vul::VulSampler::createDefaultTexSampler(vulDevice);
     asyncImageLoadingInfo->pauseMutex.lock();
     MeshResources meshRes = createMeshShadingResources(scene, cubeMap, vulRenderer, *descPool.get(), commandBuffer, vulDevice);
@@ -60,12 +60,9 @@ int main() {
         if (!imagesFullyLoaded && asyncImageLoadingInfo->fullyProcessedImageCount >= scene.images.size()) {
             vkQueueWaitIdle(vulDevice.mainQueue());
             for (size_t i = 0; i < meshRes.descSets.size(); i++) {
-                for (size_t j = 0; j < scene.images.size(); j++) {
+                for (size_t j = 0; j < scene.images.size(); j++)
                     meshRes.descSets[i]->descriptorInfos[1].imageInfos[j] = scene.images[j]->getDescriptorInfo();
-                    meshRes.shadowDescSets[i]->descriptorInfos[8].imageInfos[j] = scene.images[j]->getDescriptorInfo();
-                }
                 meshRes.descSets[i]->update();
-                meshRes.shadowDescSets[i]->update();
             }
             asyncImageLoadingInfo->oldVkImageStuff.clear();
         }
@@ -77,7 +74,12 @@ int main() {
 
         const double frameTime = glfwGetTime() - frameStartTime;
         frameStartTime = glfwGetTime();
-        if (!camera.shouldHideGui()) GuiStuff(frameTime);
+        if (!camera.shouldHideGui()) {
+            GuiStuff(frameTime);
+            ImGui::Begin("Debug");
+            ImGui::Text("Pos: (%f, %f, %f)\nRot: (%f, %f, %f)", camera.pos.x, camera.pos.y, camera.pos.z, camera.rot.x, camera.rot.y, camera.rot.z);
+            ImGui::End();
+        }
 
         camera.applyInputs(vulWindow.getGLFWwindow(), frameTime, vulRenderer.getSwapChainExtent().height);
         camera.updateXYZ();

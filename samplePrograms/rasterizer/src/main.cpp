@@ -428,14 +428,15 @@ int main() {
         camera.updateXYZ();
             camera.setPerspectiveProjection(80.0f * (M_PI * 2.0f / 360.0f), vulRenderer.getAspectRatio(), 0.01f, 100.0f);
 
-        vulRenderer.beginRendering(cmdBuf, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent, vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent,
-                {0.0f, 0.0f, 0.0f, 0.0f}, 1.0f, vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height);
+        vulRenderer.beginRendering(cmdBuf, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent, vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent,
+                {}, {}, {0.0f, 0.0f, 0.0f, 0.0f}, 1.0f, vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height, 1);
         resources.mainPipeline->draw(cmdBuf, {resources.mainDescSets[vulRenderer.getFrameIndex()]->getSet()}, {mainScene.vertexBuffer->getBuffer(), mainScene.normalBuffer->getBuffer(),
                 mainScene.tangentBuffer->getBuffer(), mainScene.uvBuffer->getBuffer()}, mainScene.indexBuffer->getBuffer(), resources.mainDrawDatas);
         vulRenderer.stopRendering(cmdBuf);
 
         vulRenderer.getDepthImages()[vulRenderer.getImageIndex()]->transitionImageLayout(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmdBuf);
-        vulRenderer.beginRendering(cmdBuf, {}, vul::VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent, vul::VulRenderer::DepthImageMode::noDepthImage, {}, {}, vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height);
+        vulRenderer.beginRendering(cmdBuf, vul::VulRenderer::SwapChainImageMode::preservePreviousStoreCurrent,
+                vul::VulRenderer::DepthImageMode::noDepthImage, {}, {}, {}, {}, vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height, 1);
         resources.oitColoringPipeline->draw(cmdBuf, {resources.mainDescSets[vulRenderer.getFrameIndex()]->getSet(), resources.oitDescSets[vulRenderer.getFrameIndex()]->getSet()},
                 {mainScene.vertexBuffer->getBuffer(), mainScene.normalBuffer->getBuffer(), mainScene.tangentBuffer->getBuffer(), mainScene.uvBuffer->getBuffer()},
                 mainScene.indexBuffer->getBuffer(), resources.oitColoringDrawDatas);

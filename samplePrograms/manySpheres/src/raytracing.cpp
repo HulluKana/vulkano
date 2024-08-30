@@ -110,7 +110,7 @@ void raytrace(const RtResources &res, const vul::VulRenderer &vulRenderer, VkCom
     std::vector<VkDescriptorSet> vkDescSets = {res.descSets[(vulRenderer.getFrameIndex()) % vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT]->getSet()};
     res.rtPipeline->traceRays(vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height, 0, nullptr, vkDescSets, cmdBuf);
 
-    vulRenderer.beginRendering(cmdBuf, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent, vul::VulRenderer::DepthImageMode::noDepthImage, {}, {}, vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height);
+    vulRenderer.beginRendering(cmdBuf, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent, vul::VulRenderer::DepthImageMode::noDepthImage, {}, {}, {}, {}, vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height, 1);
     res.fullScreenQuadPipeline->draw(cmdBuf, vkDescSets, {res.fullScreenQuad->vertexBuffer->getBuffer(), res.fullScreenQuad->uvBuffer->getBuffer()},
             res.fullScreenQuad->indexBuffer->getBuffer(), {{.indexCount = static_cast<uint32_t>(res.fullScreenQuad->indices.size())}});
 }

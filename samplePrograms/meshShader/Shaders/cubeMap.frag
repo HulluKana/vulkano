@@ -13,4 +13,5 @@ layout (early_fragment_tests) in;
 void main()
 {
     FragColor = texture(cubeMap, fragDir);
+    FragColor = vec4(pow(FragColor.x, 150.0) / 2.0, FragColor.yzw);
 }

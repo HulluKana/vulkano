@@ -89,6 +89,6 @@ void updateRasUbo(const vul::VulCamera &camera, const vul::VulRenderer &vulRende
 
 void rasterize(const RasResources &res, const vul::VulRenderer &vulRenderer, VkCommandBuffer cmdBuf)
 {
-    vulRenderer.beginRendering(cmdBuf, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent, vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent, {0.0f, 0.0f, 0.0f, 1.0f}, 1.0f, 0, 0);
+    vulRenderer.beginRendering(cmdBuf, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent, vul::VulRenderer::DepthImageMode::clearPreviousStoreCurrent, {}, {}, {0.0f, 0.0f, 0.0f, 1.0f}, 1.0f, 0, 0, 1);
     res.pipeline->draw(cmdBuf, {res.descSets[vulRenderer.getFrameIndex()]->getSet()}, {res.scene->vertexBuffer->getBuffer()}, res.scene->indexBuffer->getBuffer(), {res.drawData});
 }

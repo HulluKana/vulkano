@@ -17,6 +17,7 @@ using uvec4 = glm::uvec4;
 #define MAX_MESHLET_VERTICES 64
 #define MAX_MESHLET_TRIANGLES 124
 #define MESHLETS_PER_TASK_SHADER 32
+#define VIEWS_PER_SHADOW_MAP 6
 
 struct Ubo {
     mat4 viewMatrix;
@@ -29,7 +30,7 @@ struct Ubo {
 };
 
 struct ShadowUbo {
-    mat4 viewMatrixes[6];
+    mat4 viewMatrixes[VIEWS_PER_SHADOW_MAP];
     mat4 projectionMatrix;
     vec4 cameraPosition;
 };

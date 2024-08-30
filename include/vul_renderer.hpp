@@ -9,6 +9,7 @@
 #include <glm/glm.hpp>
 #include<cassert>
 #include<memory>
+#include <vulkan/vulkan_core.h>
 
 namespace vul{
 
@@ -54,9 +55,12 @@ class VulRenderer{
             clearPreviousStoreCurrent,
             clearPreviousDiscardCurrent,
             preservePreviousStoreCurrent,
+            customDepthImage,
             noDepthImage
         };
-        void beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, const glm::vec4 &swapChainClearColor, float depthClearColor, uint32_t renderWidth, uint32_t renderHeight) const;
+        void beginRendering(VkCommandBuffer commandBuffer, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode,
+                const std::vector<std::shared_ptr<VulImage>> &attachmentImages, const VkRenderingAttachmentInfo customDepthAttacmentInfo,
+                const glm::vec4 &swapChainClearColor, float depthClearColor, uint32_t renderWidth, uint32_t renderHeight, uint32_t layerCount) const;
         void stopRendering(VkCommandBuffer commandBuffer) const;
         
     private:

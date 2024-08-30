@@ -141,7 +141,9 @@ void VulRenderer::endFrame()
     currentFrameIndex = (currentFrameIndex + 1) % VulSwapChain::MAX_FRAMES_IN_FLIGHT;
 }
 
-void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, const glm::vec4 &swapChainClearColor, float depthClearColor, uint32_t renderWidth, uint32_t renderHeight) const
+void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode,
+                const std::vector<std::shared_ptr<VulImage>> &attachmentImages, const VkRenderingAttachmentInfo customDepthAttacmentInfo,
+                const glm::vec4 &swapChainClearColor, float depthClearColor, uint32_t renderWidth, uint32_t renderHeight, uint32_t layerCount) const
 {
     VUL_PROFILE_FUNC()
     assert(isFrameStarted && "Can't call beginRendering if the frame hasn't been started either");
@@ -157,23 +159,27 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vecto
     if (swapChainImageMode != SwapChainImageMode::noSwapChainImage) colorAttachmentInfos.push_back(vulSwapChain->getImage(currentImageIndex)->getAttachmentInfo({{{swapChainClearColor.r, swapChainClearColor.g, swapChainClearColor.b, swapChainClearColor.a}}}));
     for (size_t i = 0; i < attachmentImages.size(); i++) colorAttachmentInfos.push_back(attachmentImages[i]->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}}));
 
-    if (depthImageMode == DepthImageMode::clearPreviousStoreCurrent) {
-        m_depthImages[currentImageIndex]->attachmentStoreCurrentContents = true;
-        m_depthImages[currentImageIndex]->attachmentPreservePreviousContents = false;
-    } else if (depthImageMode == DepthImageMode::clearPreviousDiscardCurrent) {
-        m_depthImages[currentImageIndex]->attachmentStoreCurrentContents = false;
-        m_depthImages[currentImageIndex]->attachmentPreservePreviousContents = false;
-    } else if (depthImageMode == DepthImageMode::preservePreviousStoreCurrent) {
-        m_depthImages[currentImageIndex]->attachmentStoreCurrentContents = true;
-        m_depthImages[currentImageIndex]->attachmentPreservePreviousContents = true;
+    VkRenderingAttachmentInfo depthAttachmentInfo{};
+    if (depthImageMode == DepthImageMode::customDepthImage) depthAttachmentInfo = customDepthAttacmentInfo;
+    else {
+        if (depthImageMode == DepthImageMode::clearPreviousStoreCurrent) {
+            m_depthImages[currentImageIndex]->attachmentStoreCurrentContents = true;
+            m_depthImages[currentImageIndex]->attachmentPreservePreviousContents = false;
+        } else if (depthImageMode == DepthImageMode::clearPreviousDiscardCurrent) {
+            m_depthImages[currentImageIndex]->attachmentStoreCurrentContents = false;
+            m_depthImages[currentImageIndex]->attachmentPreservePreviousContents = false;
+        } else if (depthImageMode == DepthImageMode::preservePreviousStoreCurrent) {
+            m_depthImages[currentImageIndex]->attachmentStoreCurrentContents = true;
+            m_depthImages[currentImageIndex]->attachmentPreservePreviousContents = true;
+        }
+        depthAttachmentInfo = m_depthImages[currentImageIndex]->getAttachmentInfo({{{depthClearColor}}});
     }
-    VkRenderingAttachmentInfo depthAttachmentInfo = m_depthImages[currentImageIndex]->getAttachmentInfo({{{depthClearColor}}});
 
     VkRenderingInfo renderingInfo{};
     renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
     renderingInfo.renderArea.offset = {0, 0};
-    renderingInfo.renderArea.extent = vulSwapChain->getSwapChainExtent();
-    renderingInfo.layerCount = 1;
+    renderingInfo.renderArea.extent = renderArea;
+    renderingInfo.layerCount = layerCount;
     renderingInfo.colorAttachmentCount = static_cast<uint32_t>(colorAttachmentInfos.size());
     renderingInfo.pColorAttachments = colorAttachmentInfos.data();
     if (depthImageMode != DepthImageMode::noDepthImage) renderingInfo.pDepthAttachment = &depthAttachmentInfo;

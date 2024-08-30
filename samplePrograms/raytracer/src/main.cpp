@@ -213,8 +213,8 @@ int main() {
         std::vector<VkDescriptorSet> vkDescSets = {descSets[(frameIdx + 1) % vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT]->getSet()};
         rtPipeline.traceRays(vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height, 0, nullptr, vkDescSets, commandBuffer);
 
-        vulRenderer.beginRendering(commandBuffer, {}, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent, vul::VulRenderer::DepthImageMode::noDepthImage,
-                glm::vec4(0.0, 0.0, 0.0, 1.0), {}, vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height);
+        vulRenderer.beginRendering(commandBuffer, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent, vul::VulRenderer::DepthImageMode::noDepthImage,
+                {}, {}, glm::vec4(0.0, 0.0, 0.0, 1.0), {}, vulRenderer.getSwapChainExtent().width, vulRenderer.getSwapChainExtent().height, 1);
         pipeline->draw(commandBuffer, vkDescSets, {fullScreenQuad.vertexBuffer->getBuffer(), fullScreenQuad.uvBuffer->getBuffer()}, fullScreenQuad.indexBuffer->getBuffer(),
                 {vul::VulPipeline::DrawData{.indexCount = 6}});
         vulGui.endFrame(commandBuffer);
