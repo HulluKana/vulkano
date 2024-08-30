@@ -53,6 +53,7 @@ class VulRenderer{
         enum class DepthImageMode {
             clearPreviousStoreCurrent,
             clearPreviousDiscardCurrent,
+            preservePreviousStoreCurrent,
             noDepthImage
         };
         void beginRendering(VkCommandBuffer commandBuffer, const std::vector<std::shared_ptr<VulImage>> &attachmentImages, SwapChainImageMode swapChainImageMode, DepthImageMode depthImageMode, const glm::vec4 &swapChainClearColor, float depthClearColor, uint32_t renderWidth, uint32_t renderHeight) const;

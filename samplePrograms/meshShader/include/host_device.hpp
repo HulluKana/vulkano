@@ -28,6 +28,12 @@ struct Ubo {
     uint lightCount;
 };
 
+struct ShadowUbo {
+    mat4 viewMatrixes[6];
+    mat4 projectionMatrix;
+    vec4 cameraPosition;
+};
+
 struct CubeMapPushConstant {
     mat4 projectionMatrix;
     mat4 originViewMatrix;

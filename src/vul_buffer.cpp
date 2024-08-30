@@ -206,8 +206,7 @@ VkResult VulBuffer::appendData(const void *data, uint32_t elementCount, VulCmdPo
 
     if (elementCount == 0) return VK_SUCCESS;
 
-    std::unique_ptr<uint8_t> newData = std::unique_ptr<uint8_t>(new uint8_t[m_bufferSize + m_elementSize * elementCount]);
-    if (!newData.get()) return VK_ERROR_OUT_OF_HOST_MEMORY;
+    std::vector<uint8_t> newData(m_bufferSize + m_elementSize * elementCount);
 
     if (hasStagingBuffer()) {
         VkResult result = m_stagingBuffer->resizeBufferAsEmpty(m_elementSize, m_elementCount + elementCount);
@@ -216,12 +215,12 @@ VkResult VulBuffer::appendData(const void *data, uint32_t elementCount, VulCmdPo
         if (result != VK_SUCCESS) return result;
     }
 
-    VkResult result = readData(newData.get(), m_bufferSize, 0, cmdPool);
+    VkResult result = readData(newData.data(), m_bufferSize, 0, cmdPool);
     if (result != VK_SUCCESS) return result;
-    if (data != nullptr) memcpy(newData.get() + m_bufferSize, data, m_elementSize * elementCount);
+    if (data != nullptr) memcpy(newData.data() + m_bufferSize, data, m_elementSize * elementCount);
 
     VkCommandBuffer cmdBuf = cmdPool.getPrimaryCommandBuffer();
-    result = resizeBufferWithData(newData.get(), m_elementSize, elementCount + m_elementCount, cmdBuf);
+    result = resizeBufferWithData(newData.data(), m_elementSize, elementCount + m_elementCount, cmdBuf);
     cmdPool.submit(cmdBuf, true);
     return result;
 }

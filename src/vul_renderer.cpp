@@ -157,8 +157,16 @@ void VulRenderer::beginRendering(VkCommandBuffer commandBuffer, const std::vecto
     if (swapChainImageMode != SwapChainImageMode::noSwapChainImage) colorAttachmentInfos.push_back(vulSwapChain->getImage(currentImageIndex)->getAttachmentInfo({{{swapChainClearColor.r, swapChainClearColor.g, swapChainClearColor.b, swapChainClearColor.a}}}));
     for (size_t i = 0; i < attachmentImages.size(); i++) colorAttachmentInfos.push_back(attachmentImages[i]->getAttachmentInfo({{{0.0f, 0.0f, 0.0f, 1.0f}}}));
 
-    if (depthImageMode == DepthImageMode::clearPreviousStoreCurrent) m_depthImages[currentImageIndex]->attachmentStoreCurrentContents = true;
-    else m_depthImages[currentImageIndex]->attachmentStoreCurrentContents = false;
+    if (depthImageMode == DepthImageMode::clearPreviousStoreCurrent) {
+        m_depthImages[currentImageIndex]->attachmentStoreCurrentContents = true;
+        m_depthImages[currentImageIndex]->attachmentPreservePreviousContents = false;
+    } else if (depthImageMode == DepthImageMode::clearPreviousDiscardCurrent) {
+        m_depthImages[currentImageIndex]->attachmentStoreCurrentContents = false;
+        m_depthImages[currentImageIndex]->attachmentPreservePreviousContents = false;
+    } else if (depthImageMode == DepthImageMode::preservePreviousStoreCurrent) {
+        m_depthImages[currentImageIndex]->attachmentStoreCurrentContents = true;
+        m_depthImages[currentImageIndex]->attachmentPreservePreviousContents = true;
+    }
     VkRenderingAttachmentInfo depthAttachmentInfo = m_depthImages[currentImageIndex]->getAttachmentInfo({{{depthClearColor}}});
 
     VkRenderingInfo renderingInfo{};
