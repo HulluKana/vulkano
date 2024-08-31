@@ -18,7 +18,7 @@ layout(binding = 6, set = 0, scalar) readonly buffer MeshInfoBuffer {MeshInfo me
 
 layout (local_size_x = MESHLETS_PER_TASK_SHADER, local_size_y = 1, local_size_z = 1) in;
 
-layout(push_constant) uniform Push{uint layerIdx;};
+layout(push_constant) uniform Push{ShadowPushConstant push;};
 
 taskPayloadSharedEXT TaskPayload taskPayload;
 
@@ -33,7 +33,8 @@ void main()
     const MeshletBounds bounds = meshletBounds[meshletIdx];
     const float radius = bounds.radius * length(meshInfo.modelMatrix[0]);
     vec4 frustumPlanes[6];
-    const mat4 mvpMatrix = ubo.projectionMatrix * ubo.viewMatrixes[layerIdx] * meshInfo.modelMatrix;
+    const mat4 mvpMatrix = push.projectionMatrix * ubo.viewMatrixes[push.layerIdx] * meshInfo.modelMatrix;
+    
     for (int i = 0; i < 4; i++) frustumPlanes[0][i] = mvpMatrix[i][3] + mvpMatrix[i][0];
     for (int i = 0; i < 4; i++) frustumPlanes[1][i] = mvpMatrix[i][3] - mvpMatrix[i][0];
     for (int i = 0; i < 4; i++) frustumPlanes[2][i] = mvpMatrix[i][3] - mvpMatrix[i][1];
@@ -51,7 +52,8 @@ void main()
     const vec3 coneAxis = mat3(meshInfo.modelMatrix) * (bounds.coneAxis / 127.0);
     const float coneCutoff = bounds.coneCutoff / 127.0;
 
-    accept = accept && dot(center - ubo.cameraPosition.xyz, coneAxis) < coneCutoff * length(center - ubo.cameraPosition.xyz) + radius;
+    accept = accept && dot(center - push.cameraPosition.xyz, coneAxis) < coneCutoff * length(center - push.cameraPosition.xyz) + radius;
+    accept = true;
 
     const uvec4 ballot = subgroupBallot(accept);
     const uint index = subgroupBallotExclusiveBitCount(ballot);

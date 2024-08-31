@@ -19,7 +19,7 @@ layout (location = 0) out vec3 fragPosWorld[];
 layout (location = 1) out vec2 fragTexCoord[];
 layout (location = 2) out flat uint matIdx[];
 
-layout(push_constant) uniform Push{uint layerIdx;};
+layout(push_constant) uniform Push{ShadowPushConstant push;};
 
 taskPayloadSharedEXT TaskPayload taskPayload;
 
@@ -30,7 +30,7 @@ void main()
     if (threadIdx == 0) SetMeshOutputsEXT(uint(meshlet.vertexCount), uint(meshlet.triangleCount));
 
     const mat4 modelMat = taskPayload.modelMatrix;
-    const mat4 projViewMat = ubo.projectionMatrix * ubo.viewMatrixes[layerIdx];
+    const mat4 projViewMat = push.projectionMatrix * ubo.viewMatrixes[push.layerIdx % LAYERS_IN_SHADOW_MAP];
     const mat3 normalMat = mat3(modelMat);
 
     for (uint i = threadIdx; i < uint(meshlet.vertexCount); i += meshShadersPerMeshlet) {
@@ -42,6 +42,6 @@ void main()
     for (uint i = threadIdx; i < uint(meshlet.triangleCount); i += meshShadersPerMeshlet) {
         gl_PrimitiveTriangleIndicesEXT[i] = uvec3(meshletTriangles[meshlet.triangleOffset + i * 3],
             meshletTriangles[meshlet.triangleOffset + i * 3 + 1], meshletTriangles[meshlet.triangleOffset + i * 3 + 2]);
-        gl_MeshPrimitivesEXT[i].gl_Layer = int(layerIdx);
+        gl_MeshPrimitivesEXT[i].gl_Layer = int(push.layerIdx);
     }
 }
