@@ -73,7 +73,7 @@ bool isInShadow(vec3 worldPos, vec3 lightPos, float lightRange, uint lightIdx)
     const vec3 absDir = abs(dir);
     const float localZComp = max(absDir.x, max(absDir.y, absDir.z));
     const float far = lightRange;
-    const float near = 0.001;
+    const float near = 0.01;
     const float normZComp = -(far / (near - far) - (near * far) / (near - far) / localZComp);
     const float depth = texture(shadowMap, vec4(dir, lightIdx)).r;
     const float bias = 0.00001;

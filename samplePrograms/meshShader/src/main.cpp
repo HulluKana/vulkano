@@ -45,8 +45,8 @@ int main() {
     cubeMap.loadCubemapFromEXR( "../enviromentMaps/sunsetCube.exr");
     cubeMap.createDefaultImage(vul::VulImage::ImageType::hdrCube, commandBuffer);
     */
-    cubeMap.keepEmpty(1024, 1024, 1, 1, LAYERS_IN_SHADOW_MAP * scene.lights.size(), VK_FORMAT_D32_SFLOAT);
-    cubeMap.createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+    cubeMap.keepEmpty(2048, 2048, 1, 1, LAYERS_IN_SHADOW_MAP * scene.lights.size(), vulRenderer.getDepthFormat());
+    cubeMap.createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, /*VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL*/VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, commandBuffer);
     cubeMap.vulSampler = vul::VulSampler::createDefaultTexSampler(vulDevice);
     cmdPool.submit(commandBuffer, true);
