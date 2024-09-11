@@ -52,7 +52,7 @@ void main()
     const vec3 coneAxis = mat3(meshInfo.modelMatrix) * (bounds.coneAxis / 127.0);
     const float coneCutoff = bounds.coneCutoff / 127.0;
 
-    accept = accept && dot(center - push.cameraPosition.xyz, coneAxis) < coneCutoff * length(center - push.cameraPosition.xyz) + radius;
+    accept = accept && dot(center - push.cameraPosition.xyz, coneAxis) >= coneCutoff * length(center - push.cameraPosition.xyz) + radius;
     accept = true;
 
     const uvec4 ballot = subgroupBallot(accept);

@@ -23,6 +23,7 @@ using uvec4 = glm::uvec4;
 struct Ubo {
     mat4 viewMatrix;
     mat4 projectionMatrix;
+    mat4 lightViewProjMats[MAX_LIGHT_COUNT * LAYERS_IN_SHADOW_MAP];
     vec4 ambientLightColor;
     vec4 cameraPosition;
     vec4 lightPositions[MAX_LIGHT_COUNT];

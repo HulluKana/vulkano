@@ -1,4 +1,5 @@
 #include "host_device.hpp"
+#include <cmath>
 #include <iostream>
 #include <mesh_shading.hpp>
 #include <vulkan/vulkan_core.h>
@@ -155,6 +156,9 @@ MeshResources createMeshShadingResources(const vul::VulMeshletScene &scene, vul:
     return meshResources;
 }
 
+std::array<glm::vec3, LAYERS_IN_SHADOW_MAP> shadowMapFaceRotations = {glm::vec3(0.0f, -M_PI_2, 0.0f), glm::vec3(0.0f, M_PI_2, 0.0f),
+    glm::vec3(M_PI_2, 0.0f, 0.0f), glm::vec3(-M_PI_2, 0.0f, 0.0f), glm::vec3(0.0f, M_PI, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)};
+
 void updateMeshUbo(const MeshResources &res, const vul::VulMeshletScene &scene, const vul::VulCamera &camera, const vul::VulRenderer &vulRenderer, const glm::vec4 &ambientLightColor)
 {
     Ubo ubo;
@@ -166,6 +170,14 @@ void updateMeshUbo(const MeshResources &res, const vul::VulMeshletScene &scene, 
     for (uint32_t i = 0; i < ubo.lightCount; i++) {
         ubo.lightPositions[i] = glm::vec4(scene.lights[i].position, scene.lights[i].range);
         ubo.lightColors[i] = glm::vec4(scene.lights[i].color, scene.lights[i].intensity);
+    }
+    for (uint32_t i = 0; i < ubo.lightCount * LAYERS_IN_SHADOW_MAP; i++) {
+        vul::VulCamera cam{};
+        cam.pos = scene.lights[i / LAYERS_IN_SHADOW_MAP].position;
+        cam.rot = shadowMapFaceRotations[i % LAYERS_IN_SHADOW_MAP];
+        cam.updateXYZ();
+        cam.setPerspectiveProjection(M_PI_2, 1.0f, 0.01f, scene.lights[i / LAYERS_IN_SHADOW_MAP].range);
+        ubo.lightViewProjMats[i] = cam.getProjection() * cam.getView();
     }
     /*
     ubo.lightCount = 1;
@@ -183,9 +195,6 @@ void meshShade(const MeshResources &res, const vul::VulMeshletScene &scene, cons
     res.pipeline->meshShadeIndirect(scene.indirectDrawCommandsBuffer->getBuffer(), 0, scene.indirectDrawCommands.size(),
             sizeof(VkDrawMeshTasksIndirectCommandEXT), nullptr, 0, {res.descSets[vulRenderer.getFrameIndex()]->getSet()}, cmdBuf);
     vulRenderer.stopRendering(cmdBuf);
-
-    std::array<glm::vec3, LAYERS_IN_SHADOW_MAP> shadowMapFaceRotations = {glm::vec3(0.0f, -M_PI_2, 0.0f), glm::vec3(0.0f, M_PI_2, 0.0f),
-        glm::vec3(M_PI_2, M_PI, 0.0f), glm::vec3(-M_PI_2, M_PI, 0.0f), glm::vec3(0.0f, M_PI, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)};
 
     ShadowUbo shadowUbo; 
     for (uint32_t i = 0; i < cubeMap.getArrayCount(); i++) {

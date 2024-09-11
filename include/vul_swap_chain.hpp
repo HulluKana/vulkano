@@ -12,7 +12,7 @@ namespace vul {
 
 class VulSwapChain {
  public:
-  static constexpr int MAX_FRAMES_IN_FLIGHT = 2;
+  static constexpr int MAX_FRAMES_IN_FLIGHT = 3;
 
   VulSwapChain(VulDevice &deviceRef, VkExtent2D windowExtent);
   VulSwapChain(VulDevice &deviceRef, VkExtent2D windowExtent, std::shared_ptr<VulSwapChain> previous);
