@@ -2,6 +2,7 @@
 #include "vul_gltf_loader.hpp"
 #include "vul_image.hpp"
 #include "vul_swap_chain.hpp"
+#include <GLFW/glfw3.h>
 #include <vul_window.hpp>
 #include <vul_device.hpp>
 #include <vul_renderer.hpp>
@@ -21,6 +22,8 @@ void GuiStuff(double frameTime) {
 }
 
 int main() {
+    constexpr double MIN_FRAME_TIME = 1.0 / 144.0;
+
     vul::VulWindow vulWindow(2560, 1440, "Vulkano");
     vul::VulDevice vulDevice(vulWindow, 1, true, false);
     std::shared_ptr<vul::VulSampler> depthImgSampler = vul::VulSampler::createDefaultTexSampler(vulDevice);
@@ -32,10 +35,13 @@ int main() {
     vul::VulCmdPool transferCmdPool(vul::VulCmdPool::QueueType::transfer, 0, 0, vulDevice);
     vul::VulGUI vulGui(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice, cmdPool);
     vul::VulCamera camera{};
+    camera.baseMoveSpeed = 2.0f;
+    camera.speedChanger = 5.0f;
     vul::VulMeshletScene scene;
     std::unique_ptr<vul::GltfLoader::AsyncImageLoadingInfo> asyncImageLoadingInfo = scene.loadGltfAsync(
             "../Models/sponza/sponza.gltf", "../Models/sponza/", MAX_MESHLET_TRIANGLES, MAX_MESHLET_VERTICES,
-            MESHLETS_PER_TASK_SHADER, 6, {}, cmdPool, transferCmdPool, sideCmdPool, vulDevice); vul::Scene cube(vulDevice);
+            MESHLETS_PER_TASK_SHADER, 6, {}, cmdPool, transferCmdPool, sideCmdPool, vulDevice);
+    vul::Scene cube(vulDevice);
     cube.loadCubes({vul::Scene::Cube{.centerPos = glm::vec3(0.0f), .dimensions = glm::vec3(1.0f), .matIdx = 0}}, {},
             {.normal = false, .tangent = false, .uv = false, .material = false}, cmdPool);
 
@@ -46,7 +52,7 @@ int main() {
     cubeMap.createDefaultImage(vul::VulImage::ImageType::hdrCube, commandBuffer);
     */
     cubeMap.keepEmpty(2048, 2048, 1, 1, LAYERS_IN_SHADOW_MAP * scene.lights.size(), vulRenderer.getDepthFormat());
-    cubeMap.createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, /*VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL*/VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+    cubeMap.createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL/*VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL*/, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, commandBuffer);
     cubeMap.vulSampler = vul::VulSampler::createDefaultTexSampler(vulDevice);
     cmdPool.submit(commandBuffer, true);
@@ -73,6 +79,7 @@ int main() {
         if (commandBuffer == nullptr) continue;
         vulGui.startFrame();
 
+        while (glfwGetTime() - frameStartTime < MIN_FRAME_TIME);
         const double frameTime = glfwGetTime() - frameStartTime;
         frameStartTime = glfwGetTime();
         if (!camera.shouldHideGui()) {

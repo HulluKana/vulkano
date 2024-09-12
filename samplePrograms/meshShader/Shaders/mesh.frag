@@ -69,29 +69,22 @@ vec3 diffBRDF(vec3 surfaceNormal, vec3 viewDirection, vec3 lightDirection, vec3 
 
 bool isInShadow(vec3 worldPos, vec3 lightPos, float lightRange, uint lightIdx, vec3 normal)
 {
-    /*
     const vec3 dir = worldPos - lightPos;
     const vec3 absDir = abs(dir);
     const float localZComp = max(absDir.x, max(absDir.y, absDir.z));
-    const float far = lightRange;
-    const float near = 0.01;
+    float far;
+    float near;
+    if (lightIdx > 0) {
+        far = lightRange;
+        near = 0.01;
+    } else {
+        far = 450.0;
+        near = 400.0;
+    }
     const float normZComp = -(far / (near - far) - (near * far) / (near - far) / localZComp);
     const float depth = texture(shadowMap, vec4(dir, lightIdx)).r;
-    const float bias = 0.00001;
+    const float bias = 0.00005;
     return normZComp - bias <= depth ? false : true;
-    */
-    vec3 dir = worldPos - lightPos;
-    const vec3 absDir = abs(dir);
-    uint shadowMapLayerIdx = uint(sign(dir.x) < 0.0);
-    if (absDir.y > absDir.x && absDir.y != 0.0) shadowMapLayerIdx = 2 + uint(sign(dir.y) < 0.0);
-    if (absDir.z > absDir.x && absDir.z > absDir.y && absDir.z != 0.0) shadowMapLayerIdx = 4 + uint(sign(dir.z) < 0.0);
-    shadowMapLayerIdx += lightIdx * LAYERS_IN_SHADOW_MAP;
-    dir.x *= -1.0;
-    const float depth = texture(shadowMap, vec4(dir, lightIdx)).r;
-    const vec4 lightNdc = ubo.lightViewProjMats[shadowMapLayerIdx] * vec4(worldPos, 1.0);
-    const float currDepth = vec3(lightNdc.xyz / lightNdc.w).z;
-    const float bias = max(0.05 * (1.0 - dot(normal, lightPos - worldPos)), 0.005);
-    return currDepth - 0.00001 > depth;
 }
 
 void main()
