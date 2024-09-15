@@ -18,20 +18,25 @@ using uvec4 = glm::uvec4;
 #define MAX_MESHLET_TRIANGLES 124
 #define MESHLETS_PER_TASK_SHADER 32
 #define LAYERS_IN_SHADOW_MAP 6
-#define MAX_LIGHT_COUNT 32
+#define MAX_POINT_LIGHTS 32
+#define MAX_DIRECTIONAL_LIGHTS 8
 
 struct Ubo {
     mat4 viewMatrix;
     mat4 projectionMatrix;
+    mat4 sunProjViewMatrix;
     vec4 ambientLightColor;
     vec4 cameraPosition;
-    vec4 lightPositions[MAX_LIGHT_COUNT];
-    vec4 lightColors[MAX_LIGHT_COUNT];
-    uint lightCount;
+    vec4 lightPositions[MAX_POINT_LIGHTS];
+    vec4 pointLightColors[MAX_POINT_LIGHTS];
+    vec4 lightDirections[MAX_DIRECTIONAL_LIGHTS];
+    vec4 directionalLightColors[MAX_DIRECTIONAL_LIGHTS];
+    uint pointLightCount;
+    uint directionalLightCount;
 };
 
 struct ShadowUbo {
-    mat4 viewMatrixes[MAX_LIGHT_COUNT * LAYERS_IN_SHADOW_MAP];
+    mat4 viewMatrixes[(MAX_POINT_LIGHTS + MAX_DIRECTIONAL_LIGHTS) * LAYERS_IN_SHADOW_MAP];
 };
 
 struct ShadowPushConstant {

@@ -455,10 +455,15 @@ void GltfLoader::processNode(int nodeIdx, const glm::vec3 &parentPos, const glm:
         GltfLight gltfLight{};
         gltfLight.name = light.name;
         gltfLight.position = transform.pos;
+        gltfLight.direction = glm::rotate(rotationQuaternion, glm::vec3(0.0f, 0.0f, 1.0f));
         gltfLight.color = {light.color[0], light.color[1], light.color[2]};
         gltfLight.intensity = light.intensity;
         gltfLight.range = light.range;
         if (gltfLight.range < 0.01f) gltfLight.range = 10'000.0f;
+        if (light.type == "point") gltfLight.type = GltfLightType::point;
+        else if (light.type == "directional") gltfLight.type = GltfLightType::directional;
+        else if (light.type == "spot") gltfLight.type = GltfLightType::spot;
+        else throw std::runtime_error("Unrecognized gltf light type: " + light.type);
         lights.push_back(gltfLight);
     }
 

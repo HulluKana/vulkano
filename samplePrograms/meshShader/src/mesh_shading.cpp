@@ -1,4 +1,6 @@
 #include "host_device.hpp"
+#include "vul_gltf_loader.hpp"
+#include "vul_transform.hpp"
 #include <cmath>
 #include <glm/ext/matrix_transform.hpp>
 #include <iostream>
@@ -122,9 +124,14 @@ MeshResources createMeshShadingResources(const vul::VulMeshletScene &scene, vul:
     vul::VulCamera cam{};
     ShadowUbo shadowUbo; 
     for (uint32_t i = 0; i < cubeMap.getArrayCount(); i++) {
-        cam.pos = glm::vec3(scene.lights[i / LAYERS_IN_SHADOW_MAP].position);
-        cam.rot = shadowMapFaceRotations[i % LAYERS_IN_SHADOW_MAP];
-        cam.updateXYZ();
+        if (scene.lights[i / LAYERS_IN_SHADOW_MAP].type == vul::GltfLoader::GltfLightType::point) {
+            cam.pos = glm::vec3(scene.lights[i / LAYERS_IN_SHADOW_MAP].position);
+            cam.rot = shadowMapFaceRotations[i % LAYERS_IN_SHADOW_MAP];
+            cam.updateXYZ();
+        } else {
+            cam.pos = glm::vec3(0.0f);
+            cam.setViewDirection(scene.lights[i / LAYERS_IN_SHADOW_MAP].direction);
+        }
         shadowUbo.viewMatrixes[i] = cam.getView();
     }
     meshResources.shadowUbos[0]->writeData(&shadowUbo, sizeof(shadowUbo), 0, VK_NULL_HANDLE);
@@ -137,9 +144,9 @@ MeshResources createMeshShadingResources(const vul::VulMeshletScene &scene, vul:
     std::vector<ShadowPushConstant> pushes;
     for (uint32_t i = 0; i < cubeMap.getArrayCount(); i++) {
         ShadowPushConstant push;
-        if (i < 6) cam.setPerspectiveProjection(M_PI_2, 1.0f, 400.0f, 450.0f);
+        if (i < 6) cam.setOrthographicProjection(-50.0f, 50.0f, -50.0f, 50.0f, -50.0f, 50.0f);
         else cam.setPerspectiveProjection(M_PI_2, 1.0f, 0.01f, scene.lights[i / LAYERS_IN_SHADOW_MAP].range);
-        if (i % LAYERS_IN_SHADOW_MAP == 2 || i % LAYERS_IN_SHADOW_MAP == 3) push.projectionMatrix = glm::scale(cam.getProjection(), glm::vec3(-1.0f, 1.0f, 1.0f));
+        if ((i % LAYERS_IN_SHADOW_MAP == 2 || i % LAYERS_IN_SHADOW_MAP == 3) && i >= 6) push.projectionMatrix = glm::scale(cam.getProjection(), glm::vec3(-1.0f, 1.0f, 1.0f));
         else push.projectionMatrix = glm::scale(cam.getProjection(), glm::vec3(1.0f, 1.0f, -1.0f));
         push.cameraPosition = scene.lights[i / LAYERS_IN_SHADOW_MAP].position;
         push.layerIdx = i;
@@ -158,15 +165,29 @@ MeshResources createMeshShadingResources(const vul::VulMeshletScene &scene, vul:
 
 void updateMeshUbo(const MeshResources &res, const vul::VulMeshletScene &scene, const vul::VulCamera &camera, const vul::VulRenderer &vulRenderer, const glm::vec4 &ambientLightColor)
 {
+    vul::VulCamera cam{};
+    cam.pos = glm::vec3(0.0f);
+    cam.setViewDirection(scene.lights[0].direction);
+    cam.setOrthographicProjection(-50.0f, 50.0f, -50.0f, 50.0f, -50.0f, 50.0f);
     Ubo ubo;
     ubo.projectionMatrix = camera.getProjection();
     ubo.viewMatrix = camera.getView();
+    ubo.sunProjViewMatrix = glm::scale(cam.getProjection(), glm::vec3(1.0f, 1.0f, -1.0f)) * cam.getView();
     ubo.cameraPosition = glm::vec4(camera.pos, 69.0f);
     ubo.ambientLightColor = ambientLightColor;
-    ubo.lightCount = std::min(static_cast<int>(scene.lights.size()), MAX_LIGHT_COUNT);
-    for (uint32_t i = 0; i < ubo.lightCount; i++) {
-        ubo.lightPositions[i] = glm::vec4(scene.lights[i].position, scene.lights[i].range);
-        ubo.lightColors[i] = glm::vec4(scene.lights[i].color, scene.lights[i].intensity);
+    ubo.pointLightCount = 0;
+    ubo.directionalLightCount = 0;
+    for (size_t i = 0; i < scene.lights.size(); i++) {
+        if (scene.lights[i].type == vul::GltfLoader::GltfLightType::point && ubo.pointLightCount < MAX_POINT_LIGHTS) {
+            ubo.lightPositions[ubo.pointLightCount] = glm::vec4(scene.lights[i].position, scene.lights[i].range);
+            ubo.pointLightColors[ubo.pointLightCount] = glm::vec4(scene.lights[i].color, scene.lights[i].intensity);
+            ubo.pointLightCount++;
+        }
+        if (scene.lights[i].type == vul::GltfLoader::GltfLightType::directional && ubo.directionalLightCount < MAX_DIRECTIONAL_LIGHTS) {
+            ubo.lightDirections[ubo.directionalLightCount] = glm::vec4(scene.lights[i].direction, scene.lights[i].range);
+            ubo.directionalLightColors[ubo.directionalLightCount] = glm::vec4(scene.lights[i].color, scene.lights[i].intensity);
+            ubo.directionalLightCount++;
+        }
     }
     res.ubos[vulRenderer.getFrameIndex()]->writeData(&ubo, sizeof(ubo), 0, VK_NULL_HANDLE);
 }

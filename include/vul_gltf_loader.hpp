@@ -52,6 +52,11 @@ class GltfLoader
             mask,
             blend
         };
+        enum class GltfLightType {
+            point,
+            directional,
+            spot
+        };
         struct Material{
             glm::vec4 colorFactor = glm::vec4(0.8f);
             glm::vec3 emissiveFactor = glm::vec3(0.0f);
@@ -70,7 +75,8 @@ class GltfLoader
             float ior = 1.5f;
         };
         struct GltfPrimMesh{
-            uint32_t firstIndex = 0; uint32_t indexCount = 0;
+            uint32_t firstIndex = 0;
+            uint32_t indexCount = 0;
             uint32_t vertexOffset = 0;
             uint32_t vertexCount = 0;
             int materialIndex = 0;
@@ -89,7 +95,9 @@ class GltfLoader
             std::string name;
         };
         struct GltfLight{
+            GltfLightType type{};
             glm::vec3 position{0.0f};
+            glm::vec3 direction{0.0f, 0.0f, 1.0f};
             glm::vec3 color{0.0f};
             float intensity = 0.0;
             float range = 0.0;

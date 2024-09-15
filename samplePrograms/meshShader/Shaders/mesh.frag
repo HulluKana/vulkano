@@ -67,22 +67,23 @@ vec3 diffBRDF(vec3 surfaceNormal, vec3 viewDirection, vec3 lightDirection, vec3 
     return 21.0 / (20.0 * pi) * (vec3(1.0) - specularColor) * diffuseColor * (1.0 - pow(1.0 - nl, 5.0)) * (1.0 - pow(1.0 - nv, 5.0)); 
 }
 
-bool isInShadow(vec3 worldPos, vec3 lightPos, float lightRange, uint lightIdx, vec3 normal)
+bool isInShadowPoint(vec3 worldPos, vec3 lightPos, float lightRange, uint lightIdx)
 {
     const vec3 dir = worldPos - lightPos;
     const vec3 absDir = abs(dir);
     const float localZComp = max(absDir.x, max(absDir.y, absDir.z));
-    float far;
-    float near;
-    if (lightIdx > 0) {
-        far = lightRange;
-        near = 0.01;
-    } else {
-        far = 450.0;
-        near = 400.0;
-    }
+    const float far = lightRange;
+    const float near = 0.01;
     const float normZComp = -(far / (near - far) - (near * far) / (near - far) / localZComp);
     const float depth = texture(shadowMap, vec4(dir, lightIdx)).r;
+    const float bias = 0.00005;
+    return normZComp - bias <= depth ? false : true;
+}
+
+bool isInShadowDirectional(vec3 worldPos, vec3 lightDir, uint lightIdx)
+{
+    const float normZComp = vec4(ubo.sunProjViewMatrix * vec4(worldPos, 1.0)).z;
+    const float depth = texture(shadowMap, vec4(lightDir, 0.0)).r;
     const float bias = 0.00005;
     return normZComp - bias <= depth ? false : true;
 }
@@ -115,10 +116,25 @@ void main()
     vec3 color = vec3(0.0);
     const vec3 specularColor = mix(vec3(0.03), rawColor, metalliness);
     const vec3 diffuseColor = mix(rawColor, vec3(0.0), metalliness);
-    for (uint i = 0; i < ubo.lightCount; i++){
+
+    for (uint i = 0; i < ubo.directionalLightCount; i++){
+        const vec4 lightColor = ubo.directionalLightColors[i];
+        const vec3 lightDir = normalize(ubo.lightDirections[i].xyz);
+        if (dot(surfaceNormal, lightDir) <= 0.0) continue;
+
+        if (isInShadowDirectional(fragPosWorld, lightDir, i)) continue;
+
+        vec3 colorFromThisLight = vec3(0.0);
+        colorFromThisLight += BRDF(surfaceNormal, viewDirection, lightDir, specularColor, roughness);
+        colorFromThisLight += diffBRDF(surfaceNormal, viewDirection, lightDir, specularColor, diffuseColor);
+        colorFromThisLight *= sRGBToAlbedo(lightColor.xyz * lightColor.w);
+        color += colorFromThisLight;
+    }
+
+    for (uint i = 0; i < ubo.pointLightCount; i++){
         const vec3 lightPos = ubo.lightPositions[i].xyz;
         const float lightrange = ubo.lightPositions[i].w;
-        const vec4 lightColor = ubo.lightColors[i];
+        const vec4 lightColor = ubo.pointLightColors[i];
 
         vec3 lightDir = lightPos - fragPosWorld;
         const float lightDstSquared = dot(lightDir, lightDir);
@@ -128,7 +144,7 @@ void main()
         lightDir = normalize(lightDir);
         if (dot(surfaceNormal, lightDir) <= 0.0) continue;
 
-        if (isInShadow(fragPosWorld, lightPos, lightrange, i, surfaceNormal)) continue;
+        if (isInShadowPoint(fragPosWorld, lightPos, lightrange, i + ubo.directionalLightCount)) continue;
 
         vec3 colorFromThisLight = vec3(0.0);
         colorFromThisLight += BRDF(surfaceNormal, viewDirection, lightDir, specularColor, roughness);
