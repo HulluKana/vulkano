@@ -30,7 +30,7 @@ void main()
     if (threadIdx == 0) SetMeshOutputsEXT(uint(meshlet.vertexCount), uint(meshlet.triangleCount));
 
     const mat4 modelMat = taskPayload.modelMatrix;
-    const mat4 projViewMat = push.projectionMatrix * ubo.viewMatrixes[push.layerIdx];
+    const mat4 projViewMat = push.projectionMatrix * ubo.viewMatrixes[push.viewMatIdx];
     const mat3 normalMat = mat3(modelMat);
 
     for (uint i = threadIdx; i < uint(meshlet.vertexCount); i += meshShadersPerMeshlet) {

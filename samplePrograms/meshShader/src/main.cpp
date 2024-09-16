@@ -47,17 +47,25 @@ int main() {
 
     VkCommandBuffer commandBuffer = cmdPool.getPrimaryCommandBuffer();
     vul::VulImage cubeMap(vulDevice);
-    /*
     cubeMap.loadCubemapFromEXR( "../enviromentMaps/sunsetCube.exr");
     cubeMap.createDefaultImage(vul::VulImage::ImageType::hdrCube, commandBuffer);
-    */
-    cubeMap.keepEmpty(2048, 2048, 1, 1, LAYERS_IN_SHADOW_MAP * scene.lights.size(), vulRenderer.getDepthFormat());
-    cubeMap.createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL/*VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL*/, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, commandBuffer);
     cubeMap.vulSampler = vul::VulSampler::createDefaultTexSampler(vulDevice);
+    vul::VulImage shadowMapPoint(vulDevice);
+    uint32_t pointLightCount = 0;
+    for (const vul::GltfLoader::GltfLight &light : scene.lights) if (light.type == vul::GltfLoader::GltfLightType::point) pointLightCount++;
+    shadowMapPoint.keepEmpty(2048, 2048, 1, 1, LAYERS_IN_SHADOW_MAP * pointLightCount, vulRenderer.getDepthFormat());
+    shadowMapPoint.createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, commandBuffer);
+    shadowMapPoint.vulSampler = cubeMap.vulSampler;
+    vul::VulImage shadowMapDir(vulDevice);
+    shadowMapDir.keepEmpty(8192, 8192, 1, 1, 1, vulRenderer.getDepthFormat());
+    shadowMapDir.createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, commandBuffer);
+    shadowMapDir.vulSampler = cubeMap.vulSampler;
     cmdPool.submit(commandBuffer, true);
     asyncImageLoadingInfo->pauseMutex.lock();
-    MeshResources meshRes = createMeshShadingResources(scene, cubeMap, vulRenderer, *descPool.get(), vulDevice);
+    MeshResources meshRes = createMeshShadingResources(scene, cubeMap, shadowMapPoint, shadowMapDir, vulRenderer, *descPool.get(), vulDevice);
+    renderShadowMaps(vulRenderer, shadowMapPoint, shadowMapDir, scene, meshRes);
     asyncImageLoadingInfo->pauseMutex.unlock();
 
     double frameStartTime = glfwGetTime();
@@ -95,7 +103,7 @@ int main() {
 
         constexpr glm::vec4 ambientLightColor(0.529f, 0.808f, 0.922f, 1.0f);
         updateMeshUbo(meshRes, scene, camera, vulRenderer, ambientLightColor);
-        meshShade(meshRes, scene, cube, cubeMap, camera, vulRenderer, ambientLightColor, commandBuffer);
+        meshShade(meshRes, scene, cube, camera, vulRenderer, ambientLightColor, commandBuffer);
 
         vulGui.endFrame(commandBuffer); 
         vulRenderer.stopRendering(commandBuffer);

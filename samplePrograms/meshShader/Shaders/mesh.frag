@@ -21,6 +21,7 @@ layout(set = 0, binding = 0) uniform UniformBuffer {Ubo ubo;};
 layout(set = 0, binding = 1) uniform sampler2D textures[];
 layout(set = 0, binding = 2) readonly buffer MaterialBuffer{PackedMaterial materials[];};
 layout(set = 0, binding = 12) uniform samplerCubeArray shadowMap;
+layout(set = 0, binding = 13) uniform sampler2D shadowMapDir;
 
 layout (early_fragment_tests) in;
 
@@ -80,12 +81,14 @@ bool isInShadowPoint(vec3 worldPos, vec3 lightPos, float lightRange, uint lightI
     return normZComp - bias <= depth ? false : true;
 }
 
-bool isInShadowDirectional(vec3 worldPos, vec3 lightDir, uint lightIdx)
+bool isInShadowDirectional(vec3 worldPos, uint lightIdx)
 {
-    const float normZComp = vec4(ubo.sunProjViewMatrix * vec4(worldPos, 1.0)).z;
-    const float depth = texture(shadowMap, vec4(lightDir, 0.0)).r;
+    const vec4 lightPerspectiveCoords = ubo.sunProjViewMatrix * vec4(worldPos, 1.0);
+    const float zComp = lightPerspectiveCoords.z;
+    const vec2 shadowMapUv = lightPerspectiveCoords.xy / 2.0 + vec2(0.5);
+    const float depth = texture(shadowMapDir, shadowMapUv).r;
     const float bias = 0.00005;
-    return normZComp - bias <= depth ? false : true;
+    return zComp - bias <= depth ? false : true;
 }
 
 void main()
@@ -122,7 +125,7 @@ void main()
         const vec3 lightDir = normalize(ubo.lightDirections[i].xyz);
         if (dot(surfaceNormal, lightDir) <= 0.0) continue;
 
-        if (isInShadowDirectional(fragPosWorld, lightDir, i)) continue;
+        if (isInShadowDirectional(fragPosWorld, i)) continue;
 
         vec3 colorFromThisLight = vec3(0.0);
         colorFromThisLight += BRDF(surfaceNormal, viewDirection, lightDir, specularColor, roughness);
@@ -144,7 +147,7 @@ void main()
         lightDir = normalize(lightDir);
         if (dot(surfaceNormal, lightDir) <= 0.0) continue;
 
-        if (isInShadowPoint(fragPosWorld, lightPos, lightrange, i + ubo.directionalLightCount)) continue;
+        if (isInShadowPoint(fragPosWorld, lightPos, lightrange, i)) continue;
 
         vec3 colorFromThisLight = vec3(0.0);
         colorFromThisLight += BRDF(surfaceNormal, viewDirection, lightDir, specularColor, roughness);

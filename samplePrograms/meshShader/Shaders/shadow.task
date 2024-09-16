@@ -33,7 +33,7 @@ void main()
     const MeshletBounds bounds = meshletBounds[meshletIdx];
     const float radius = bounds.radius * length(meshInfo.modelMatrix[0]);
     vec4 frustumPlanes[6];
-    const mat4 mvpMatrix = push.projectionMatrix * ubo.viewMatrixes[push.layerIdx] * meshInfo.modelMatrix;
+    const mat4 mvpMatrix = push.projectionMatrix * ubo.viewMatrixes[push.viewMatIdx] * meshInfo.modelMatrix;
     
     for (int i = 0; i < 4; i++) frustumPlanes[0][i] = mvpMatrix[i][3] + mvpMatrix[i][0];
     for (int i = 0; i < 4; i++) frustumPlanes[1][i] = mvpMatrix[i][3] - mvpMatrix[i][0];

@@ -43,6 +43,7 @@ struct ShadowPushConstant {
     mat4 projectionMatrix;
     vec3 cameraPosition;
     uint layerIdx;
+    uint viewMatIdx;
 };
 
 struct CubeMapPushConstant {
