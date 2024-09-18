@@ -1,4 +1,5 @@
 #include "vul_gltf_loader.hpp"
+#include "vul_scene.hpp"
 #include <functional>
 #include <thread>
 #include <vul_meshlet_scene.hpp>
@@ -53,6 +54,7 @@ void VulMeshletScene::createMeshletsFromScene(vul::Scene &scene, uint32_t maxTri
     }
 
     meshes.resize(scene.nodes.size());
+    meshAabbs.resize(meshes.size());
     indirectDrawCommands.resize(meshes.size());
     meshlets.resize(maxMeshlets);
     meshletBounds.resize(maxMeshlets);
@@ -74,11 +76,12 @@ void VulMeshletScene::createMeshletsFromScene(vul::Scene &scene, uint32_t maxTri
 
             const size_t meshletCount = meshopt_buildMeshlets(localMeshlets.data(), localMeshletVertices.data(), localMeshletTriangles.data(),
                     scene.indices.data() + mesh.firstIndex, mesh.indexCount, reinterpret_cast<const float *>(scene.vertices.data()),
-                    scene.vertices.size(), sizeof(glm::vec3), maxVertices, maxTriangles, 0.0f);
+                    scene.vertices.size(), sizeof(glm::vec3), maxVertices, maxTriangles, 1.0f);
 
             const uint32_t meshletIdx = atomicMeshletIdx.fetch_add(meshletCount);
             meshes[meshIdx] = MeshInfo{.modelMatrix = node.worldMatrix, .meshletOffset = meshletIdx,
                     .meshletCount = static_cast<uint32_t>(meshletCount), .matIdx = static_cast<uint32_t>(mesh.materialIndex)};
+            meshAabbs[meshIdx] = Aabb{.min = mesh.posMin, .max = mesh.posMax};
             indirectDrawCommands[meshIdx] = VkDrawMeshTasksIndirectCommandEXT{((static_cast<uint32_t>(meshletCount) +
                             (maxMeshletsPerWorkgroup - 1)) & ~(maxMeshletsPerWorkgroup - 1)) / maxMeshletsPerWorkgroup, 1, 1};
 
@@ -111,6 +114,10 @@ void VulMeshletScene::createMeshletsFromScene(vul::Scene &scene, uint32_t maxTri
     vertIndices.resize(atomicVertIdx);
     triIndices.resize(atomicTriIdx);
 
+    vertices = scene.vertices;
+    normals = scene.normals;
+    tangents = scene.tangents;
+    uvs = scene.uvs;
     lights = scene.lights;
     materials = scene.materials;
     images = scene.images;

@@ -2,86 +2,14 @@
 #include "vul_gltf_loader.hpp"
 #include "vul_meshlet_scene.hpp"
 #include "vul_transform.hpp"
+#include <GLFW/glfw3.h>
 #include <cmath>
 #include <glm/ext/matrix_transform.hpp>
 #include <iostream>
+#include <limits>
 #include <mesh_shading.hpp>
 #include <vulkan/vulkan_core.h>
 
-
-void renderShadowMaps(vul::VulRenderer &vulRenderer, vul::VulImage &shadowMapPoint, vul::VulImage &shadowMapDir, const vul::VulMeshletScene &scene, const MeshResources &meshResources)
-{
-    std::array<glm::vec3, LAYERS_IN_SHADOW_MAP> shadowMapDirFaceRotations = {glm::vec3(0.0f, M_PI_2, 0.0f), glm::vec3(0.0f, -M_PI_2, 0.0f),
-        glm::vec3(M_PI_2, 0.0f, 0.0f), glm::vec3(-M_PI_2, 0.0f, 0.0f), glm::vec3(0.0f, M_PI, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)};
-
-    VkCommandBuffer cmdBuf = vulRenderer.beginFrame();
-    vul::VulCamera cam{};
-    ShadowUbo shadowUbo; 
-    uint32_t viewMatIdx = 0;
-    std::vector<uint32_t> directionalLightIdxs;
-    std::vector<uint32_t> pointLightIdxs;
-    std::vector<uint32_t> directionalLightViewMatIdxs;
-    std::vector<uint32_t> pointLightViewMatIdxs;
-    for (uint32_t i = 0; i < scene.lights.size(); i++) {
-        if (scene.lights[i].type == vul::GltfLoader::GltfLightType::point) {
-            for (uint32_t j = 0; j < LAYERS_IN_SHADOW_MAP; j++) {
-                cam.pos = glm::vec3(scene.lights[i].position);
-                cam.rot = shadowMapDirFaceRotations[j];
-                cam.updateXYZ();
-                shadowUbo.viewMatrixes[viewMatIdx] = cam.getView();
-                pointLightIdxs.push_back(i);
-                pointLightViewMatIdxs.push_back(viewMatIdx);
-                viewMatIdx++;
-            }
-        } else {
-            cam.pos = glm::vec3(0.0f);
-            cam.setViewDirection(scene.lights[i].direction);
-            shadowUbo.viewMatrixes[viewMatIdx] = cam.getView();
-            directionalLightIdxs.push_back(i);
-            directionalLightViewMatIdxs.push_back(viewMatIdx);
-            viewMatIdx++;
-        }
-    }
-    meshResources.shadowUbos[0]->writeData(&shadowUbo, sizeof(shadowUbo), 0, VK_NULL_HANDLE);
-
-    shadowMapDir.attachmentPreservePreviousContents = false;
-    shadowMapDir.attachmentStoreCurrentContents = true;
-    vulRenderer.beginRendering(cmdBuf, vul::VulRenderer::SwapChainImageMode::noSwapChainImage,
-            vul::VulRenderer::DepthImageMode::customDepthImage, {}, shadowMapDir.getAttachmentInfo({{{1.0f}}}),
-            {}, 1.0f, shadowMapDir.getBaseWidth(), shadowMapDir.getBaseHeight(), shadowMapDir.getArrayCount());
-    for (uint32_t i = 0; i < directionalLightIdxs.size(); i++) {
-        ShadowPushConstant push;
-        cam.setOrthographicProjection(-50.0f, 50.0f, -50.0f, 50.0f, -50.0f, 50.0f);
-        push.projectionMatrix = glm::scale(cam.getProjection(), glm::vec3(1.0f, 1.0f, -1.0f));
-        push.cameraPosition = scene.lights[directionalLightIdxs[i]].position;
-        push.layerIdx = i;
-        push.viewMatIdx = directionalLightViewMatIdxs[i];
-        meshResources.shadowPipeline->meshShadeIndirect(scene.indirectDrawCommandsBuffer->getBuffer(), 0, scene.indirectDrawCommands.size(),
-                sizeof(VkDrawMeshTasksIndirectCommandEXT), &push, sizeof(push), {meshResources.shadowDescSets[0]->getSet()}, cmdBuf);
-    }
-    vulRenderer.stopRendering(cmdBuf);
-    shadowMapDir.transitionImageLayout(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmdBuf);
-
-    shadowMapPoint.attachmentPreservePreviousContents = false;
-    shadowMapPoint.attachmentStoreCurrentContents = true;
-    vulRenderer.beginRendering(cmdBuf, vul::VulRenderer::SwapChainImageMode::noSwapChainImage,
-            vul::VulRenderer::DepthImageMode::customDepthImage, {}, shadowMapPoint.getAttachmentInfo({{{1.0f}}}),
-            {}, 1.0f, shadowMapPoint.getBaseWidth(), shadowMapPoint.getBaseHeight(), shadowMapPoint.getArrayCount());
-    for (uint32_t i = 0; i < pointLightIdxs.size(); i++) {
-        ShadowPushConstant push;
-        cam.setPerspectiveProjection(M_PI_2, 1.0f, 0.01f, scene.lights[pointLightIdxs[i]].range);
-        if ((i % LAYERS_IN_SHADOW_MAP == 2 || i % LAYERS_IN_SHADOW_MAP == 3)) push.projectionMatrix = glm::scale(cam.getProjection(), glm::vec3(-1.0f, 1.0f, 1.0f));
-        else push.projectionMatrix = glm::scale(cam.getProjection(), glm::vec3(1.0f, 1.0f, -1.0f));
-        push.cameraPosition = scene.lights[pointLightIdxs[i]].position;
-        push.layerIdx = i;
-        push.viewMatIdx = pointLightViewMatIdxs[i];
-        meshResources.shadowPipeline->meshShadeIndirect(scene.indirectDrawCommandsBuffer->getBuffer(), 0, scene.indirectDrawCommands.size(),
-                sizeof(VkDrawMeshTasksIndirectCommandEXT), &push, sizeof(push), {meshResources.shadowDescSets[0]->getSet()}, cmdBuf);
-    }
-    vulRenderer.stopRendering(cmdBuf);
-    shadowMapPoint.transitionImageLayout(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmdBuf);
-    vulRenderer.endFrame();
-}
 
 MeshResources createMeshShadingResources(const vul::VulMeshletScene &scene, vul::VulImage &cubeMap, vul::VulImage &shadowMapPoint,
         vul::VulImage &shadowMapDir, vul::VulRenderer &vulRenderer, const vul::VulDescriptorPool &descPool, const vul::VulDevice &vulDevice)
@@ -181,6 +109,7 @@ MeshResources createMeshShadingResources(const vul::VulMeshletScene &scene, vul:
     configInfo.colorAttachmentFormats = {vulRenderer.getSwapChainColorFormat()};
     configInfo.depthAttachmentFormat = vulRenderer.getDepthFormat();
     configInfo.setLayouts = {meshResources.descSets[0]->getLayout()->getDescriptorSetLayout()};
+    configInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
     meshResources.pipeline = std::make_unique<vul::VulMeshPipeline>(vulDevice, "mesh.task.spv", "mesh.mesh.spv", "mesh.frag.spv", configInfo);
 
     configInfo.colorAttachmentFormats.clear();
@@ -196,7 +125,99 @@ MeshResources createMeshShadingResources(const vul::VulMeshletScene &scene, vul:
     cubeMapPointConfigInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
     meshResources.cubeMapPipeline = std::make_unique<vul::VulPipeline>(vulDevice, "cubeMap.vert.spv", "cubeMap.frag.spv", cubeMapPointConfigInfo);
 
+    meshResources.sunViewMinPos = glm::vec3(std::numeric_limits<float>::max());
+    meshResources.sunViewMaxPos = glm::vec3(-std::numeric_limits<float>::max());
+    vul::VulCamera cam{};
+    cam.setViewDirection(scene.lights[0].direction);
+    for (const vul::VulMeshletScene::MeshInfo &mesh : scene.meshes) {
+        for (uint32_t i = mesh.meshletOffset; i < mesh.meshletOffset + mesh.meshletCount; i++) {
+            const vul::VulMeshletScene::Meshlet &meshlet = scene.meshlets[i];
+            const glm::mat4 modelViewMat = cam.getView() * mesh.modelMatrix;
+            for (uint32_t j = meshlet.triangleOffset; j < meshlet.triangleOffset + meshlet.triangleCount * 3; j++) {
+                const glm::vec3 &vert = scene.vertices[scene.vertIndices[scene.triIndices[j] + meshlet.vertexOffset]];
+                const glm::vec3 pos = glm::vec3(modelViewMat * glm::vec4(vert, 1.0f));
+                meshResources.sunViewMinPos = glm::min(meshResources.sunViewMinPos, pos);
+                meshResources.sunViewMaxPos = glm::max(meshResources.sunViewMaxPos, pos);
+            }
+        }
+    }
+    
     return meshResources;
+}
+
+void renderShadowMaps(vul::VulRenderer &vulRenderer, vul::VulImage &shadowMapPoint, vul::VulImage &shadowMapDir, const vul::VulMeshletScene &scene, const MeshResources &meshResources)
+{
+    std::array<glm::vec3, LAYERS_IN_SHADOW_MAP> shadowMapDirFaceRotations = {glm::vec3(0.0f, M_PI_2, 0.0f), glm::vec3(0.0f, -M_PI_2, 0.0f),
+        glm::vec3(M_PI_2, 0.0f, 0.0f), glm::vec3(-M_PI_2, 0.0f, 0.0f), glm::vec3(0.0f, M_PI, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)};
+
+    VkCommandBuffer cmdBuf = vulRenderer.beginFrame();
+    vul::VulCamera cam{};
+    ShadowUbo shadowUbo; 
+    uint32_t viewMatIdx = 0;
+    std::vector<uint32_t> directionalLightIdxs;
+    std::vector<uint32_t> pointLightIdxs;
+    std::vector<uint32_t> directionalLightViewMatIdxs;
+    std::vector<uint32_t> pointLightViewMatIdxs;
+    for (uint32_t i = 0; i < scene.lights.size(); i++) {
+        if (scene.lights[i].type == vul::GltfLoader::GltfLightType::point) {
+            for (uint32_t j = 0; j < LAYERS_IN_SHADOW_MAP; j++) {
+                cam.pos = glm::vec3(scene.lights[i].position);
+                cam.rot = shadowMapDirFaceRotations[j];
+                cam.updateXYZ();
+                shadowUbo.viewMatrixes[viewMatIdx] = cam.getView();
+                pointLightIdxs.push_back(i);
+                pointLightViewMatIdxs.push_back(viewMatIdx);
+                viewMatIdx++;
+            }
+        } else {
+            cam.pos = glm::vec3(0.0f);
+            cam.setViewDirection(scene.lights[i].direction);
+            shadowUbo.viewMatrixes[viewMatIdx] = cam.getView();
+            directionalLightIdxs.push_back(i);
+            directionalLightViewMatIdxs.push_back(viewMatIdx);
+            viewMatIdx++;
+        }
+    }
+    meshResources.shadowUbos[0]->writeData(&shadowUbo, sizeof(shadowUbo), 0, VK_NULL_HANDLE);
+
+    shadowMapDir.attachmentPreservePreviousContents = false;
+    shadowMapDir.attachmentStoreCurrentContents = true;
+    vulRenderer.beginRendering(cmdBuf, vul::VulRenderer::SwapChainImageMode::noSwapChainImage,
+            vul::VulRenderer::DepthImageMode::customDepthImage, {}, shadowMapDir.getAttachmentInfo({{{1.0f}}}),
+            {}, 1.0f, shadowMapDir.getBaseWidth(), shadowMapDir.getBaseHeight(), shadowMapDir.getArrayCount());
+    for (uint32_t i = 0; i < directionalLightIdxs.size(); i++) {
+        ShadowPushConstant push;
+        cam.setOrthographicProjection(meshResources.sunViewMaxPos.x, meshResources.sunViewMinPos.x, meshResources.sunViewMinPos.y,
+                meshResources.sunViewMaxPos.y, meshResources.sunViewMaxPos.z, meshResources.sunViewMinPos.z);
+        push.projectionMatrix = cam.getProjection();
+        push.cameraPosition = scene.lights[directionalLightIdxs[i]].position;
+        push.layerIdx = i;
+        push.viewMatIdx = directionalLightViewMatIdxs[i];
+        meshResources.shadowPipeline->meshShadeIndirect(scene.indirectDrawCommandsBuffer->getBuffer(), 0, scene.indirectDrawCommands.size(),
+                sizeof(VkDrawMeshTasksIndirectCommandEXT), &push, sizeof(push), {meshResources.shadowDescSets[0]->getSet()}, cmdBuf);
+    }
+    vulRenderer.stopRendering(cmdBuf);
+    shadowMapDir.transitionImageLayout(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmdBuf);
+
+    shadowMapPoint.attachmentPreservePreviousContents = false;
+    shadowMapPoint.attachmentStoreCurrentContents = true;
+    vulRenderer.beginRendering(cmdBuf, vul::VulRenderer::SwapChainImageMode::noSwapChainImage,
+            vul::VulRenderer::DepthImageMode::customDepthImage, {}, shadowMapPoint.getAttachmentInfo({{{1.0f}}}),
+            {}, 1.0f, shadowMapPoint.getBaseWidth(), shadowMapPoint.getBaseHeight(), shadowMapPoint.getArrayCount());
+    for (uint32_t i = 0; i < pointLightIdxs.size(); i++) {
+        ShadowPushConstant push;
+        cam.setPerspectiveProjection(M_PI_2, 1.0f, 0.01f, scene.lights[pointLightIdxs[i]].range);
+        if ((i % LAYERS_IN_SHADOW_MAP == 2 || i % LAYERS_IN_SHADOW_MAP == 3)) push.projectionMatrix = glm::scale(cam.getProjection(), glm::vec3(-1.0f, 1.0f, 1.0f));
+        else push.projectionMatrix = glm::scale(cam.getProjection(), glm::vec3(1.0f, 1.0f, -1.0f));
+        push.cameraPosition = scene.lights[pointLightIdxs[i]].position;
+        push.layerIdx = i;
+        push.viewMatIdx = pointLightViewMatIdxs[i];
+        meshResources.shadowPipeline->meshShadeIndirect(scene.indirectDrawCommandsBuffer->getBuffer(), 0, scene.indirectDrawCommands.size(),
+                sizeof(VkDrawMeshTasksIndirectCommandEXT), &push, sizeof(push), {meshResources.shadowDescSets[0]->getSet()}, cmdBuf);
+    }
+    vulRenderer.stopRendering(cmdBuf);
+    shadowMapPoint.transitionImageLayout(VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmdBuf);
+    vulRenderer.endFrame();
 }
 
 void updateMeshUbo(const MeshResources &res, const vul::VulMeshletScene &scene, const vul::VulCamera &camera, const vul::VulRenderer &vulRenderer, const glm::vec4 &ambientLightColor)
@@ -204,11 +225,11 @@ void updateMeshUbo(const MeshResources &res, const vul::VulMeshletScene &scene, 
     vul::VulCamera cam{};
     cam.pos = glm::vec3(0.0f);
     cam.setViewDirection(scene.lights[0].direction);
-    cam.setOrthographicProjection(-50.0f, 50.0f, -50.0f, 50.0f, -50.0f, 50.0f);
+    cam.setOrthographicProjection(res.sunViewMaxPos.x, res.sunViewMinPos.x, res.sunViewMinPos.y, res.sunViewMaxPos.y, res.sunViewMaxPos.z, res.sunViewMinPos.z);
     Ubo ubo;
     ubo.projectionMatrix = camera.getProjection();
     ubo.viewMatrix = camera.getView();
-    ubo.sunProjViewMatrix = glm::scale(cam.getProjection(), glm::vec3(1.0f, 1.0f, -1.0f)) * cam.getView();
+    ubo.sunProjViewMatrix = cam.getProjection() * cam.getView();
     ubo.cameraPosition = glm::vec4(camera.pos, 69.0f);
     ubo.ambientLightColor = ambientLightColor;
     ubo.pointLightCount = 0;

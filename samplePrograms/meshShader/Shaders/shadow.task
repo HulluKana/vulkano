@@ -52,8 +52,7 @@ void main()
     const vec3 coneAxis = mat3(meshInfo.modelMatrix) * (bounds.coneAxis / 127.0);
     const float coneCutoff = bounds.coneCutoff / 127.0;
 
-    accept = accept && dot(center - push.cameraPosition.xyz, coneAxis) >= coneCutoff * length(center - push.cameraPosition.xyz) + radius;
-    accept = true;
+    accept = accept && dot(center - push.cameraPosition.xyz, coneAxis) <= coneCutoff * length(center - push.cameraPosition.xyz) + radius; // Front face culling instead of backface to fix "peter panning", so the less than or equal is not a typo.
 
     const uvec4 ballot = subgroupBallot(accept);
     const uint index = subgroupBallotExclusiveBitCount(ballot);

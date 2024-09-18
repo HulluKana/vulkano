@@ -370,7 +370,7 @@ void GltfLoader::processMesh(const tinygltf::Primitive &mesh, GltfAttributes req
 
         const tinygltf::Accessor accessor = m_model.accessors[mesh.attributes.find("POSITION")->second];
         resultMesh.vertexCount = static_cast<uint32_t>(accessor.count);
-        if (!accessor.minValues.empty()){
+        if (!accessor.minValues.empty() && false){
             resultMesh.posMin = glm::vec3(accessor.minValues[0], accessor.minValues[1], accessor.minValues[2]);
         } else{
             resultMesh.posMin = glm::vec3(std::numeric_limits<float>::max());
@@ -378,7 +378,7 @@ void GltfLoader::processMesh(const tinygltf::Primitive &mesh, GltfAttributes req
                 resultMesh.posMin = glm::min(resultMesh.posMin, pos);
             }
         }
-        if (!accessor.maxValues.empty()){
+        if (!accessor.maxValues.empty() && false){
             resultMesh.posMax = glm::vec3(accessor.maxValues[0], accessor.maxValues[1], accessor.maxValues[2]);
         } else{
             resultMesh.posMax = glm::vec3(-std::numeric_limits<float>::max());

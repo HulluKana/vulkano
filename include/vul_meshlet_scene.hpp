@@ -62,7 +62,13 @@ class VulMeshletScene {
 
         #ifdef __cplusplus
 
+        struct Aabb {
+            glm::vec3 min;
+            glm::vec3 max;
+        };
+
         std::vector<MeshInfo> meshes;
+        std::vector<Aabb> meshAabbs;
         std::vector<Meshlet> meshlets;
         std::vector<MeshletBounds> meshletBounds;
         std::vector<VkDrawMeshTasksIndirectCommandEXT> indirectDrawCommands;
