@@ -24,7 +24,7 @@ using uvec4 = glm::uvec4;
 struct Ubo {
     mat4 viewMatrix;
     mat4 projectionMatrix;
-    mat4 sunProjViewMatrix;
+    mat4 directionalLightProjViewMats[MAX_DIRECTIONAL_LIGHTS];
     vec4 ambientLightColor;
     vec4 cameraPosition;
     vec4 lightPositions[MAX_POINT_LIGHTS];

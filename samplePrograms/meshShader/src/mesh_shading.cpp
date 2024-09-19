@@ -114,6 +114,7 @@ MeshResources createMeshShadingResources(const vul::VulMeshletScene &scene, vul:
 
     configInfo.colorAttachmentFormats.clear();
     configInfo.setLayouts = {meshResources.shadowDescSets[0]->getLayout()->getDescriptorSetLayout()};
+    configInfo.cullMode = VK_CULL_MODE_NONE;
     meshResources.shadowPipeline = std::make_unique<vul::VulMeshPipeline>(vulDevice, "shadow.task.spv", "shadow.mesh.spv", "shadow.frag.spv", configInfo);
 
     vul::VulPipeline::PipelineConfigInfo cubeMapPointConfigInfo{};
@@ -125,20 +126,26 @@ MeshResources createMeshShadingResources(const vul::VulMeshletScene &scene, vul:
     cubeMapPointConfigInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
     meshResources.cubeMapPipeline = std::make_unique<vul::VulPipeline>(vulDevice, "cubeMap.vert.spv", "cubeMap.frag.spv", cubeMapPointConfigInfo);
 
-    meshResources.sunViewMinPos = glm::vec3(std::numeric_limits<float>::max());
-    meshResources.sunViewMaxPos = glm::vec3(-std::numeric_limits<float>::max());
-    vul::VulCamera cam{};
-    cam.setViewDirection(scene.lights[0].direction);
-    for (const vul::VulMeshletScene::MeshInfo &mesh : scene.meshes) {
-        for (uint32_t i = mesh.meshletOffset; i < mesh.meshletOffset + mesh.meshletCount; i++) {
-            const vul::VulMeshletScene::Meshlet &meshlet = scene.meshlets[i];
-            const glm::mat4 modelViewMat = cam.getView() * mesh.modelMatrix;
-            for (uint32_t j = meshlet.triangleOffset; j < meshlet.triangleOffset + meshlet.triangleCount * 3; j++) {
-                const glm::vec3 &vert = scene.vertices[scene.vertIndices[scene.triIndices[j] + meshlet.vertexOffset]];
-                const glm::vec3 pos = glm::vec3(modelViewMat * glm::vec4(vert, 1.0f));
-                meshResources.sunViewMinPos = glm::min(meshResources.sunViewMinPos, pos);
-                meshResources.sunViewMaxPos = glm::max(meshResources.sunViewMaxPos, pos);
+    for (const vul::GltfLoader::GltfLight &light : scene.lights) {
+        if (light.type == vul::GltfLoader::GltfLightType::directional) {
+            glm::vec3 minPos = glm::vec3(std::numeric_limits<float>::max());
+            glm::vec3 maxPos = glm::vec3(-std::numeric_limits<float>::max());
+            vul::VulCamera cam{};
+            cam.setViewDirection(light.direction);
+            for (const vul::VulMeshletScene::MeshInfo &mesh : scene.meshes) {
+                for (uint32_t i = mesh.meshletOffset; i < mesh.meshletOffset + mesh.meshletCount; i++) {
+                    const vul::VulMeshletScene::Meshlet &meshlet = scene.meshlets[i];
+                    const glm::mat4 modelViewMat = cam.getView() * mesh.modelMatrix;
+                    for (uint32_t j = meshlet.triangleOffset; j < meshlet.triangleOffset + meshlet.triangleCount * 3; j++) {
+                        const glm::vec3 &vert = scene.vertices[scene.vertIndices[scene.triIndices[j] + meshlet.vertexOffset]];
+                        const glm::vec3 pos = glm::vec3(modelViewMat * glm::vec4(vert, 1.0f));
+                        minPos = glm::min(minPos, pos);
+                        maxPos = glm::max(maxPos, pos);
+                    }
+                }
             }
+            meshResources.dirLightViewMinPoses.push_back(minPos);
+            meshResources.dirLightViewMaxPoses.push_back(maxPos);
         }
     }
     
@@ -187,8 +194,9 @@ void renderShadowMaps(vul::VulRenderer &vulRenderer, vul::VulImage &shadowMapPoi
             {}, 1.0f, shadowMapDir.getBaseWidth(), shadowMapDir.getBaseHeight(), shadowMapDir.getArrayCount());
     for (uint32_t i = 0; i < directionalLightIdxs.size(); i++) {
         ShadowPushConstant push;
-        cam.setOrthographicProjection(meshResources.sunViewMaxPos.x, meshResources.sunViewMinPos.x, meshResources.sunViewMinPos.y,
-                meshResources.sunViewMaxPos.y, meshResources.sunViewMaxPos.z, meshResources.sunViewMinPos.z);
+        const glm::vec3 &minPos = meshResources.dirLightViewMinPoses[i];
+        const glm::vec3 &maxPos = meshResources.dirLightViewMaxPoses[i];
+        cam.setOrthographicProjection(maxPos.x, minPos.x, minPos.y, maxPos.y, maxPos.z, minPos.z);
         push.projectionMatrix = cam.getProjection();
         push.cameraPosition = scene.lights[directionalLightIdxs[i]].position;
         push.layerIdx = i;
@@ -222,14 +230,9 @@ void renderShadowMaps(vul::VulRenderer &vulRenderer, vul::VulImage &shadowMapPoi
 
 void updateMeshUbo(const MeshResources &res, const vul::VulMeshletScene &scene, const vul::VulCamera &camera, const vul::VulRenderer &vulRenderer, const glm::vec4 &ambientLightColor)
 {
-    vul::VulCamera cam{};
-    cam.pos = glm::vec3(0.0f);
-    cam.setViewDirection(scene.lights[0].direction);
-    cam.setOrthographicProjection(res.sunViewMaxPos.x, res.sunViewMinPos.x, res.sunViewMinPos.y, res.sunViewMaxPos.y, res.sunViewMaxPos.z, res.sunViewMinPos.z);
     Ubo ubo;
     ubo.projectionMatrix = camera.getProjection();
     ubo.viewMatrix = camera.getView();
-    ubo.sunProjViewMatrix = cam.getProjection() * cam.getView();
     ubo.cameraPosition = glm::vec4(camera.pos, 69.0f);
     ubo.ambientLightColor = ambientLightColor;
     ubo.pointLightCount = 0;
@@ -243,6 +246,13 @@ void updateMeshUbo(const MeshResources &res, const vul::VulMeshletScene &scene, 
         if (scene.lights[i].type == vul::GltfLoader::GltfLightType::directional && ubo.directionalLightCount < MAX_DIRECTIONAL_LIGHTS) {
             ubo.lightDirections[ubo.directionalLightCount] = glm::vec4(scene.lights[i].direction, scene.lights[i].range);
             ubo.directionalLightColors[ubo.directionalLightCount] = glm::vec4(scene.lights[i].color, scene.lights[i].intensity);
+            const glm::vec3 &minPos = res.dirLightViewMinPoses[ubo.directionalLightCount];
+            const glm::vec3 &maxPos = res.dirLightViewMaxPoses[ubo.directionalLightCount];
+            vul::VulCamera cam{};
+            cam.pos = glm::vec3(0.0f);
+            cam.setViewDirection(scene.lights[i].direction);
+            cam.setOrthographicProjection(maxPos.x, minPos.x, minPos.y, maxPos.y, maxPos.z, minPos.z);
+            ubo.directionalLightProjViewMats[ubo.directionalLightCount] = cam.getProjection() * cam.getView();
             ubo.directionalLightCount++;
         }
     }

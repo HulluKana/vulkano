@@ -600,8 +600,7 @@ std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createDefaultImage(ImageTyp
 void VulImage::createVkImage()
 {
     VkImageCreateFlags createFlags = 0;
-    if (m_imageViewType == VK_IMAGE_VIEW_TYPE_2D_ARRAY) createFlags = VK_IMAGE_CREATE_2D_ARRAY_COMPATIBLE_BIT;
-    else if (m_imageViewType == VK_IMAGE_VIEW_TYPE_CUBE || m_imageViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY)
+    if (m_imageViewType == VK_IMAGE_VIEW_TYPE_CUBE || m_imageViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY)
         createFlags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
     VkImageCreateInfo imageInfo{};

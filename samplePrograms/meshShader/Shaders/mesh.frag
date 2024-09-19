@@ -21,7 +21,7 @@ layout(set = 0, binding = 0) uniform UniformBuffer {Ubo ubo;};
 layout(set = 0, binding = 1) uniform sampler2D textures[];
 layout(set = 0, binding = 2) readonly buffer MaterialBuffer{PackedMaterial materials[];};
 layout(set = 0, binding = 12) uniform samplerCubeArray shadowMap;
-layout(set = 0, binding = 13) uniform sampler2D shadowMapDir;
+layout(set = 0, binding = 13) uniform sampler2DArray shadowMapDir;
 
 layout (early_fragment_tests) in;
 
@@ -83,10 +83,10 @@ bool isInShadowPoint(vec3 worldPos, vec3 lightPos, float lightRange, uint lightI
 
 bool isInShadowDirectional(vec3 worldPos, uint lightIdx)
 {
-    const vec4 lightPerspectiveCoords = ubo.sunProjViewMatrix * vec4(worldPos, 1.0);
+    const vec4 lightPerspectiveCoords = ubo.directionalLightProjViewMats[lightIdx] * vec4(worldPos, 1.0);
     const float zComp = lightPerspectiveCoords.z;
     const vec2 shadowMapUv = lightPerspectiveCoords.xy / 2.0 + vec2(0.5);
-    const float depth = texture(shadowMapDir, shadowMapUv).r;
+    const float depth = texture(shadowMapDir, vec3(shadowMapUv, lightIdx)).r;
     const float bias = 0.00005;
     return zComp - bias <= depth ? false : true;
 }

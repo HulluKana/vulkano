@@ -22,8 +22,8 @@ struct MeshResources {
     std::array<std::unique_ptr<vul::VulDescriptorSet>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> cubeMapDescSets;
     std::array<std::unique_ptr<vul::VulBuffer>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> ubos;
     std::array<std::unique_ptr<vul::VulBuffer>, vul::VulSwapChain::MAX_FRAMES_IN_FLIGHT> shadowUbos;
-    glm::vec3 sunViewMinPos;
-    glm::vec3 sunViewMaxPos;
+    std::vector<glm::vec3> dirLightViewMinPoses;
+    std::vector<glm::vec3> dirLightViewMaxPoses;
 };
 MeshResources createMeshShadingResources(const vul::VulMeshletScene &scene, vul::VulImage &cubeMap, vul::VulImage &shadowMapPoint,
         vul::VulImage &shadowMapDir, vul::VulRenderer &vulRenderer, const vul::VulDescriptorPool &descPool, const vul::VulDevice &vulDevice);

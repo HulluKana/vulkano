@@ -76,7 +76,7 @@ void VulMeshletScene::createMeshletsFromScene(vul::Scene &scene, uint32_t maxTri
 
             const size_t meshletCount = meshopt_buildMeshlets(localMeshlets.data(), localMeshletVertices.data(), localMeshletTriangles.data(),
                     scene.indices.data() + mesh.firstIndex, mesh.indexCount, reinterpret_cast<const float *>(scene.vertices.data()),
-                    scene.vertices.size(), sizeof(glm::vec3), maxVertices, maxTriangles, 1.0f);
+                    scene.vertices.size(), sizeof(glm::vec3), maxVertices, maxTriangles, 0.5f);
 
             const uint32_t meshletIdx = atomicMeshletIdx.fetch_add(meshletCount);
             meshes[meshIdx] = MeshInfo{.modelMatrix = node.worldMatrix, .meshletOffset = meshletIdx,
