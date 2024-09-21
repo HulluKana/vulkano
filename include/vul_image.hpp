@@ -139,6 +139,8 @@ class VulImage {
         std::unique_ptr<OldVkImageStuff> createDefaultImage(ImageType type, VkCommandBuffer cmdBuf);
         std::unique_ptr<OldVkImageStuff> createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
                 VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf);
+        std::unique_ptr<OldVkImageStuff> createCustomImageSparse(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
+                VkMemoryPropertyFlags memoryProperties, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf);
 
         void createFromVkImage(VkImage image, VkImageViewType type, VkFormat format, VkImageAspectFlags aspect,
                 uint32_t mipLevelCount, uint32_t arrayLayerCount);
@@ -204,7 +206,10 @@ class VulImage {
             size_t layerSize;
         };
 
-        void createVkImage();
+        std::unique_ptr<OldVkImageStuff> prepareImageCreation(VkImageViewType type, VkImageUsageFlags usage,
+                VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect);
+        void createVkImage(VkImageCreateFlags flags);
+        void allocateVkMemory();
         VkImageView createImageView(uint32_t baseMipLevel, uint32_t mipLevelCount);
         void copyBufferToImage(VkBuffer buffer, VkDeviceSize offset, uint32_t mipLevel, VkCommandBuffer cmdBuf);
 
@@ -236,6 +241,7 @@ class VulImage {
         VkImageView m_imageView = VK_NULL_HANDLE;
         std::vector<VkImageView> m_mipImageViews;
         VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
+        std::vector<VkDeviceMemory> m_sparseMemoryRegions;
 
         const VulDevice &m_vulDevice;
 };

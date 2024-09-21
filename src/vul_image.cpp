@@ -100,6 +100,7 @@ VulImage::~VulImage()
     if (m_imageView != VK_NULL_HANDLE) vkDestroyImageView(m_vulDevice.device(), m_imageView, nullptr);
     if (m_image != VK_NULL_HANDLE && m_ownsImage) vkDestroyImage(m_vulDevice.device(), m_image, nullptr);
     if (m_imageMemory != VK_NULL_HANDLE) vkFreeMemory(m_vulDevice.device(), m_imageMemory, nullptr);
+    for (VkDeviceMemory sparseMemoryRegion : m_sparseMemoryRegions) vkFreeMemory(m_vulDevice.device(), sparseMemoryRegion, nullptr);
 }
 
 void VulImage::OldVkImageStuff::destoyImageStuff()
@@ -271,34 +272,9 @@ void VulImage::addMipLevelsToStartFromCompressedKtxFile(const std::string &fileN
 std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
         VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf)
 {
-    assert(m_mipLevels.size() > 0);
-    if (type == VK_IMAGE_VIEW_TYPE_1D || type == VK_IMAGE_VIEW_TYPE_1D_ARRAY) m_imageType = VK_IMAGE_TYPE_1D;
-    else if (type == VK_IMAGE_VIEW_TYPE_2D || type == VK_IMAGE_VIEW_TYPE_2D_ARRAY || type == VK_IMAGE_VIEW_TYPE_CUBE
-            || type == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY) m_imageType = VK_IMAGE_TYPE_2D;
-    else if (type == VK_IMAGE_VIEW_TYPE_3D) m_imageType = VK_IMAGE_TYPE_3D;
-    m_ownsImage = true;
-    m_imageViewType = type;
-    m_usage = usage;
-    m_memoryProperties = memoryProperties;
-    m_tiling = tiling;
-    m_aspect = aspect;
-    m_arrayLayersCount = m_mipLevels[0].layers.size();
-    for (uint32_t i = 1; i < m_mipLevels.size(); i++) assert(m_arrayLayersCount == m_mipLevels[i].layers.size());
-    assert(m_arrayLayersCount >= 1);
-    assert(!(m_arrayLayersCount > 1 && type == VK_IMAGE_VIEW_TYPE_3D));
-    uint32_t maxSize = std::max(m_mipLevels[0].width, m_mipLevels[0].height);
-    maxSize = std::max(maxSize, m_mipLevels[0].depth);
-    m_mipLevels.resize(std::min(static_cast<uint32_t>(m_mipLevels.size()), static_cast<uint32_t>(std::log2(maxSize) + 1)));
-
-    std::unique_ptr<OldVkImageStuff> oldVkImageStuff = std::make_unique<OldVkImageStuff>();
-    oldVkImageStuff->image = m_image;
-    oldVkImageStuff->imageMemory = m_imageMemory;
-    oldVkImageStuff->imageView = m_imageView;
-    oldVkImageStuff->mipImageViews = m_mipImageViews;
-    oldVkImageStuff->device = m_vulDevice.device();
-    deleteStagingResources();
-
-    createVkImage();
+    std::unique_ptr<VulImage::OldVkImageStuff> oldVkImageStuff = prepareImageCreation(type, usage, memoryProperties, tiling, aspect);
+    createVkImage(0);
+    allocateVkMemory();
     m_imageView = createImageView(0, m_mipLevels.size());
 
     const bool isDeviceLocal = memoryProperties & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -323,6 +299,92 @@ std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImage(VkImageVi
         
     }
     else transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, layout, cmdBuf);
+
+    return oldVkImageStuff;
+}
+
+std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImageSparse(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
+        VkMemoryPropertyFlags memoryProperties, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf)
+{
+    std::unique_ptr<VulImage::OldVkImageStuff> oldVkImageStuff = prepareImageCreation(type, usage, memoryProperties, VK_IMAGE_TILING_OPTIMAL, aspect);
+    createVkImage(VK_IMAGE_CREATE_SPARSE_BINDING_BIT | VK_IMAGE_CREATE_SPARSE_RESIDENCY_BIT);
+
+    VkPhysicalDeviceSparseImageFormatInfo2 formatInfo{};
+    formatInfo.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SPARSE_IMAGE_FORMAT_INFO_2;
+    formatInfo.format = m_format;
+    formatInfo.type = m_imageType;
+    formatInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+    formatInfo.usage = usage;
+    formatInfo.tiling = m_tiling;
+
+    constexpr uint32_t MAX_PROPERTIES = 3;
+    std::array<VkSparseImageFormatProperties2, MAX_PROPERTIES> properties{};
+    for (uint32_t i = 0; i < MAX_PROPERTIES; i++) properties[i].sType = VK_STRUCTURE_TYPE_SPARSE_IMAGE_FORMAT_PROPERTIES_2;
+    uint32_t propertyCount = MAX_PROPERTIES;
+    vkGetPhysicalDeviceSparseImageFormatProperties2(m_vulDevice.getPhysicalDevice(), &formatInfo, &propertyCount, properties.data());
+    assert(propertyCount < MAX_PROPERTIES && propertyCount > 0);
+
+    VkMemoryRequirements memoryRequirements;
+    vkGetImageMemoryRequirements(m_vulDevice.device(), m_image, &memoryRequirements);
+    const uint32_t blockWidth = properties[0].properties.imageGranularity.width;
+    const uint32_t blockHeight = properties[0].properties.imageGranularity.height;
+    const uint32_t blockDepth = properties[0].properties.imageGranularity.depth;
+
+    const double allocStartTime = glfwGetTime();
+    std::vector<VkSparseImageMemoryBind> binds;
+    for (uint32_t i = 0; i < m_mipLevels.size(); i++) {
+        for (uint32_t j = 0; j < m_arrayLayersCount; j++) {
+            for (uint32_t z = 0; z < m_mipLevels[i].depth; z += blockDepth) {
+                for (uint32_t y = 0; y < m_mipLevels[i].height; y += blockHeight) {
+                    for (uint32_t x = 0; x < m_mipLevels[i].width; x += blockWidth) {
+                        const VkDeviceSize bindSize = memoryRequirements.alignment;
+                        VkSparseImageMemoryBind bind;
+                        bind.subresource.aspectMask = m_aspect;
+                        bind.subresource.mipLevel = i;
+                        bind.subresource.arrayLayer = j;
+                        bind.memoryOffset = 0;
+                        bind.offset = VkOffset3D{static_cast<int32_t>(x), static_cast<int32_t>(y), static_cast<int32_t>(z)};
+                        bind.extent = VkExtent3D{std::min(blockWidth, m_mipLevels[i].width - x),
+                            std::min(blockHeight, m_mipLevels[i].height - y), std::min(blockDepth, m_mipLevels[i].depth - z)};
+                        bind.flags = 0;
+
+                        VkMemoryAllocateInfo allocInfo{};
+                        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+                        allocInfo.allocationSize = bindSize;
+                        allocInfo.memoryTypeIndex = m_vulDevice.findMemoryType(memoryRequirements.memoryTypeBits, m_memoryProperties);
+                        VkResult result = vkAllocateMemory(m_vulDevice.device(), &allocInfo, nullptr, &bind.memory);
+                        assert(result == VK_SUCCESS);
+                        m_sparseMemoryRegions.push_back(bind.memory);
+
+                        binds.push_back(bind);
+                        memoryRequirements.size -= bindSize;
+                    }
+                }
+            }
+        }
+    }
+    assert(memoryRequirements.size == 0);
+    const double allocTime = glfwGetTime() - allocStartTime;
+
+    VkSparseImageMemoryBindInfo imageMemoryBindInfo{};
+    imageMemoryBindInfo.image = m_image;
+    imageMemoryBindInfo.pBinds = binds.data();
+    imageMemoryBindInfo.bindCount = binds.size();
+
+    VkBindSparseInfo bindInfo{};
+    bindInfo.sType = VK_STRUCTURE_TYPE_BIND_SPARSE_INFO;
+    bindInfo.pImageBinds = &imageMemoryBindInfo;
+    bindInfo.imageBindCount = 1;
+
+    vkQueueWaitIdle(m_vulDevice.mainQueue());
+    const double bindStartTime = glfwGetTime();
+    vkQueueBindSparse(m_vulDevice.mainQueue(), 1, &bindInfo, VK_NULL_HANDLE);
+    vkQueueWaitIdle(m_vulDevice.mainQueue());
+    const double bindTime = glfwGetTime() - bindStartTime;
+    std::cout << allocTime << " " << bindTime << "\n";
+
+    m_imageView = createImageView(0, m_mipLevels.size());
+    transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, layout, cmdBuf);
 
     return oldVkImageStuff;
 }
@@ -597,11 +659,43 @@ std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createDefaultImage(ImageTyp
     return {};
 }
 
-void VulImage::createVkImage()
+std::unique_ptr<VulImage::OldVkImageStuff> VulImage::prepareImageCreation(VkImageViewType type, VkImageUsageFlags usage,
+        VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect)
 {
-    VkImageCreateFlags createFlags = 0;
+    assert(m_mipLevels.size() > 0);
+    if (type == VK_IMAGE_VIEW_TYPE_1D || type == VK_IMAGE_VIEW_TYPE_1D_ARRAY) m_imageType = VK_IMAGE_TYPE_1D;
+    else if (type == VK_IMAGE_VIEW_TYPE_2D || type == VK_IMAGE_VIEW_TYPE_2D_ARRAY || type == VK_IMAGE_VIEW_TYPE_CUBE
+            || type == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY) m_imageType = VK_IMAGE_TYPE_2D;
+    else if (type == VK_IMAGE_VIEW_TYPE_3D) m_imageType = VK_IMAGE_TYPE_3D;
+    m_ownsImage = true;
+    m_imageViewType = type;
+    m_usage = usage;
+    m_memoryProperties = memoryProperties;
+    m_tiling = tiling;
+    m_aspect = aspect;
+    m_arrayLayersCount = m_mipLevels[0].layers.size();
+    for (uint32_t i = 1; i < m_mipLevels.size(); i++) assert(m_arrayLayersCount == m_mipLevels[i].layers.size());
+    assert(m_arrayLayersCount >= 1);
+    assert(!(m_arrayLayersCount > 1 && type == VK_IMAGE_VIEW_TYPE_3D));
+    uint32_t maxSize = std::max(m_mipLevels[0].width, m_mipLevels[0].height);
+    maxSize = std::max(maxSize, m_mipLevels[0].depth);
+    m_mipLevels.resize(std::min(static_cast<uint32_t>(m_mipLevels.size()), static_cast<uint32_t>(std::log2(maxSize) + 1)));
+
+    std::unique_ptr<OldVkImageStuff> oldVkImageStuff = std::make_unique<OldVkImageStuff>();
+    oldVkImageStuff->image = m_image;
+    oldVkImageStuff->imageMemory = m_imageMemory;
+    oldVkImageStuff->imageView = m_imageView;
+    oldVkImageStuff->mipImageViews = m_mipImageViews;
+    oldVkImageStuff->device = m_vulDevice.device();
+    deleteStagingResources();
+
+    return oldVkImageStuff;
+}
+
+void VulImage::createVkImage(VkImageCreateFlags flags)
+{
     if (m_imageViewType == VK_IMAGE_VIEW_TYPE_CUBE || m_imageViewType == VK_IMAGE_VIEW_TYPE_CUBE_ARRAY)
-        createFlags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+        flags |= VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
 
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -617,11 +711,17 @@ void VulImage::createVkImage()
     imageInfo.usage = m_usage;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-    imageInfo.flags = createFlags;
+    imageInfo.flags = flags;
 
     if (vkCreateImage(m_vulDevice.device(), &imageInfo, nullptr, &m_image) != VK_SUCCESS)
         throw std::runtime_error("failed to create image in VulImage");
 
+    if (name.length() > 0) VUL_NAME_VK_MANUAL(m_image, (name + "   image").c_str());
+    if (name.length() == 0) VUL_NAME_VK(m_image)
+}
+
+void VulImage::allocateVkMemory()
+{
     VkMemoryRequirements memRequirements;
     vkGetImageMemoryRequirements(m_vulDevice.device(), m_image, &memRequirements);
 
@@ -635,14 +735,8 @@ void VulImage::createVkImage()
     if (vkBindImageMemory(m_vulDevice.device(), m_image, m_imageMemory, 0) != VK_SUCCESS)
         throw std::runtime_error("Failed to bind image memory in VulImage");
 
-    if (name.length() > 0) {
-        VUL_NAME_VK_MANUAL(m_image, (name + "   image").c_str())
-        VUL_NAME_VK_MANUAL(m_imageMemory, (name + "   image memory").c_str())
-    }
-    else {
-        VUL_NAME_VK(m_image)
-        VUL_NAME_VK(m_imageMemory)
-    }
+    if (name.length() > 0) VUL_NAME_VK_MANUAL(m_imageMemory, (name + "   image memory").c_str());
+    if (name.length() == 0) VUL_NAME_VK(m_imageMemory)
 }
 
 VkImageView VulImage::createImageView(uint32_t baseMipLevel, uint32_t mipLevelCount)

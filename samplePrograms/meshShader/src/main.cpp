@@ -1,7 +1,6 @@
 #include "host_device.hpp"
 #include "vul_gltf_loader.hpp"
 #include "vul_image.hpp"
-#include "vul_swap_chain.hpp"
 #include <GLFW/glfw3.h>
 #include <vul_window.hpp>
 #include <vul_device.hpp>
@@ -64,8 +63,10 @@ int main() {
     shadowMapPoint.vulSampler = cubeMap.vulSampler;
     vul::VulImage shadowMapDir(vulDevice);
     shadowMapDir.keepEmpty(8192, 8192, 1, 1, directionalLightCount, vulRenderer.getDepthFormat());
-    shadowMapDir.createCustomImage(VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, commandBuffer);
+    /*shadowMapDir.createCustomImage(VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, commandBuffer);*/
+    shadowMapDir.createCustomImageSparse(VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
+            | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT, commandBuffer);
     shadowMapDir.vulSampler = cubeMap.vulSampler;
     cmdPool.submit(commandBuffer, true);
 
