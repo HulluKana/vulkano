@@ -104,6 +104,18 @@ class VulImage {
             void destoyImageStuff();
             ~OldVkImageStuff() {destoyImageStuff();}
         };
+        struct SparseMemory {
+            VkDeviceMemory memory;
+            uint32_t blockCount;
+        };
+        struct SparseBindInfo {
+            uint32_t memoryIndex;
+            uint32_t blockOffset;
+            VkOffset3D imageRegionOffset;
+            VkExtent3D imageRegionSize;
+            uint32_t arrayLayer;
+            uint32_t mipLevel;
+        };
 
         static std::unique_ptr<VulImage> createDefaultWholeImageAllInOne(const VulDevice &vulDevice, std::variant<std::string,
                 RawImageData> data, std::variant<KtxCompressionFormat, VkFormat> format, bool addSampler,
@@ -141,6 +153,8 @@ class VulImage {
                 VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf);
         std::unique_ptr<OldVkImageStuff> createCustomImageSparse(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
                 VkMemoryPropertyFlags memoryProperties, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf);
+        void allocateSparseMemory(const std::vector<uint32_t> &blockCounts);
+        void bindSparseMemory(const std::vector<SparseBindInfo> &bindInfos);
 
         void createFromVkImage(VkImage image, VkImageViewType type, VkFormat format, VkImageAspectFlags aspect,
                 uint32_t mipLevelCount, uint32_t arrayLayerCount);
@@ -169,6 +183,9 @@ class VulImage {
         uint32_t getArrayCount() const {return m_arrayLayersCount;}
         uint32_t getBitsPerTexel() const {return m_bitsPerTexel;}
         size_t getDataSize() const {return m_data.size();}
+        VkExtent3D getSparseBlockExtent() const {return m_sparseBlockExtent;}
+        size_t getSparseMemoryCount() const {return m_sparseMemoryRegions.size();}
+        uint32_t getSparseMemoryBlockCount(uint32_t memoryIndex) const {return m_sparseMemoryRegions[memoryIndex].blockCount;}
 
         VkFormat getFormat() const {return m_format;}
         VkMemoryPropertyFlags getMemoryProperties() const {return m_memoryProperties;}
@@ -235,13 +252,15 @@ class VulImage {
         uint32_t m_baseWidth = 0;
         uint32_t m_baseHeight = 0;
         uint32_t m_baseDepth = 0;
+        VkExtent3D m_sparseBlockExtent{};
+        VkDeviceSize m_blockSize = 0;
         std::unique_ptr<VulBuffer> m_stagingBuffer;
 
         VkImage m_image = VK_NULL_HANDLE;
         VkImageView m_imageView = VK_NULL_HANDLE;
         std::vector<VkImageView> m_mipImageViews;
         VkDeviceMemory m_imageMemory = VK_NULL_HANDLE;
-        std::vector<VkDeviceMemory> m_sparseMemoryRegions;
+        std::vector<SparseMemory> m_sparseMemoryRegions;
 
         const VulDevice &m_vulDevice;
 };

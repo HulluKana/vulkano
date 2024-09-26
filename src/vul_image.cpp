@@ -100,7 +100,7 @@ VulImage::~VulImage()
     if (m_imageView != VK_NULL_HANDLE) vkDestroyImageView(m_vulDevice.device(), m_imageView, nullptr);
     if (m_image != VK_NULL_HANDLE && m_ownsImage) vkDestroyImage(m_vulDevice.device(), m_image, nullptr);
     if (m_imageMemory != VK_NULL_HANDLE) vkFreeMemory(m_vulDevice.device(), m_imageMemory, nullptr);
-    for (VkDeviceMemory sparseMemoryRegion : m_sparseMemoryRegions) vkFreeMemory(m_vulDevice.device(), sparseMemoryRegion, nullptr);
+    for (const SparseMemory &sparseMemory : m_sparseMemoryRegions) vkFreeMemory(m_vulDevice.device(), sparseMemory.memory, nullptr);
 }
 
 void VulImage::OldVkImageStuff::destoyImageStuff()
@@ -323,48 +323,51 @@ std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImageSparse(VkI
     uint32_t propertyCount = MAX_PROPERTIES;
     vkGetPhysicalDeviceSparseImageFormatProperties2(m_vulDevice.getPhysicalDevice(), &formatInfo, &propertyCount, properties.data());
     assert(propertyCount < MAX_PROPERTIES && propertyCount > 0);
+    m_sparseBlockExtent = properties[0].properties.imageGranularity;
 
+    m_imageView = createImageView(0, m_mipLevels.size());
+    transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, layout, cmdBuf);
+
+    return oldVkImageStuff;
+}
+
+void VulImage::allocateSparseMemory(const std::vector<uint32_t> &blockCounts)
+{
     VkMemoryRequirements memoryRequirements;
     vkGetImageMemoryRequirements(m_vulDevice.device(), m_image, &memoryRequirements);
-    const uint32_t blockWidth = properties[0].properties.imageGranularity.width;
-    const uint32_t blockHeight = properties[0].properties.imageGranularity.height;
-    const uint32_t blockDepth = properties[0].properties.imageGranularity.depth;
+    m_blockSize = memoryRequirements.alignment;
 
-    const double allocStartTime = glfwGetTime();
-    std::vector<VkSparseImageMemoryBind> binds;
-    for (uint32_t i = 0; i < m_mipLevels.size(); i++) {
-        for (uint32_t j = 0; j < m_arrayLayersCount; j++) {
-            for (uint32_t z = 0; z < m_mipLevels[i].depth; z += blockDepth) {
-                for (uint32_t y = 0; y < m_mipLevels[i].height; y += blockHeight) {
-                    for (uint32_t x = 0; x < m_mipLevels[i].width; x += blockWidth) {
-                        const VkDeviceSize bindSize = memoryRequirements.alignment;
-                        VkSparseImageMemoryBind bind;
-                        bind.subresource.aspectMask = m_aspect;
-                        bind.subresource.mipLevel = i;
-                        bind.subresource.arrayLayer = j;
-                        bind.memoryOffset = 0;
-                        bind.offset = VkOffset3D{static_cast<int32_t>(x), static_cast<int32_t>(y), static_cast<int32_t>(z)};
-                        bind.extent = VkExtent3D{std::min(blockWidth, m_mipLevels[i].width - x),
-                            std::min(blockHeight, m_mipLevels[i].height - y), std::min(blockDepth, m_mipLevels[i].depth - z)};
-                        bind.flags = 0;
+    m_sparseMemoryRegions.reserve(m_sparseMemoryRegions.size() + blockCounts.size());
+    for (uint32_t blockCount : blockCounts) {
+        SparseMemory sparseMemory;
+        sparseMemory.blockCount = blockCount;
 
-                        VkMemoryAllocateInfo allocInfo{};
-                        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-                        allocInfo.allocationSize = bindSize;
-                        allocInfo.memoryTypeIndex = m_vulDevice.findMemoryType(memoryRequirements.memoryTypeBits, m_memoryProperties);
-                        VkResult result = vkAllocateMemory(m_vulDevice.device(), &allocInfo, nullptr, &bind.memory);
-                        assert(result == VK_SUCCESS);
-                        m_sparseMemoryRegions.push_back(bind.memory);
-
-                        binds.push_back(bind);
-                        memoryRequirements.size -= bindSize;
-                    }
-                }
-            }
-        }
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memoryRequirements.alignment * blockCount;
+        allocInfo.memoryTypeIndex = m_vulDevice.findMemoryType(memoryRequirements.memoryTypeBits, m_memoryProperties);
+        VkResult result = vkAllocateMemory(m_vulDevice.device(), &allocInfo, nullptr, &sparseMemory.memory);
+        assert(result == VK_SUCCESS);
+        m_sparseMemoryRegions.push_back(sparseMemory);
     }
-    assert(memoryRequirements.size == 0);
-    const double allocTime = glfwGetTime() - allocStartTime;
+}
+
+void VulImage::bindSparseMemory(const std::vector<SparseBindInfo> &bindInfos)
+{
+    std::vector<VkSparseImageMemoryBind> binds;
+    for (const SparseBindInfo &info : bindInfos) {
+        VkSparseImageMemoryBind bind;
+        bind.subresource.aspectMask = m_aspect;
+        bind.subresource.mipLevel = info.mipLevel;
+        bind.subresource.arrayLayer = info.arrayLayer;
+        bind.memory = m_sparseMemoryRegions[info.memoryIndex].memory;
+        bind.memoryOffset = info.blockOffset * m_blockSize;
+        bind.offset = info.imageRegionOffset;
+        bind.extent = info.imageRegionSize;
+        bind.flags = 0;
+
+        binds.push_back(bind);
+    }
 
     VkSparseImageMemoryBindInfo imageMemoryBindInfo{};
     imageMemoryBindInfo.image = m_image;
@@ -377,16 +380,8 @@ std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImageSparse(VkI
     bindInfo.imageBindCount = 1;
 
     vkQueueWaitIdle(m_vulDevice.mainQueue());
-    const double bindStartTime = glfwGetTime();
     vkQueueBindSparse(m_vulDevice.mainQueue(), 1, &bindInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(m_vulDevice.mainQueue());
-    const double bindTime = glfwGetTime() - bindStartTime;
-    std::cout << allocTime << " " << bindTime << "\n";
-
-    m_imageView = createImageView(0, m_mipLevels.size());
-    transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, layout, cmdBuf);
-
-    return oldVkImageStuff;
 }
 
 void VulImage::createFromVkImage(VkImage image, VkImageViewType type, VkFormat format, VkImageAspectFlags aspect,

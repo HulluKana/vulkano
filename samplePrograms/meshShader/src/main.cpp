@@ -60,6 +60,8 @@ int main() {
     shadowMapPoint.keepEmpty(2048, 2048, 1, 1, LAYERS_IN_SHADOW_MAP * pointLightCount, vulRenderer.getDepthFormat());
     shadowMapPoint.createCustomImage(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, commandBuffer);
+    /*shadowMapPoint.createCustomImageSparse(VK_IMAGE_VIEW_TYPE_CUBE_ARRAY, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT,
+            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT, commandBuffer);*/
     shadowMapPoint.vulSampler = cubeMap.vulSampler;
     vul::VulImage shadowMapDir(vulDevice);
     shadowMapDir.keepEmpty(8192, 8192, 1, 1, directionalLightCount, vulRenderer.getDepthFormat());
@@ -67,6 +69,13 @@ int main() {
             VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_DEPTH_BIT, commandBuffer);*/
     shadowMapDir.createCustomImageSparse(VK_IMAGE_VIEW_TYPE_2D_ARRAY, VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT
             | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_ASPECT_DEPTH_BIT, commandBuffer);
+    shadowMapDir.allocateSparseMemory({shadowMapDir.getBaseWidth() / shadowMapDir.getSparseBlockExtent().width *
+            shadowMapDir.getBaseHeight() / shadowMapDir.getSparseBlockExtent().height * shadowMapDir.getArrayCount()});
+    shadowMapDir.bindSparseMemory({vul::VulImage::SparseBindInfo{.memoryIndex = 0, .blockOffset = 0, .imageRegionOffset = {0, 0, 0},
+            .imageRegionSize = VkExtent3D{shadowMapDir.getBaseWidth(), shadowMapDir.getBaseHeight(), shadowMapDir.getBaseDepth()},
+            .arrayLayer = 0, .mipLevel = 0}, {.memoryIndex = 0, .blockOffset = shadowMapDir.getSparseMemoryBlockCount(0) /
+            shadowMapDir.getArrayCount(), .imageRegionOffset = {0, 0, 0}, .imageRegionSize = VkExtent3D{shadowMapDir.getBaseWidth(),
+            shadowMapDir.getBaseHeight(), shadowMapDir.getBaseDepth()}, .arrayLayer = 1, .mipLevel = 0}});
     shadowMapDir.vulSampler = cubeMap.vulSampler;
     cmdPool.submit(commandBuffer, true);
 
