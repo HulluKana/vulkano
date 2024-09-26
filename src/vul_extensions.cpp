@@ -1,4 +1,5 @@
 #include<vul_extensions.hpp>
+#include <vulkan/vulkan_core.h>
 
 using namespace vul::extensions;
 
@@ -30,6 +31,13 @@ static PFN_vkGetRayTracingShaderGroupStackSizeKHR pfn_vkGetRayTracingShaderGroup
 static PFN_vkCmdDrawMeshTasksEXT pfn_vkCmdDrawMeshTasksEXT= 0;
 static PFN_vkCmdDrawMeshTasksIndirectCountEXT pfn_vkCmdDrawMeshTasksIndirectCountEXT= 0;
 static PFN_vkCmdDrawMeshTasksIndirectEXT pfn_vkCmdDrawMeshTasksIndirectEXT= 0;
+
+static PFN_vkGetPhysicalDeviceVideoFormatPropertiesKHR pfn_vkGetPhysicalDeviceVideoFormatPropertiesKHR= 0;
+static PFN_vkGetPhysicalDeviceVideoCapabilitiesKHR pfn_vkGetPhysicalDeviceVideoCapabilitiesKHR= 0;
+static PFN_vkCreateVideoSessionKHR pfn_vkCreateVideoSessionKHR= 0;
+static PFN_vkDestroyVideoSessionKHR pfn_vkDestroyVideoSessionKHR= 0;
+static PFN_vkGetVideoSessionMemoryRequirementsKHR pfn_vkGetVideoSessionMemoryRequirementsKHR= 0;
+static PFN_vkBindVideoSessionMemoryKHR pfn_vkBindVideoSessionMemoryKHR= 0;
 
 // Acceleration structure functions start here
 //----------------------------------------------------------------------------------------------------------------------
@@ -252,6 +260,46 @@ void vkCmdDrawMeshTasksIndirectEXT(
 { 
     pfn_vkCmdDrawMeshTasksIndirectEXT(commandBuffer, buffer, offset, drawCount, stride); 
 }
+//----------------------------------------------------------------------------------------------------------------------
+// Mesh shading functions end here and video functions begin here
+//----------------------------------------------------------------------------------------------------------------------
+VkResult vkGetPhysicalDeviceVideoFormatPropertiesKHR(
+        VkPhysicalDevice physicalDevice,
+        const VkPhysicalDeviceVideoFormatInfoKHR *pVideoFormatInfo,
+        uint32_t *pVideoFormatPropertyCount,
+        VkVideoFormatPropertiesKHR *pVideoFormatProperties)
+{
+    return pfn_vkGetPhysicalDeviceVideoFormatPropertiesKHR(physicalDevice, pVideoFormatInfo, pVideoFormatPropertyCount, pVideoFormatProperties);
+}
+VkResult vkGetPhysicalDeviceVideoCapabilitiesKHR(
+        VkPhysicalDevice physicalDevice,
+        const VkVideoProfileInfoKHR *pVideoProfile,
+        VkVideoCapabilitiesKHR *pCapabilities)
+{
+    return pfn_vkGetPhysicalDeviceVideoCapabilitiesKHR(physicalDevice, pVideoProfile, pCapabilities);
+}
+VkResult vkCreateVideoSessionKHR(VkDevice device,
+        const VkVideoSessionCreateInfoKHR *pCreateInfo,
+        const VkAllocationCallbacks *pAllocator,
+        VkVideoSessionKHR *pVideoSession)
+{
+    return pfn_vkCreateVideoSessionKHR(device, pCreateInfo, pAllocator, pVideoSession);
+}
+void vkDestroyVideoSessionKHR(
+        VkDevice device,
+        VkVideoSessionKHR videoSession,
+        const VkAllocationCallbacks *pAllocator)
+{
+    pfn_vkDestroyVideoSessionKHR(device, videoSession, pAllocator);
+}
+VkResult vkGetVideoSessionMemoryRequirementsKHR(
+        VkDevice device,
+        VkVideoSessionKHR videoSession,
+        uint32_t *pMemoryRequirementsCount,
+        VkVideoSessionMemoryRequirementsKHR *pMemoryRequirements)
+{
+    return pfn_vkGetVideoSessionMemoryRequirementsKHR(device, videoSession, pMemoryRequirementsCount, pMemoryRequirements);
+}
 
 namespace vul {
 
@@ -293,6 +341,16 @@ void addMeshShader(VkDevice device, PFN_vkGetDeviceProcAddr getDeviceProcAddr)
     pfn_vkCmdDrawMeshTasksEXT = (PFN_vkCmdDrawMeshTasksEXT)getDeviceProcAddr(device, "vkCmdDrawMeshTasksEXT");
     pfn_vkCmdDrawMeshTasksIndirectCountEXT = (PFN_vkCmdDrawMeshTasksIndirectCountEXT)getDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectCountEXT");
     pfn_vkCmdDrawMeshTasksIndirectEXT = (PFN_vkCmdDrawMeshTasksIndirectEXT)getDeviceProcAddr(device, "vkCmdDrawMeshTasksIndirectEXT");
+}
+
+void addVideo(VkInstance instance, PFN_vkGetInstanceProcAddr getInstanceProcAddr)
+{
+    pfn_vkGetPhysicalDeviceVideoFormatPropertiesKHR = (PFN_vkGetPhysicalDeviceVideoFormatPropertiesKHR)getInstanceProcAddr(instance, "vkGetPhysicalDeviceVideoFormatPropertiesKHR");
+    pfn_vkGetPhysicalDeviceVideoCapabilitiesKHR = (PFN_vkGetPhysicalDeviceVideoCapabilitiesKHR)getInstanceProcAddr(instance, "vkGetPhysicalDeviceVideoCapabilitiesKHR");
+    pfn_vkCreateVideoSessionKHR = (PFN_vkCreateVideoSessionKHR)getInstanceProcAddr(instance, "vkCreateVideoSessionKHR");
+    pfn_vkDestroyVideoSessionKHR = (PFN_vkDestroyVideoSessionKHR)getInstanceProcAddr(instance, "vkDestroyVideoSessionKHR");
+    pfn_vkGetVideoSessionMemoryRequirementsKHR = (PFN_vkGetVideoSessionMemoryRequirementsKHR)getInstanceProcAddr(instance, "vkGetVideoSessionMemoryRequirementsKHR");
+    pfn_vkBindVideoSessionMemoryKHR = (PFN_vkBindVideoSessionMemoryKHR)getInstanceProcAddr(instance, "vkBindVideoSessionMemoryKHR");
 }
 
 }
