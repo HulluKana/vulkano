@@ -15,7 +15,7 @@ class VulDevice {
         const bool enableValidationLayers = true;
 #endif
 
-        VulDevice(VulWindow &window, uint32_t maxSideQueueCount, bool enableMeshShading, bool enableRayTracing);
+        VulDevice(VulWindow &window, uint32_t maxSideQueueCount, bool enableMeshShading, bool enableRayTracing, bool enableVideoDecoding);
         ~VulDevice();
 
         VulDevice(const VulDevice &) = delete;
@@ -42,9 +42,11 @@ class VulDevice {
             uint32_t mainFamily;
             uint32_t computeFamily;
             uint32_t transferFamily;
+            uint32_t videoDecodeFamily;
             bool hasMainFamily = false;
             bool hasSeparateComputeFamily = false;
             bool hasSeparateTransferFamily = false;
+            bool hasVideoDecodeFamily = false;
             uint32_t sideQueueCount;
         };
 
@@ -62,13 +64,13 @@ class VulDevice {
         void createInstance();
         void setupDebugMessenger();
         void createSurface();
-        void pickPhysicalDevice();
-        void createLogicalDevice(uint32_t maxSideQueueCount, bool enableMeshShading, bool enableRayTracing);
+        void pickPhysicalDevice(bool requireVideoDecodingSupport);
+        void createLogicalDevice(uint32_t maxSideQueueCount, bool enableMeshShading, bool enableRayTracing, bool enableVideoDecoding);
 
-        bool isDeviceSuitable(VkPhysicalDevice device);
+        bool isDeviceSuitable(VkPhysicalDevice device, bool requireVideoDecodingSupport);
         std::vector<const char *> getRequiredExtensions();
         bool checkValidationLayerSupport();
-        QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device) const;
+        QueueFamilyIndices findQueueFamilies(VkPhysicalDevice device, bool enableVideoDecoding) const;
         void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT &createInfo);
         void hasGflwRequiredInstanceExtensions();
         bool checkDeviceExtensionSupport(VkPhysicalDevice device);

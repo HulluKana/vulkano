@@ -57,12 +57,12 @@ void DestroyDebugUtilsMessengerEXT(VkInstance instance,
 }
 
 // class member functions
-VulDevice::VulDevice(VulWindow &window, uint32_t maxSideQueueCount, bool enableMeshShading, bool enableRayTracing) : window{window} {
+VulDevice::VulDevice(VulWindow &window, uint32_t maxSideQueueCount, bool enableMeshShading, bool enableRayTracing, bool enableVideoDecoding) : window{window} {
     createInstance();
     setupDebugMessenger();
     createSurface();
-    pickPhysicalDevice();
-    createLogicalDevice(maxSideQueueCount, enableMeshShading, enableRayTracing);
+    pickPhysicalDevice(enableVideoDecoding);
+    createLogicalDevice(maxSideQueueCount, enableMeshShading, enableRayTracing, enableVideoDecoding);
 
     DebugNamer::initialize(*this);
     VUL_NAME_VK(instance)
@@ -128,7 +128,7 @@ void VulDevice::createInstance() {
     hasGflwRequiredInstanceExtensions();
 }
 
-void VulDevice::pickPhysicalDevice() {
+void VulDevice::pickPhysicalDevice(bool requireVideoDecodingSupport) {
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
     if (deviceCount == 0) {
@@ -138,11 +138,23 @@ void VulDevice::pickPhysicalDevice() {
     std::vector<VkPhysicalDevice> devices(deviceCount);
     vkEnumeratePhysicalDevices(instance, &deviceCount, devices.data());
 
+    std::array<int, 5> devicePriorities;
+    devicePriorities[VK_PHYSICAL_DEVICE_TYPE_OTHER] = 0;
+    devicePriorities[VK_PHYSICAL_DEVICE_TYPE_CPU] = 1;
+    devicePriorities[VK_PHYSICAL_DEVICE_TYPE_VIRTUAL_GPU] = 2;
+    devicePriorities[VK_PHYSICAL_DEVICE_TYPE_INTEGRATED_GPU] = 3;
+    devicePriorities[VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU] = 4;
+    int highestPriority = -1;
     for (const auto &device : devices) {
-        if (isDeviceSuitable(device)) {
-            physicalDevice = device;
-            m_queueFamilyIndices = findQueueFamilies(device);
-            break;
+        if (isDeviceSuitable(device, requireVideoDecodingSupport)) {
+            VkPhysicalDeviceProperties deviceProperties;
+            vkGetPhysicalDeviceProperties(device, &deviceProperties);
+            if (devicePriorities[deviceProperties.deviceType] > highestPriority) {
+                physicalDevice = device;
+                properties = deviceProperties;
+                m_queueFamilyIndices = findQueueFamilies(device, requireVideoDecodingSupport);
+                highestPriority = devicePriorities[properties.deviceType];
+            }
         }
     }
 
@@ -150,11 +162,10 @@ void VulDevice::pickPhysicalDevice() {
         throw std::runtime_error("failed to find a suitable GPU!");
     }
 
-    vkGetPhysicalDeviceProperties(physicalDevice, &properties);
-    // std::cout << "physical device: " << properties.deviceName << std::endl;
+    //std::cout << "physical device: " << properties.deviceName << std::endl;
 }
 
-void VulDevice::createLogicalDevice(uint32_t maxSideQueueCount, bool enableMeshShading, bool enableRayTracing)
+void VulDevice::createLogicalDevice(uint32_t maxSideQueueCount, bool enableMeshShading, bool enableRayTracing, bool enableVideoDecoding)
 {
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
@@ -204,11 +215,15 @@ void VulDevice::createLogicalDevice(uint32_t maxSideQueueCount, bool enableMeshS
         if (enableMeshShading) fragShadingRateFeatures.pNext = &rtPipelineFeatures;
         else physicalFeaturesVulkan11.pNext = &rtPipelineFeatures;
     }
-
     if (enableMeshShading) {
         deviceExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
         deviceExtensions.push_back(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
         physicalFeaturesVulkan11.pNext = &meshShaderFeatures;
+    }
+    if (enableVideoDecoding) {
+        deviceExtensions.push_back(VK_KHR_VIDEO_QUEUE_EXTENSION_NAME);
+        deviceExtensions.push_back(VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME);
+        deviceExtensions.push_back(VK_KHR_VIDEO_DECODE_H264_EXTENSION_NAME);
     }
 
     VkPhysicalDeviceFeatures2 physicalFeatures2{};
@@ -255,14 +270,15 @@ void VulDevice::createLogicalDevice(uint32_t maxSideQueueCount, bool enableMeshS
         extensions::addRayTracingPipeline(device_, vkGetDeviceProcAddr);
     }
     if (enableMeshShading) extensions::addMeshShader(device_, vkGetDeviceProcAddr);
+    if (enableVideoDecoding) extensions::addVideo(instance, vkGetInstanceProcAddr);
 }
 
 void VulDevice::createSurface() {
     window.createWindowSurface(instance, &surface_);
 }
 
-bool VulDevice::isDeviceSuitable(VkPhysicalDevice device) {
-    QueueFamilyIndices indices = findQueueFamilies(device);
+bool VulDevice::isDeviceSuitable(VkPhysicalDevice device, bool requireVideoDecodingSupport) {
+    QueueFamilyIndices indices = findQueueFamilies(device, requireVideoDecodingSupport);
 
     bool extensionsSupported = checkDeviceExtensionSupport(device);
 
@@ -276,7 +292,7 @@ bool VulDevice::isDeviceSuitable(VkPhysicalDevice device) {
     VkPhysicalDeviceFeatures supportedFeatures;
     vkGetPhysicalDeviceFeatures(device, &supportedFeatures);
 
-    return indices.hasMainFamily && extensionsSupported && swapChainAdequate &&
+    return indices.hasMainFamily && (indices.hasVideoDecodeFamily || !requireVideoDecodingSupport) && extensionsSupported && swapChainAdequate &&
         supportedFeatures.samplerAnisotropy;
 }
 
@@ -389,7 +405,7 @@ bool VulDevice::checkDeviceExtensionSupport(VkPhysicalDevice device) {
     return requiredExtensions.empty();
 }
 
-VulDevice::QueueFamilyIndices VulDevice::findQueueFamilies(VkPhysicalDevice device) const {
+VulDevice::QueueFamilyIndices VulDevice::findQueueFamilies(VkPhysicalDevice device, bool enableVideoDecoding) const {
     QueueFamilyIndices indices{};
 
     uint32_t queueFamilyCount = 0;
@@ -420,6 +436,10 @@ VulDevice::QueueFamilyIndices VulDevice::findQueueFamilies(VkPhysicalDevice devi
             indices.transferFamily = i;
             indices.hasSeparateTransferFamily = true;
             continue;
+        }
+        if (queueFamilies[i].queueFlags & VK_QUEUE_VIDEO_DECODE_BIT_KHR && !indices.hasVideoDecodeFamily) {
+            indices.videoDecodeFamily = i;
+            indices.hasVideoDecodeFamily = true;
         }
     }
     if (!indices.hasSeparateComputeFamily) indices.computeFamily = indices.mainFamily;

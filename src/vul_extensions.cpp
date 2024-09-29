@@ -1,3 +1,5 @@
+#include <cstdlib>
+#include <iostream>
 #include<vul_extensions.hpp>
 #include <vulkan/vulkan_core.h>
 
@@ -278,7 +280,8 @@ VkResult vkGetPhysicalDeviceVideoCapabilitiesKHR(
 {
     return pfn_vkGetPhysicalDeviceVideoCapabilitiesKHR(physicalDevice, pVideoProfile, pCapabilities);
 }
-VkResult vkCreateVideoSessionKHR(VkDevice device,
+VkResult vkCreateVideoSessionKHR(
+        VkDevice device,
         const VkVideoSessionCreateInfoKHR *pCreateInfo,
         const VkAllocationCallbacks *pAllocator,
         VkVideoSessionKHR *pVideoSession)
@@ -299,6 +302,14 @@ VkResult vkGetVideoSessionMemoryRequirementsKHR(
         VkVideoSessionMemoryRequirementsKHR *pMemoryRequirements)
 {
     return pfn_vkGetVideoSessionMemoryRequirementsKHR(device, videoSession, pMemoryRequirementsCount, pMemoryRequirements);
+}
+VkResult vkBindVideoSessionMemoryKHR(
+        VkDevice device,
+        VkVideoSessionKHR videoSession,
+        uint32_t bindSessionMemoryInfoCount,
+        const VkBindVideoSessionMemoryInfoKHR *pBindSessionMemoryInfos)
+{
+    return pfn_vkBindVideoSessionMemoryKHR(device, videoSession, bindSessionMemoryInfoCount, pBindSessionMemoryInfos);
 }
 
 namespace vul {

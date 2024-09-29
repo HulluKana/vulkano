@@ -10,8 +10,7 @@
 
 int main() {
     vul::VulWindow vulWindow(2560, 1440, "Vulkano video");
-    vul::VulDevice vulDevice(vulWindow, 0, false, false);
-    vul::extensions::addVideo(vulDevice.getInstace(), vkGetInstanceProcAddr);
+    vul::VulDevice vulDevice(vulWindow, 0, false, false, true);
 
     VkVideoDecodeH264ProfileInfoKHR videoDecodeH264ProfileInfo{};
     videoDecodeH264ProfileInfo.sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_PROFILE_INFO_KHR;
@@ -41,8 +40,6 @@ int main() {
     result = vkGetPhysicalDeviceVideoFormatPropertiesKHR(vulDevice.getPhysicalDevice(), &videoFormatInfo, &videoFormatPropertyCount, videoFormatProperties.data());
     assert(result == VK_SUCCESS);
 
-    std::cout << videoFormatProperties[0].format << "\n";
-
     VkVideoDecodeH264CapabilitiesKHR videoDecodeH264Capabilities{};
     videoDecodeH264Capabilities.sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_CAPABILITIES_KHR;
     VkVideoDecodeCapabilitiesKHR videoDecodeCapabilities{};
@@ -52,9 +49,50 @@ int main() {
     videoCapabilities.sType = VK_STRUCTURE_TYPE_VIDEO_CAPABILITIES_KHR;
     videoCapabilities.pNext = &videoDecodeCapabilities;
     result = vkGetPhysicalDeviceVideoCapabilitiesKHR(vulDevice.getPhysicalDevice(), &videoProfileInfo, &videoCapabilities);
-    std::cout << result << "\n";
 
     std::cout << videoDecodeH264Capabilities.fieldOffsetGranularity.x << " " << videoDecodeH264Capabilities.fieldOffsetGranularity.y << " " << videoDecodeH264Capabilities.maxLevelIdc << " " << videoDecodeCapabilities.flags << " " << videoCapabilities.minCodedExtent.width << " " << videoCapabilities.minCodedExtent.height << " " << videoCapabilities.maxCodedExtent.width << " " << videoCapabilities.maxCodedExtent.height << " " << videoCapabilities.minBitstreamBufferOffsetAlignment << " " << videoCapabilities.minBitstreamBufferSizeAlignment << " " << videoCapabilities.stdHeaderVersion.specVersion << " " << videoCapabilities.stdHeaderVersion.extensionName << " " << videoCapabilities.maxDpbSlots << " " << videoCapabilities.pictureAccessGranularity.width << " " << videoCapabilities.pictureAccessGranularity.height << " " << videoCapabilities.maxActiveReferencePictures << "\n";
+
+    VkVideoSessionCreateInfoKHR videoSessionCreateInfo{};
+    videoSessionCreateInfo.sType = VK_STRUCTURE_TYPE_VIDEO_SESSION_CREATE_INFO_KHR;
+    videoSessionCreateInfo.queueFamilyIndex = vulDevice.getQueueFamilies().videoDecodeFamily;
+    videoSessionCreateInfo.flags = 0;
+    videoSessionCreateInfo.pVideoProfile = &videoProfileInfo;
+    videoSessionCreateInfo.pictureFormat = videoFormatProperties[0].format;
+    videoSessionCreateInfo.maxCodedExtent = VkExtent2D{480, 360};
+    videoSessionCreateInfo.referencePictureFormat = videoFormatProperties[0].format;
+    videoSessionCreateInfo.maxDpbSlots = 1;
+    videoSessionCreateInfo.maxActiveReferencePictures = 1;
+    videoSessionCreateInfo.pStdHeaderVersion = &videoCapabilities.stdHeaderVersion;
+    VkVideoSessionKHR videoSession;
+    result = vkCreateVideoSessionKHR(vulDevice.device(), &videoSessionCreateInfo, nullptr, &videoSession);
+    assert(result == VK_SUCCESS);
+
+    uint32_t videoMemReqCount;
+    vkGetVideoSessionMemoryRequirementsKHR(vulDevice.device(), videoSession, &videoMemReqCount, nullptr);
+    assert(videoMemReqCount > 0);
+    std::vector<VkVideoSessionMemoryRequirementsKHR> videoSessionMemReqs(videoMemReqCount);
+    for (uint32_t i = 0; i < videoMemReqCount; i++) videoSessionMemReqs[i].sType = VK_STRUCTURE_TYPE_VIDEO_SESSION_MEMORY_REQUIREMENTS_KHR;
+    vkGetVideoSessionMemoryRequirementsKHR(vulDevice.device(), videoSession, &videoMemReqCount, videoSessionMemReqs.data());
+
+    std::vector<VkBindVideoSessionMemoryInfoKHR> videoSessionMemoryBinds(videoMemReqCount);
+    for (uint32_t i = 0; i < videoMemReqCount; i++) {
+        VkMemoryAllocateInfo allocateInfo{};
+        allocateInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocateInfo.memoryTypeIndex = vulDevice.findMemoryType(videoSessionMemReqs[i].memoryRequirements.memoryTypeBits, 0);
+        allocateInfo.allocationSize = videoSessionMemReqs[i].memoryRequirements.size;
+        vkAllocateMemory(vulDevice.device(), &allocateInfo, nullptr, &videoSessionMemoryBinds[i].memory);
+
+        videoSessionMemoryBinds[i].sType = VK_STRUCTURE_TYPE_BIND_VIDEO_SESSION_MEMORY_INFO_KHR;
+        videoSessionMemoryBinds[i].memoryBindIndex = videoSessionMemReqs[i].memoryBindIndex;
+        videoSessionMemoryBinds[i].memoryOffset = 0;
+        videoSessionMemoryBinds[i].memorySize = videoSessionMemReqs[i].memoryRequirements.size;
+    }
+    result = vkBindVideoSessionMemoryKHR(vulDevice.device(), videoSession, videoMemReqCount, videoSessionMemoryBinds.data());
+    assert(result == VK_SUCCESS);
+
+    vulDevice.waitForIdle();
+    for (const VkBindVideoSessionMemoryInfoKHR &bindInfo : videoSessionMemoryBinds) vkFreeMemory(vulDevice.device(), bindInfo.memory, nullptr);
+    vkDestroyVideoSessionKHR(vulDevice.device(), videoSession, nullptr);
 
     return 0;
 }
