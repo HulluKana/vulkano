@@ -1,16 +1,43 @@
+#include "vul_command_pool.hpp"
 #include "vul_extensions.hpp"
 #include "vul_window.hpp"
+#include <bit>
 #include <cassert>
+#include <cstring>
+#include <fstream>
+#include <iterator>
 #include <limits>
+#include <stdexcept>
+#include <climits>
 #include <vk_video/vulkan_video_codec_h264std.h>
 #include <vul_device.hpp>
 
 #include <iostream>
 #include <vulkan/vulkan_core.h>
 
+template <typename T>
+T swapEndian(T data)
+{
+    static_assert (CHAR_BIT == 8, "CHAR_BIT != 8");
+
+    union
+    {
+        T data;
+        uint8_t dataChars[sizeof(T)];
+    } source, dest;
+
+    source.data = data;
+
+    for (size_t i = 0; i < sizeof(T); i++)
+        dest.dataChars[i] = source.dataChars[sizeof(T) - i - 1];
+
+    return dest.data;
+}
+
 int main() {
     vul::VulWindow vulWindow(2560, 1440, "Vulkano video");
     vul::VulDevice vulDevice(vulWindow, 0, false, false, true);
+    vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::main, 0, 0, vulDevice);
 
     VkVideoDecodeH264ProfileInfoKHR videoDecodeH264ProfileInfo{};
     videoDecodeH264ProfileInfo.sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_PROFILE_INFO_KHR;
@@ -50,7 +77,7 @@ int main() {
     videoCapabilities.pNext = &videoDecodeCapabilities;
     result = vkGetPhysicalDeviceVideoCapabilitiesKHR(vulDevice.getPhysicalDevice(), &videoProfileInfo, &videoCapabilities);
 
-    std::cout << videoDecodeH264Capabilities.fieldOffsetGranularity.x << " " << videoDecodeH264Capabilities.fieldOffsetGranularity.y << " " << videoDecodeH264Capabilities.maxLevelIdc << " " << videoDecodeCapabilities.flags << " " << videoCapabilities.minCodedExtent.width << " " << videoCapabilities.minCodedExtent.height << " " << videoCapabilities.maxCodedExtent.width << " " << videoCapabilities.maxCodedExtent.height << " " << videoCapabilities.minBitstreamBufferOffsetAlignment << " " << videoCapabilities.minBitstreamBufferSizeAlignment << " " << videoCapabilities.stdHeaderVersion.specVersion << " " << videoCapabilities.stdHeaderVersion.extensionName << " " << videoCapabilities.maxDpbSlots << " " << videoCapabilities.pictureAccessGranularity.width << " " << videoCapabilities.pictureAccessGranularity.height << " " << videoCapabilities.maxActiveReferencePictures << "\n";
+    //std::cout << videoDecodeH264Capabilities.fieldOffsetGranularity.x << " " << videoDecodeH264Capabilities.fieldOffsetGranularity.y << " " << videoDecodeH264Capabilities.maxLevelIdc << " " << videoDecodeCapabilities.flags << " " << videoCapabilities.minCodedExtent.width << " " << videoCapabilities.minCodedExtent.height << " " << videoCapabilities.maxCodedExtent.width << " " << videoCapabilities.maxCodedExtent.height << " " << videoCapabilities.minBitstreamBufferOffsetAlignment << " " << videoCapabilities.minBitstreamBufferSizeAlignment << " " << videoCapabilities.stdHeaderVersion.specVersion << " " << videoCapabilities.stdHeaderVersion.extensionName << " " << videoCapabilities.maxDpbSlots << " " << videoCapabilities.pictureAccessGranularity.width << " " << videoCapabilities.pictureAccessGranularity.height << " " << videoCapabilities.maxActiveReferencePictures << "\n";
 
     VkVideoSessionCreateInfoKHR videoSessionCreateInfo{};
     videoSessionCreateInfo.sType = VK_STRUCTURE_TYPE_VIDEO_SESSION_CREATE_INFO_KHR;
@@ -90,7 +117,48 @@ int main() {
     result = vkBindVideoSessionMemoryKHR(vulDevice.device(), videoSession, videoMemReqCount, videoSessionMemoryBinds.data());
     assert(result == VK_SUCCESS);
 
+    StdVideoH264SequenceParameterSet h264sps{};
+    h264sps.seq_parameter_set_id = 0;
+    h264sps.level_idc = videoDecodeH264Capabilities.maxLevelIdc;
+    StdVideoH264PictureParameterSet h264pps{};
+    h264pps.seq_parameter_set_id = 0;
+    h264pps.pic_parameter_set_id = 0;
+    VkVideoDecodeH264SessionParametersAddInfoKHR h264DecodeParametersAddInfo{};
+    h264DecodeParametersAddInfo.sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_SESSION_PARAMETERS_ADD_INFO_KHR;
+    h264DecodeParametersAddInfo.pStdSPSs = &h264sps;
+    h264DecodeParametersAddInfo.pStdPPSs = &h264pps;
+    h264DecodeParametersAddInfo.stdSPSCount = 1;
+    h264DecodeParametersAddInfo.stdPPSCount = 1;
+    VkVideoDecodeH264SessionParametersCreateInfoKHR h264DecodeParametersInfo{};
+    h264DecodeParametersInfo.sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_SESSION_PARAMETERS_CREATE_INFO_KHR;
+    h264DecodeParametersInfo.maxStdSPSCount = 1;
+    h264DecodeParametersInfo.maxStdPPSCount = 1;
+    h264DecodeParametersInfo.pParametersAddInfo = &h264DecodeParametersAddInfo;
+    VkVideoSessionParametersCreateInfoKHR sessionParametersInfo{};
+    sessionParametersInfo.sType = VK_STRUCTURE_TYPE_VIDEO_SESSION_PARAMETERS_CREATE_INFO_KHR;
+    sessionParametersInfo.pNext = &h264DecodeParametersInfo;
+    sessionParametersInfo.videoSession = videoSession;
+    VkVideoSessionParametersKHR sessionParameters;
+    result = vkCreateVideoSessionParametersKHR(vulDevice.device(), &sessionParametersInfo, nullptr, &sessionParameters);
+    assert(result == VK_SUCCESS);
+
+    
+    std::ifstream inputFile("../badAppleVideo.mp4", std::ios::binary);
+    if (!inputFile.is_open()) throw std::runtime_error("Failed to open video file\n");
+    std::vector<uint8_t> inputData(std::istreambuf_iterator<char>(inputFile), {});
+    uint32_t identificationBoxSize = swapEndian(*reinterpret_cast<uint32_t *>(&inputData[0]));
+    char identifierString[4];
+    memcpy(identifierString, &inputData[4], 4);
+    if (identifierString[0] != 'f' || identifierString[1] != 't' || identifierString[2] != 'y' || identifierString[3] != 'p')
+        throw std::runtime_error("Not a valid mp4 file\n");
+    uint32_t mediaHeaderBoxSize = swapEndian(*reinterpret_cast<uint32_t *>(&inputData[identificationBoxSize]));
+    char mediaHeaderString[4];
+    memcpy(mediaHeaderString, &inputData[identificationBoxSize + 4], 4);
+    if (mediaHeaderString[0] != 'm' || mediaHeaderString[1] != 'o' || mediaHeaderString[2] != 'o' || mediaHeaderString[3] != 'v')
+        throw std::runtime_error("Cant sparse this mp4 file\n");
+
     vulDevice.waitForIdle();
+    vkDestroyVideoSessionParametersKHR(vulDevice.device(), sessionParameters, nullptr);
     for (const VkBindVideoSessionMemoryInfoKHR &bindInfo : videoSessionMemoryBinds) vkFreeMemory(vulDevice.device(), bindInfo.memory, nullptr);
     vkDestroyVideoSessionKHR(vulDevice.device(), videoSession, nullptr);
 

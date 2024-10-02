@@ -40,6 +40,10 @@ static PFN_vkCreateVideoSessionKHR pfn_vkCreateVideoSessionKHR= 0;
 static PFN_vkDestroyVideoSessionKHR pfn_vkDestroyVideoSessionKHR= 0;
 static PFN_vkGetVideoSessionMemoryRequirementsKHR pfn_vkGetVideoSessionMemoryRequirementsKHR= 0;
 static PFN_vkBindVideoSessionMemoryKHR pfn_vkBindVideoSessionMemoryKHR= 0;
+static PFN_vkCreateVideoSessionParametersKHR pfn_vkCreateVideoSessionParametersKHR= 0;
+static PFN_vkDestroyVideoSessionParametersKHR pfn_vkDestroyVideoSessionParametersKHR= 0;
+static PFN_vkUpdateVideoSessionParametersKHR pfn_vkUpdateVideoSessionParametersKHR= 0;
+static PFN_vkCmdDecodeVideoKHR pfn_vkCmdDecodeVideoKHR= 0;
 
 // Acceleration structure functions start here
 //----------------------------------------------------------------------------------------------------------------------
@@ -311,6 +315,34 @@ VkResult vkBindVideoSessionMemoryKHR(
 {
     return pfn_vkBindVideoSessionMemoryKHR(device, videoSession, bindSessionMemoryInfoCount, pBindSessionMemoryInfos);
 }
+VkResult vkCreateVideoSessionParametersKHR(
+        VkDevice device,
+        const VkVideoSessionParametersCreateInfoKHR *pCreateInfo,
+        const VkAllocationCallbacks *pAllocator,
+        VkVideoSessionParametersKHR *pVideoSessionParameters)
+{
+    return pfn_vkCreateVideoSessionParametersKHR(device, pCreateInfo, pAllocator, pVideoSessionParameters);
+}
+void vkDestroyVideoSessionParametersKHR(
+        VkDevice device,
+        VkVideoSessionParametersKHR videoSessionParameters,
+        const VkAllocationCallbacks *pAllocator)
+{
+    pfn_vkDestroyVideoSessionParametersKHR(device, videoSessionParameters, pAllocator);
+}
+VkResult vkUpdateVideoSessionParametersKHR(
+        VkDevice device,
+        VkVideoSessionParametersKHR videoSessionParameters,
+        const VkVideoSessionParametersUpdateInfoKHR *pUpdateInfo)
+{
+    return pfn_vkUpdateVideoSessionParametersKHR(device, videoSessionParameters, pUpdateInfo);
+}
+void vkCmdDecodeVideoKHR(
+        VkCommandBuffer commandBuffer,
+        const VkVideoDecodeInfoKHR *pDecodeInfo)
+{
+    pfn_vkCmdDecodeVideoKHR(commandBuffer, pDecodeInfo);
+}
 
 namespace vul {
 
@@ -362,6 +394,10 @@ void addVideo(VkInstance instance, PFN_vkGetInstanceProcAddr getInstanceProcAddr
     pfn_vkDestroyVideoSessionKHR = (PFN_vkDestroyVideoSessionKHR)getInstanceProcAddr(instance, "vkDestroyVideoSessionKHR");
     pfn_vkGetVideoSessionMemoryRequirementsKHR = (PFN_vkGetVideoSessionMemoryRequirementsKHR)getInstanceProcAddr(instance, "vkGetVideoSessionMemoryRequirementsKHR");
     pfn_vkBindVideoSessionMemoryKHR = (PFN_vkBindVideoSessionMemoryKHR)getInstanceProcAddr(instance, "vkBindVideoSessionMemoryKHR");
+    pfn_vkCreateVideoSessionParametersKHR = (PFN_vkCreateVideoSessionParametersKHR)getInstanceProcAddr(instance, "vkCreateVideoSessionParametersKHR");
+    pfn_vkDestroyVideoSessionParametersKHR = (PFN_vkDestroyVideoSessionParametersKHR)getInstanceProcAddr(instance, "vkDestroyVideoSessionParametersKHR");
+    pfn_vkUpdateVideoSessionParametersKHR = (PFN_vkUpdateVideoSessionParametersKHR)getInstanceProcAddr(instance, "vkUpdateVideoSessionParametersKHR");
+    pfn_vkCmdDecodeVideoKHR = (PFN_vkCmdDecodeVideoKHR)getInstanceProcAddr(instance, "vkCmdDecodeVideoKHR");
 }
 
 }
