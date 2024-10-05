@@ -9,6 +9,7 @@
 #include <limits>
 #include <stdexcept>
 #include <climits>
+#include <string>
 #include <vk_video/vulkan_video_codec_h264std.h>
 #include <vul_device.hpp>
 
@@ -19,22 +20,98 @@ template <typename T>
 T swapEndian(T data)
 {
     static_assert (CHAR_BIT == 8, "CHAR_BIT != 8");
-
-    union
-    {
+    union {
         T data;
         uint8_t dataChars[sizeof(T)];
     } source, dest;
-
     source.data = data;
-
-    for (size_t i = 0; i < sizeof(T); i++)
-        dest.dataChars[i] = source.dataChars[sizeof(T) - i - 1];
-
+    for (size_t i = 0; i < sizeof(T); i++) dest.dataChars[i] = source.dataChars[sizeof(T) - i - 1];
     return dest.data;
 }
 
+template <typename T>
+T readValue(const std::vector<uint8_t> &data, size_t offset)
+{
+    return swapEndian(*reinterpret_cast<const T *>(&data[offset]));
+}
+
+bool compare4byteStr(char *str, const char *testStr)
+{
+    return str[0] == testStr[0] && str[1] == testStr[1] && str[2] == testStr[2] && str[3] == testStr[3];
+}
+
+void getAndValidate4byteStr(const std::vector<uint8_t> &data, size_t offset, const char *testStr, const char *errStr)
+{
+    char str[4];
+    memcpy(str, &data[offset], 4);
+    if (!compare4byteStr(str, testStr)) throw std::runtime_error(errStr);
+}
+
+size_t checkBoxValidityAndReturnSize(const std::vector<uint8_t> &data, size_t offset, const char *testStr, const char *errStr)
+{
+    uint32_t boxSize = readValue<uint32_t>(data, offset);
+    getAndValidate4byteStr(data, offset + 4, testStr, errStr);
+    return boxSize;
+}
+
+size_t findBoxOffset(const std::vector<uint8_t> &data, size_t startOffset, size_t endOffset, const char *boxName)
+{
+    for (size_t i = startOffset; i < endOffset;) {
+        uint32_t boxSize = readValue<uint32_t>(data, i);
+        if (boxSize == 0) throw std::runtime_error("Box size is 0\n");
+        char str[4];
+        memcpy(str, &data[i + 4], 4);
+        if (compare4byteStr(str, boxName)) return i;
+        i += boxSize;
+    }
+    throw std::runtime_error(std::string("Did not find a box called ") + boxName);
+}
+
 int main() {
+    std::ifstream inputFile("../badAppleVideo.mp4", std::ios::binary);
+    if (!inputFile.is_open()) throw std::runtime_error("Failed to open video file\n");
+    std::vector<uint8_t> inputData(std::istreambuf_iterator<char>(inputFile), {});
+    size_t index = 0;
+    index += checkBoxValidityAndReturnSize(inputData, index, "ftyp", "Not a valid mp4 file\n");
+    checkBoxValidityAndReturnSize(inputData, index, "moov", "Expected moov\n");
+    index += 8;
+    index += checkBoxValidityAndReturnSize(inputData, index, "mvhd", "Expected mvhd\n");
+    checkBoxValidityAndReturnSize(inputData, index, "trak", "Expected trak\n");
+    index += 8;
+    index += checkBoxValidityAndReturnSize(inputData, index, "tkhd", "Expected tkhd\n");
+    checkBoxValidityAndReturnSize(inputData, index, "edts", "Expected edts\n");
+    index += 8;
+    index += checkBoxValidityAndReturnSize(inputData, index, "elst", "Expected elst\n");
+    checkBoxValidityAndReturnSize(inputData, index, "mdia", "Expected mdia\n");
+    index += 8;
+    index += checkBoxValidityAndReturnSize(inputData, index, "mdhd", "Expected mdhd\n");
+    index += checkBoxValidityAndReturnSize(inputData, index, "hdlr", "Expected hdlr\n");
+    checkBoxValidityAndReturnSize(inputData, index, "minf", "Expected minf\n");
+    index += 8;
+    index += checkBoxValidityAndReturnSize(inputData, index, "vmhd", "Expected vmhd\n");
+    checkBoxValidityAndReturnSize(inputData, index, "dinf", "Expected dinf\n");
+    index += 8;
+    index += checkBoxValidityAndReturnSize(inputData, index, "dref", "Expected dref\n");
+    checkBoxValidityAndReturnSize(inputData, index, "stbl", "Expected stbl\n");
+    index += 8;
+    size_t stsdEndIndex = checkBoxValidityAndReturnSize(inputData, index, "stsd", "Expected stsd\n") + index;
+    index += 12;
+    if (readValue<uint32_t>(inputData, index) != 1) throw std::runtime_error("Description count isnt 1\n");
+    index += 8;
+    getAndValidate4byteStr(inputData, index, "avc1", "Expected avc1\n"); 
+    index += 80;
+    if (readValue<int16_t>(inputData, index) != -1) throw std::runtime_error("Quicktime table exists\n");
+    index += 2;
+    index = findBoxOffset(inputData, index, stsdEndIndex, "avcC");
+    index += 12;
+    /*uint32_t nalLength = (inputData[index++] & 0b11) + 1*/index++;
+    if ((inputData[index++] & 0b11111) != 1) throw std::runtime_error("SPS count isnt 1\n");
+    uint32_t spsSize = readValue<uint16_t>(inputData, index);
+    index += spsSize + 2;
+    if (inputData[index++] != 1) throw std::runtime_error("PPS count isnt 1\n");
+    //uint32_t ppsSize = readValue<uint16_t>(inputData, index);
+
+
     vul::VulWindow vulWindow(2560, 1440, "Vulkano video");
     vul::VulDevice vulDevice(vulWindow, 0, false, false, true);
     vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::main, 0, 0, vulDevice);
@@ -141,22 +218,7 @@ int main() {
     VkVideoSessionParametersKHR sessionParameters;
     result = vkCreateVideoSessionParametersKHR(vulDevice.device(), &sessionParametersInfo, nullptr, &sessionParameters);
     assert(result == VK_SUCCESS);
-
-    
-    std::ifstream inputFile("../badAppleVideo.mp4", std::ios::binary);
-    if (!inputFile.is_open()) throw std::runtime_error("Failed to open video file\n");
-    std::vector<uint8_t> inputData(std::istreambuf_iterator<char>(inputFile), {});
-    uint32_t identificationBoxSize = swapEndian(*reinterpret_cast<uint32_t *>(&inputData[0]));
-    char identifierString[4];
-    memcpy(identifierString, &inputData[4], 4);
-    if (identifierString[0] != 'f' || identifierString[1] != 't' || identifierString[2] != 'y' || identifierString[3] != 'p')
-        throw std::runtime_error("Not a valid mp4 file\n");
-    uint32_t mediaHeaderBoxSize = swapEndian(*reinterpret_cast<uint32_t *>(&inputData[identificationBoxSize]));
-    char mediaHeaderString[4];
-    memcpy(mediaHeaderString, &inputData[identificationBoxSize + 4], 4);
-    if (mediaHeaderString[0] != 'm' || mediaHeaderString[1] != 'o' || mediaHeaderString[2] != 'o' || mediaHeaderString[3] != 'v')
-        throw std::runtime_error("Cant sparse this mp4 file\n");
-
+ 
     vulDevice.waitForIdle();
     vkDestroyVideoSessionParametersKHR(vulDevice.device(), sessionParameters, nullptr);
     for (const VkBindVideoSessionMemoryInfoKHR &bindInfo : videoSessionMemoryBinds) vkFreeMemory(vulDevice.device(), bindInfo.memory, nullptr);
