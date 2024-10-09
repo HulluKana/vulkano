@@ -44,6 +44,9 @@ static PFN_vkCreateVideoSessionParametersKHR pfn_vkCreateVideoSessionParametersK
 static PFN_vkDestroyVideoSessionParametersKHR pfn_vkDestroyVideoSessionParametersKHR= 0;
 static PFN_vkUpdateVideoSessionParametersKHR pfn_vkUpdateVideoSessionParametersKHR= 0;
 static PFN_vkCmdDecodeVideoKHR pfn_vkCmdDecodeVideoKHR= 0;
+static PFN_vkCmdBeginVideoCodingKHR pfn_vkCmdBeginVideoCodingKHR= 0;
+static PFN_vkCmdEndVideoCodingKHR pfn_vkCmdEndVideoCodingKHR= 0;
+static PFN_vkCmdControlVideoCodingKHR pfn_vkCmdControlVideoCodingKHR= 0;
 
 // Acceleration structure functions start here
 //----------------------------------------------------------------------------------------------------------------------
@@ -343,6 +346,24 @@ void vkCmdDecodeVideoKHR(
 {
     pfn_vkCmdDecodeVideoKHR(commandBuffer, pDecodeInfo);
 }
+void vkCmdBeginVideoCodingKHR(
+        VkCommandBuffer commandBuffer,
+        const VkVideoBeginCodingInfoKHR *pBeginInfo)
+{
+    pfn_vkCmdBeginVideoCodingKHR(commandBuffer, pBeginInfo);
+}
+void vkCmdEndVideoCodingKHR(
+        VkCommandBuffer commandBuffer,
+        const VkVideoEndCodingInfoKHR *pEndCodingInfo)
+{
+    pfn_vkCmdEndVideoCodingKHR(commandBuffer, pEndCodingInfo);
+}
+void vkCmdControlVideoCodingKHR(
+        VkCommandBuffer commandBuffer,
+        const VkVideoCodingControlInfoKHR *pCodingControlInfo)
+{
+    pfn_vkCmdControlVideoCodingKHR(commandBuffer, pCodingControlInfo);
+}
 
 namespace vul {
 
@@ -398,6 +419,9 @@ void addVideo(VkInstance instance, PFN_vkGetInstanceProcAddr getInstanceProcAddr
     pfn_vkDestroyVideoSessionParametersKHR = (PFN_vkDestroyVideoSessionParametersKHR)getInstanceProcAddr(instance, "vkDestroyVideoSessionParametersKHR");
     pfn_vkUpdateVideoSessionParametersKHR = (PFN_vkUpdateVideoSessionParametersKHR)getInstanceProcAddr(instance, "vkUpdateVideoSessionParametersKHR");
     pfn_vkCmdDecodeVideoKHR = (PFN_vkCmdDecodeVideoKHR)getInstanceProcAddr(instance, "vkCmdDecodeVideoKHR");
+    pfn_vkCmdBeginVideoCodingKHR = (PFN_vkCmdBeginVideoCodingKHR)getInstanceProcAddr(instance, "vkCmdBeginVideoCodingKHR");
+    pfn_vkCmdEndVideoCodingKHR = (PFN_vkCmdEndVideoCodingKHR)getInstanceProcAddr(instance, "vkCmdEndVideoCodingKHR");
+    pfn_vkCmdControlVideoCodingKHR = (PFN_vkCmdControlVideoCodingKHR)getInstanceProcAddr(instance, "vkCmdControlVideoCodingKHR");
 }
 
 }

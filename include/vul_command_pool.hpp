@@ -11,6 +11,7 @@ class VulCmdPool {
             main,
             compute,
             transfer,
+            videoDecode,
             side
         };
 

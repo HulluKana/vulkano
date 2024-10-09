@@ -170,6 +170,7 @@ void VulDevice::createLogicalDevice(uint32_t maxSideQueueCount, bool enableMeshS
     std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
     std::set<uint32_t> uniqueQueueFamilies = {
         m_queueFamilyIndices.mainFamily, m_queueFamilyIndices.computeFamily, m_queueFamilyIndices.transferFamily};
+    if (enableVideoDecoding) uniqueQueueFamilies.insert(m_queueFamilyIndices.videoDecodeFamily);
     m_queueFamilyIndices.sideQueueCount = std::min(m_queueFamilyIndices.sideQueueCount, maxSideQueueCount);
 
     std::vector<float> queuePriorities(m_queueFamilyIndices.sideQueueCount + 1);
@@ -197,6 +198,9 @@ void VulDevice::createLogicalDevice(uint32_t maxSideQueueCount, bool enableMeshS
     meshShaderFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT;
     meshShaderFeatures.pNext = &fragShadingRateFeatures;
 
+    VkPhysicalDeviceVideoMaintenance1FeaturesKHR videoMaintenanceFeatures{};
+    videoMaintenanceFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VIDEO_MAINTENANCE_1_FEATURES_KHR;
+
     VkPhysicalDeviceVulkan11Features physicalFeaturesVulkan11{};
     physicalFeaturesVulkan11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
 
@@ -213,17 +217,21 @@ void VulDevice::createLogicalDevice(uint32_t maxSideQueueCount, bool enableMeshS
         deviceExtensions.push_back(VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME);
         deviceExtensions.push_back(VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME);
         if (enableMeshShading) fragShadingRateFeatures.pNext = &rtPipelineFeatures;
+        else if (enableVideoDecoding) videoMaintenanceFeatures.pNext = &rtPipelineFeatures;
         else physicalFeaturesVulkan11.pNext = &rtPipelineFeatures;
     }
     if (enableMeshShading) {
         deviceExtensions.push_back(VK_EXT_MESH_SHADER_EXTENSION_NAME);
         deviceExtensions.push_back(VK_KHR_FRAGMENT_SHADING_RATE_EXTENSION_NAME);
-        physicalFeaturesVulkan11.pNext = &meshShaderFeatures;
+        if (enableVideoDecoding) videoMaintenanceFeatures.pNext = &meshShaderFeatures;
+        else physicalFeaturesVulkan11.pNext = &meshShaderFeatures;
     }
     if (enableVideoDecoding) {
         deviceExtensions.push_back(VK_KHR_VIDEO_QUEUE_EXTENSION_NAME);
         deviceExtensions.push_back(VK_KHR_VIDEO_DECODE_QUEUE_EXTENSION_NAME);
         deviceExtensions.push_back(VK_KHR_VIDEO_DECODE_H264_EXTENSION_NAME);
+        deviceExtensions.push_back(VK_KHR_VIDEO_MAINTENANCE_1_EXTENSION_NAME);
+        physicalFeaturesVulkan11.pNext = &videoMaintenanceFeatures;
     }
 
     VkPhysicalDeviceFeatures2 physicalFeatures2{};
@@ -262,6 +270,7 @@ void VulDevice::createLogicalDevice(uint32_t maxSideQueueCount, bool enableMeshS
     vkGetDeviceQueue(device_, m_queueFamilyIndices.mainFamily, 0, &m_mainQueue);
     vkGetDeviceQueue(device_, m_queueFamilyIndices.computeFamily, 0, &m_computeQueue);
     vkGetDeviceQueue(device_, m_queueFamilyIndices.transferFamily, 0, &m_transferQueue);
+    if (enableVideoDecoding) vkGetDeviceQueue(device_, m_queueFamilyIndices.videoDecodeFamily, 0, &m_videoDecodeQueue);
     m_sideQueues.resize(m_queueFamilyIndices.sideQueueCount);
     for (uint32_t i = 0; i < m_queueFamilyIndices.sideQueueCount; i++) vkGetDeviceQueue(device_, m_queueFamilyIndices.mainFamily, i + 1, &m_sideQueues[i]);
 

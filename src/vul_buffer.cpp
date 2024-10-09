@@ -52,6 +52,7 @@ VkResult VulBuffer::createBuffer(uint32_t elementSize, uint32_t elementCount, bo
     bufferInfo.size = m_bufferSize;
     bufferInfo.usage = m_usageFlags;
     bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    if (usage & VK_BUFFER_USAGE_VIDEO_DECODE_SRC_BIT_KHR) bufferInfo.flags = VK_BUFFER_CREATE_VIDEO_PROFILE_INDEPENDENT_BIT_KHR;
 
     VkResult result = vkCreateBuffer(m_vulDevice.device(), &bufferInfo, nullptr, &m_buffer);
     if (result != VK_SUCCESS) return result;

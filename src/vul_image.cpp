@@ -273,7 +273,7 @@ std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImage(VkImageVi
         VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf)
 {
     std::unique_ptr<VulImage::OldVkImageStuff> oldVkImageStuff = prepareImageCreation(type, usage, memoryProperties, tiling, aspect);
-    createVkImage(0);
+    createVkImage((usage & (VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR)) ? VK_IMAGE_CREATE_VIDEO_PROFILE_INDEPENDENT_BIT_KHR : 0);
     allocateVkMemory();
     m_imageView = createImageView(0, m_mipLevels.size());
 
@@ -442,14 +442,14 @@ VkDescriptorImageInfo VulImage::getMipDescriptorInfo(uint32_t mipLevel) const
     return descInfo;
 }
 
-void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf)
+void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkCommandBuffer cmdBuf, uint32_t srcQueueFamilyIdx, uint32_t dstQueueFamilyIdx)
 {
-    VkImageMemoryBarrier barrier{};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    VkImageMemoryBarrier2 barrier{};
+    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
     barrier.oldLayout = oldLayout;
     barrier.newLayout = newLayout;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    barrier.srcQueueFamilyIndex = srcQueueFamilyIdx;
+    barrier.dstQueueFamilyIndex = dstQueueFamilyIdx;
     barrier.image = m_image;
     barrier.subresourceRange.aspectMask = m_aspect;
     barrier.subresourceRange.baseMipLevel = 0;
@@ -457,35 +457,36 @@ void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newL
     barrier.subresourceRange.baseArrayLayer = 0;
     barrier.subresourceRange.layerCount = m_arrayLayersCount;
 
-    VkPipelineStageFlags sourceStage{};
-    VkPipelineStageFlags destinationStage{};
-
     switch (oldLayout) {
         case VK_IMAGE_LAYOUT_UNDEFINED:
             barrier.srcAccessMask = 0;
-            sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            barrier.srcStageMask = VK_PIPELINE_STAGE_2_TOP_OF_PIPE_BIT;
             break;
         case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
             barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            barrier.srcStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             break;
         case VK_IMAGE_LAYOUT_GENERAL:
             barrier.srcAccessMask = VK_ACCESS_HOST_WRITE_BIT;
-            sourceStage = VK_PIPELINE_STAGE_HOST_BIT;
+            barrier.srcStageMask = VK_PIPELINE_STAGE_2_HOST_BIT;
             break;
         case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
             barrier.srcAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            sourceStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            barrier.srcStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
             break;
         case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
             barrier.srcAccessMask = attachmentPreservePreviousContents ? VK_ACCESS_COLOR_ATTACHMENT_READ_BIT :
                 VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            sourceStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            barrier.srcStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
             break;
         case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
             barrier.srcAccessMask = attachmentPreservePreviousContents ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT :
                 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-            sourceStage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            barrier.srcStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
+            break;
+        case VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR:
+            barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+            barrier.srcStageMask = VK_PIPELINE_STAGE_2_VIDEO_DECODE_BIT_KHR;
             break;
         default:
             std::invalid_argument("unsupported old layout transition in VulImage: " + std::to_string(oldLayout));
@@ -495,36 +496,48 @@ void VulImage::transitionImageLayout(VkImageLayout oldLayout, VkImageLayout newL
     switch (newLayout) {
         case VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL:
             barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            barrier.dstStageMask = VK_PIPELINE_STAGE_2_TRANSFER_BIT;
             break;
         case VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL:
             barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-            destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+            barrier.dstStageMask = VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT;
             break;
         case VK_IMAGE_LAYOUT_GENERAL:
             barrier.dstAccessMask = VK_ACCESS_HOST_WRITE_BIT;
-            destinationStage = VK_PIPELINE_STAGE_HOST_BIT; 
+            barrier.dstStageMask = VK_PIPELINE_STAGE_2_HOST_BIT; 
             break;
         case VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL:
             barrier.dstAccessMask = attachmentPreservePreviousContents ? VK_ACCESS_COLOR_ATTACHMENT_READ_BIT :
                 VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-            destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
             break;
         case VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL:
             barrier.dstAccessMask = attachmentPreservePreviousContents ? VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT :
                 VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-            destinationStage = VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT;
+            barrier.dstStageMask = VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT;
             break;
         case VK_IMAGE_LAYOUT_PRESENT_SRC_KHR:
             barrier.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_READ_BIT;
-            destinationStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+            barrier.dstStageMask = VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT;
+            break;
+        case VK_IMAGE_LAYOUT_VIDEO_DECODE_DST_KHR:
+            barrier.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+            barrier.dstStageMask = VK_PIPELINE_STAGE_2_VIDEO_DECODE_BIT_KHR;
+            break;
+        case VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR:
+            barrier.dstAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+            barrier.dstStageMask = VK_PIPELINE_STAGE_2_VIDEO_DECODE_BIT_KHR;
             break;
         default:
             throw std::invalid_argument("unsupported new layout transition in VulImage: " + std::to_string(newLayout));
             break;
     }
 
-    vkCmdPipelineBarrier(cmdBuf, sourceStage, destinationStage, 0, 0, nullptr, 0, nullptr, 1, &barrier);
+    VkDependencyInfo dependencyInfo{};
+    dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+    dependencyInfo.pImageMemoryBarriers = &barrier;
+    dependencyInfo.imageMemoryBarrierCount = 1;
+    vkCmdPipelineBarrier2(cmdBuf, &dependencyInfo);
     m_layout = newLayout;
 }
 
@@ -929,6 +942,10 @@ VulImage::VkFormatProperties VulImage::getVkFormatProperties(VkFormat format)
             break;
         case VK_FORMAT_D32_SFLOAT:
             properties.bitsPerTexel = 32;
+            properties.sideLengthAlignment = 1;
+            break;
+        case VK_FORMAT_G8_B8R8_2PLANE_420_UNORM:
+            properties.bitsPerTexel = 12;
             properties.sideLengthAlignment = 1;
             break;
         default:

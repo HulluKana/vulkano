@@ -29,6 +29,7 @@ class VulDevice {
         VkQueue mainQueue() const { return m_mainQueue; }
         VkQueue computeQueue() const { return m_computeQueue; }
         VkQueue transferQueue() const { return m_transferQueue; }
+        VkQueue videoDecodeQueue() const { return m_videoDecodeQueue; }
         std::vector<VkQueue> sideQueues() const { return m_sideQueues; }
         VkInstance getInstace() const {return instance;}
 
@@ -86,6 +87,7 @@ class VulDevice {
         VkQueue m_mainQueue;
         VkQueue m_computeQueue;
         VkQueue m_transferQueue;
+        VkQueue m_videoDecodeQueue;
         std::vector<VkQueue> m_sideQueues;
 
         QueueFamilyIndices m_queueFamilyIndices;

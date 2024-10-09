@@ -1,8 +1,16 @@
+#include "imgui.h"
+#include "vul_GUI.hpp"
+#include "vul_buffer.hpp"
 #include "vul_command_pool.hpp"
+#include "vul_descriptors.hpp"
 #include "vul_extensions.hpp"
+#include "vul_image.hpp"
+#include "vul_renderer.hpp"
 #include "vul_window.hpp"
+#include <GLFW/glfw3.h>
 #include <bit>
 #include <cassert>
+#include <chrono>
 #include <cstring>
 #include <fstream>
 #include <iterator>
@@ -10,7 +18,9 @@
 #include <stdexcept>
 #include <climits>
 #include <string>
+#include <thread>
 #include <vk_video/vulkan_video_codec_h264std.h>
+#include <vk_video/vulkan_video_codec_h264std_decode.h>
 #include <vul_device.hpp>
 
 #include <iostream>
@@ -80,6 +90,11 @@ size_t findBoxOffset(const std::vector<uint8_t> &data, size_t startOffset, size_
         i += boxSize;
     }
     throw std::runtime_error(std::string("Did not find a box called ") + boxName);
+}
+
+uint32_t alignUp(uint32_t alignee, uint32_t aligner)
+{
+    return (alignee % aligner) ? alignee + (aligner - (alignee % aligner)) : alignee;
 }
 
 struct Block {
@@ -174,7 +189,11 @@ int main() {
 
     vul::VulWindow vulWindow(2560, 1440, "Vulkano video");
     vul::VulDevice vulDevice(vulWindow, 0, false, false, true);
+    vul::VulCmdPool decodeCmdPool(vul::VulCmdPool::QueueType::videoDecode, 0, 0, vulDevice);
     vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::main, 0, 0, vulDevice);
+    std::unique_ptr<vul::VulDescriptorPool> descPool = vul::VulDescriptorPool::Builder(vulDevice).setMaxSets(2).setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT).build();
+    vul::VulRenderer vulRenderer(vulWindow, vulDevice, nullptr);
+    vul::VulGUI vulGUi(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice, cmdPool);
 
     VkVideoDecodeH264ProfileInfoKHR videoDecodeH264ProfileInfo{};
     videoDecodeH264ProfileInfo.sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_PROFILE_INFO_KHR;
@@ -278,6 +297,108 @@ int main() {
     VkVideoSessionParametersKHR sessionParameters;
     result = vkCreateVideoSessionParametersKHR(vulDevice.device(), &sessionParametersInfo, nullptr, &sessionParameters);
     assert(result == VK_SUCCESS);
+
+    VkCommandBuffer cmdBuf = decodeCmdPool.getPrimaryCommandBuffer();
+    uint32_t blockIdx = keyFrameIndices[keyFrameIndices.size() / 2];
+    uint32_t maxBlockSize = 0;
+    for (uint32_t blockSize : blockSizes) maxBlockSize = std::max(maxBlockSize, blockSize);
+    maxBlockSize = alignUp(maxBlockSize, videoCapabilities.minBitstreamBufferSizeAlignment);
+    vul::VulBuffer srcBuffer(1, maxBlockSize, false, VK_BUFFER_USAGE_VIDEO_DECODE_SRC_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT, vulDevice);
+    uint32_t alignedBlockSize =  alignUp(blockSizes[blockIdx], videoCapabilities.minBitstreamBufferSizeAlignment);
+    vkCmdFillBuffer(cmdBuf, srcBuffer.getBuffer(), 0, maxBlockSize, 0);
+    srcBuffer.writeData(&inputData[blockOffsets[blockIdx]], blockSizes[blockIdx], 0, VK_NULL_HANDLE);
+
+    vul::VulImage dstImg(vulDevice);
+    dstImg.keepEmpty(480, 360, 1, 1, 1, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM);
+    dstImg.createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
+ 
+    VkVideoPictureResourceInfoKHR referencePictureResourceInfo{};
+    referencePictureResourceInfo.sType = VK_STRUCTURE_TYPE_VIDEO_PICTURE_RESOURCE_INFO_KHR;
+    referencePictureResourceInfo.codedExtent = {.width = 480, .height = 360};
+    referencePictureResourceInfo.codedOffset = {0, 0};
+    referencePictureResourceInfo.baseArrayLayer = 0;
+    referencePictureResourceInfo.imageViewBinding = dstImg.getImageView();
+    VkVideoReferenceSlotInfoKHR referenceSlotInfo{};
+    referenceSlotInfo.sType = VK_STRUCTURE_TYPE_VIDEO_REFERENCE_SLOT_INFO_KHR;
+    referenceSlotInfo.slotIndex = 0;
+    referenceSlotInfo.pPictureResource = &referencePictureResourceInfo;
+    VkVideoBeginCodingInfoKHR videoCodingBeginInfo{};
+    videoCodingBeginInfo.sType = VK_STRUCTURE_TYPE_VIDEO_BEGIN_CODING_INFO_KHR;
+    videoCodingBeginInfo.videoSession = videoSession;
+    videoCodingBeginInfo.videoSessionParameters = sessionParameters;
+    videoCodingBeginInfo.referenceSlotCount = 1;
+    videoCodingBeginInfo.pReferenceSlots = &referenceSlotInfo;
+    vkCmdBeginVideoCodingKHR(cmdBuf, &videoCodingBeginInfo);
+
+    VkVideoCodingControlInfoKHR codingControlInfo{};
+    codingControlInfo.sType = VK_STRUCTURE_TYPE_VIDEO_CODING_CONTROL_INFO_KHR;
+    codingControlInfo.flags = VK_VIDEO_CODING_CONTROL_RESET_BIT_KHR;
+    vkCmdControlVideoCodingKHR(cmdBuf, &codingControlInfo);
+
+    StdVideoDecodeH264PictureInfo stdDecodeH264PictureInfo{};
+    stdDecodeH264PictureInfo.flags.is_reference = true;
+    VkVideoDecodeH264PictureInfoKHR decodeH264PictureInfo{};
+    decodeH264PictureInfo.sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_PICTURE_INFO_KHR;
+    decodeH264PictureInfo.pStdPictureInfo = &stdDecodeH264PictureInfo;
+    decodeH264PictureInfo.sliceCount = 1;
+    uint32_t sliceOffset = 0;
+    decodeH264PictureInfo.pSliceOffsets = &sliceOffset;
+    VkVideoPictureResourceInfoKHR dstPictureResourceInfo{};
+    dstPictureResourceInfo.sType = VK_STRUCTURE_TYPE_VIDEO_PICTURE_RESOURCE_INFO_KHR;
+    dstPictureResourceInfo.codedExtent = {.width = 480, .height = 360};
+    dstPictureResourceInfo.codedOffset = {0, 0};
+    dstPictureResourceInfo.baseArrayLayer = 0;
+    dstPictureResourceInfo.imageViewBinding = dstImg.getImageView();
+    StdVideoDecodeH264ReferenceInfo stdDecodeH264ReferenceInfo{};
+    VkVideoDecodeH264DpbSlotInfoKHR decodeH264DpbSlotInfo{};
+    decodeH264DpbSlotInfo.sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_DPB_SLOT_INFO_KHR;
+    decodeH264DpbSlotInfo.pStdReferenceInfo = &stdDecodeH264ReferenceInfo;
+    VkVideoReferenceSlotInfoKHR setupReferenceSlotInfo{};
+    setupReferenceSlotInfo.pNext = &decodeH264DpbSlotInfo;
+    setupReferenceSlotInfo.sType = VK_STRUCTURE_TYPE_VIDEO_REFERENCE_SLOT_INFO_KHR;
+    setupReferenceSlotInfo.slotIndex = 0;
+    setupReferenceSlotInfo.pPictureResource = &dstPictureResourceInfo;
+    VkVideoDecodeInfoKHR decodeInfo{};
+    decodeInfo.sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_INFO_KHR;
+    decodeInfo.pNext = &decodeH264PictureInfo;
+    decodeInfo.referenceSlotCount = 0;
+    decodeInfo.srcBuffer = srcBuffer.getBuffer();
+    decodeInfo.srcBufferRange = alignedBlockSize;
+    decodeInfo.dstPictureResource = dstPictureResourceInfo;
+    decodeInfo.pSetupReferenceSlot = &setupReferenceSlotInfo;
+    vkCmdDecodeVideoKHR(cmdBuf, &decodeInfo);
+
+    VkVideoEndCodingInfoKHR videoCodingEndInfo{};
+    videoCodingEndInfo.sType = VK_STRUCTURE_TYPE_VIDEO_END_CODING_INFO_KHR;
+    vkCmdEndVideoCodingKHR(cmdBuf, &videoCodingEndInfo);
+    decodeCmdPool.submit(cmdBuf, true);
+
+    cmdBuf = decodeCmdPool.getPrimaryCommandBuffer();
+    dstImg.transitionImageLayout(VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmdBuf, vulDevice.getQueueFamilies().videoDecodeFamily, vulDevice.getQueueFamilies().mainFamily);
+    decodeCmdPool.submit(cmdBuf, true);
+    cmdBuf = cmdPool.getPrimaryCommandBuffer();
+    dstImg.transitionImageLayout(VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmdBuf, vulDevice.getQueueFamilies().videoDecodeFamily, vulDevice.getQueueFamilies().mainFamily);
+    cmdPool.submit(cmdBuf, true);
+    dstImg.vulSampler = vul::VulSampler::createDefaultTexSampler(vulDevice);
+    vul::VulDescriptorSet::Descriptor desc{};
+    desc.type = vul::VulDescriptorSet::DescriptorType::combinedImgSampler;
+    desc.stages = VK_SHADER_STAGE_FRAGMENT_BIT;
+    desc.count = 1;
+    desc.content = &dstImg;
+    const std::unique_ptr<vul::VulDescriptorSet> descSet = vul::VulDescriptorSet::createDescriptorSet({desc}, *descPool);
+    while (!vulWindow.shouldClose()) {
+        glfwPollEvents();
+        VkCommandBuffer cmdBuf = vulRenderer.beginFrame();
+        vulGUi.startFrame();
+        ImGui::Begin("Result img");
+        ImGui::Image(descSet->getSet(), {480, 360});
+        ImGui::End();
+        vulRenderer.beginRendering(cmdBuf, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent, vul::VulRenderer::DepthImageMode::noDepthImage, {}, {}, {1.0f, 1.0f, 1.0f, 1.0f}, {}, 0, 0, 1);
+        vulGUi.endFrame(cmdBuf);
+        vulRenderer.stopRendering(cmdBuf);
+        vulRenderer.endFrame();
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
  
     vulDevice.waitForIdle();
     vkDestroyVideoSessionParametersKHR(vulDevice.device(), sessionParameters, nullptr);

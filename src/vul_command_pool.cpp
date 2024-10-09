@@ -20,6 +20,9 @@ VulCmdPool::VulCmdPool(QueueType queueType, uint32_t preallocatePrimaryBufferCou
     } else if (queueType == QueueType::transfer) {
         cmdPoolInfo.queueFamilyIndex = vulDevice.getQueueFamilies().transferFamily;
         m_queue = vulDevice.transferQueue();
+    } else if (queueType == QueueType::videoDecode) {
+        cmdPoolInfo.queueFamilyIndex = vulDevice.getQueueFamilies().videoDecodeFamily;
+        m_queue = vulDevice.videoDecodeQueue();
     } else if (queueType == QueueType::side) {
         cmdPoolInfo.queueFamilyIndex = vulDevice.getQueueFamilies().mainFamily;
         m_queue = vulDevice.sideQueues()[sideQueueIndex];
