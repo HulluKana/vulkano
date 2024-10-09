@@ -88,3 +88,4 @@
 /samplePrograms/video/cd
 /samplePrograms/video/*.mp4
 /samplePrograms/video/*.mkv
+/samplePrograms/video/*.txt

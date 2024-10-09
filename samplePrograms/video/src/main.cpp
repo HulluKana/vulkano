@@ -35,6 +35,14 @@ T readValue(const std::vector<uint8_t> &data, size_t offset)
     return swapEndian(*reinterpret_cast<const T *>(&data[offset]));
 }
 
+template <typename T>
+T readValueAndProceed(const std::vector<uint8_t> &data, size_t &offset)
+{
+    T value = swapEndian(*reinterpret_cast<const T *>(&data[offset]));
+    offset += sizeof(T);
+    return value;
+}
+
 bool compare4byteStr(char *str, const char *testStr)
 {
     return str[0] == testStr[0] && str[1] == testStr[1] && str[2] == testStr[2] && str[3] == testStr[3];
@@ -54,6 +62,13 @@ size_t checkBoxValidityAndReturnSize(const std::vector<uint8_t> &data, size_t of
     return boxSize;
 }
 
+size_t checkBoxValidityReturnSizeAndProceed(const std::vector<uint8_t> &data, size_t &offset, const char *testStr, const char *errStr)
+{
+    uint32_t size = checkBoxValidityAndReturnSize(data, offset, testStr, errStr);
+    offset += 8;
+    return size;
+}
+
 size_t findBoxOffset(const std::vector<uint8_t> &data, size_t startOffset, size_t endOffset, const char *boxName)
 {
     for (size_t i = startOffset; i < endOffset;) {
@@ -67,49 +82,94 @@ size_t findBoxOffset(const std::vector<uint8_t> &data, size_t startOffset, size_
     throw std::runtime_error(std::string("Did not find a box called ") + boxName);
 }
 
+struct Block {
+    uint32_t nextBlock;
+    uint32_t frameCount;
+    uint32_t samplesDescriptionId;
+};
+
 int main() {
     std::ifstream inputFile("../badAppleVideo.mp4", std::ios::binary);
     if (!inputFile.is_open()) throw std::runtime_error("Failed to open video file\n");
     std::vector<uint8_t> inputData(std::istreambuf_iterator<char>(inputFile), {});
     size_t index = 0;
     index += checkBoxValidityAndReturnSize(inputData, index, "ftyp", "Not a valid mp4 file\n");
-    checkBoxValidityAndReturnSize(inputData, index, "moov", "Expected moov\n");
+    const size_t freeIndex = index + checkBoxValidityAndReturnSize(inputData, index, "moov", "Expected moov\n");
     index += 8;
     index += checkBoxValidityAndReturnSize(inputData, index, "mvhd", "Expected mvhd\n");
-    checkBoxValidityAndReturnSize(inputData, index, "trak", "Expected trak\n");
-    index += 8;
+    checkBoxValidityReturnSizeAndProceed(inputData, index, "trak", "Expected trak\n");
     index += checkBoxValidityAndReturnSize(inputData, index, "tkhd", "Expected tkhd\n");
-    checkBoxValidityAndReturnSize(inputData, index, "edts", "Expected edts\n");
-    index += 8;
+    checkBoxValidityReturnSizeAndProceed(inputData, index, "edts", "Expected edts\n");
     index += checkBoxValidityAndReturnSize(inputData, index, "elst", "Expected elst\n");
-    checkBoxValidityAndReturnSize(inputData, index, "mdia", "Expected mdia\n");
+    checkBoxValidityReturnSizeAndProceed(inputData, index, "mdia", "Expected mdia\n");
+    const size_t hdlrIndex = index + checkBoxValidityAndReturnSize(inputData, index, "mdhd", "Expected mdhd\n");
     index += 8;
-    index += checkBoxValidityAndReturnSize(inputData, index, "mdhd", "Expected mdhd\n");
-    index += checkBoxValidityAndReturnSize(inputData, index, "hdlr", "Expected hdlr\n");
-    checkBoxValidityAndReturnSize(inputData, index, "minf", "Expected minf\n");
-    index += 8;
+    if (readValue<uint32_t>(inputData, index++) != 0) throw std::runtime_error("Version is not 0\n");
+    index += 11;
+    const uint32_t tickRate = readValue<uint32_t>(inputData, index);
+    index += 4;
+    const uint32_t duration = readValue<uint32_t>(inputData, index);
+    index = hdlrIndex + checkBoxValidityAndReturnSize(inputData, hdlrIndex, "hdlr", "Expected hdlr\n");
+    checkBoxValidityReturnSizeAndProceed(inputData, index, "minf", "Expected minf\n");
     index += checkBoxValidityAndReturnSize(inputData, index, "vmhd", "Expected vmhd\n");
-    checkBoxValidityAndReturnSize(inputData, index, "dinf", "Expected dinf\n");
-    index += 8;
+    checkBoxValidityReturnSizeAndProceed(inputData, index, "dinf", "Expected dinf\n");
     index += checkBoxValidityAndReturnSize(inputData, index, "dref", "Expected dref\n");
-    checkBoxValidityAndReturnSize(inputData, index, "stbl", "Expected stbl\n");
-    index += 8;
-    size_t stsdEndIndex = checkBoxValidityAndReturnSize(inputData, index, "stsd", "Expected stsd\n") + index;
+    checkBoxValidityReturnSizeAndProceed(inputData, index, "stbl", "Expected stbl\n");
+    const size_t stsdEndIndex = checkBoxValidityAndReturnSize(inputData, index, "stsd", "Expected stsd\n") + index;
     index += 12;
-    if (readValue<uint32_t>(inputData, index) != 1) throw std::runtime_error("Description count isnt 1\n");
-    index += 8;
+    if (readValueAndProceed<uint32_t>(inputData, index) != 1) throw std::runtime_error("Description count isnt 1\n");
+    index += 4;
     getAndValidate4byteStr(inputData, index, "avc1", "Expected avc1\n"); 
     index += 80;
-    if (readValue<int16_t>(inputData, index) != -1) throw std::runtime_error("Quicktime table exists\n");
-    index += 2;
+    if (readValueAndProceed<int16_t>(inputData, index) != -1) throw std::runtime_error("Quicktime table exists\n");
     index = findBoxOffset(inputData, index, stsdEndIndex, "avcC");
     index += 12;
     /*uint32_t nalLength = (inputData[index++] & 0b11) + 1*/index++;
     if ((inputData[index++] & 0b11111) != 1) throw std::runtime_error("SPS count isnt 1\n");
-    uint32_t spsSize = readValue<uint16_t>(inputData, index);
-    index += spsSize + 2;
+    const uint32_t spsSize = readValueAndProceed<uint16_t>(inputData, index);
+    index += spsSize;
     if (inputData[index++] != 1) throw std::runtime_error("PPS count isnt 1\n");
     //uint32_t ppsSize = readValue<uint16_t>(inputData, index);
+    index = stsdEndIndex;
+    checkBoxValidityReturnSizeAndProceed(inputData, index, "stts", "Expected stts\n");
+    index += 4;
+    if (readValueAndProceed<uint32_t>(inputData, index) != 1) throw std::runtime_error("Time count isn't 1\n");
+    const uint32_t frameCount = readValueAndProceed<uint32_t>(inputData, index);
+    const uint32_t frameDuration = readValueAndProceed<uint32_t>(inputData, index);
+    checkBoxValidityReturnSizeAndProceed(inputData, index, "stss", "Expected stss\n");
+    index += 4;
+    const uint32_t keyFrameCount = readValueAndProceed<uint32_t>(inputData, index);
+    std::vector<uint32_t> keyFrameIndices(keyFrameCount);
+    for (uint32_t i = 0; i < keyFrameCount; i++) {
+        const uint32_t keyFrameIdx = readValueAndProceed<uint32_t>(inputData, index);
+        keyFrameIndices[i] = keyFrameIdx;
+    }
+    index += checkBoxValidityAndReturnSize(inputData, index, "ctts", "Expected ctts\n");
+    checkBoxValidityReturnSizeAndProceed(inputData, index, "stsc", "Expected stsc\n");
+    index += 4;
+    const uint32_t blockCount = readValueAndProceed<uint32_t>(inputData, index);
+    std::vector<Block> blocks(blockCount);
+    for (uint32_t i = 0; i < blockCount; i++) {
+        const uint32_t nextBlock = readValueAndProceed<uint32_t>(inputData, index);
+        const uint32_t frameCount = readValueAndProceed<uint32_t>(inputData, index);
+        const uint32_t samplesDescriptionId = readValueAndProceed<uint32_t>(inputData, index);
+        blocks[i] = {.nextBlock = nextBlock, .frameCount = frameCount, .samplesDescriptionId = samplesDescriptionId};
+    }
+    checkBoxValidityReturnSizeAndProceed(inputData, index, "stsz", "Expected stsz\n");
+    index += 8;
+    const uint32_t blockSizeCount = readValueAndProceed<uint32_t>(inputData, index);
+    std::vector<uint32_t> blockSizes(blockSizeCount);
+    for (uint32_t i = 0; i < blockSizeCount; i++) blockSizes[i] = readValueAndProceed<uint32_t>(inputData, index);
+    checkBoxValidityReturnSizeAndProceed(inputData, index, "stco", "Expected stco\n");
+    index += 4;
+    const uint32_t blockOffsetCount = readValueAndProceed<uint32_t>(inputData, index);
+    if (blockSizeCount != blockOffsetCount + 1) throw std::runtime_error("Block offset count is not one less than block size count\n");
+    std::vector<uint32_t> blockOffsets(blockOffsetCount);
+    for (uint32_t i = 0; i < blockOffsetCount; i++) blockOffsets[i] = readValueAndProceed<uint32_t>(inputData, index);
+    index = freeIndex + checkBoxValidityAndReturnSize(inputData, freeIndex, "free", "Expected free\n");
+    size_t mdatSize = checkBoxValidityAndReturnSize(inputData, index, "mdat", "expected mdat\n");
+    if (mdatSize <= 1) throw std::runtime_error("mdat size is less than or equal 1\n");
+
 
 
     vul::VulWindow vulWindow(2560, 1440, "Vulkano video");
