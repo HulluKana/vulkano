@@ -7,22 +7,25 @@
 #include <cassert>
 #include <stdexcept>
 #include <iostream>
+#include <vulkan/vulkan_core.h>
  
 namespace vul {
  
 // *************** Descriptor Set Layout Builder *********************
 
 VulDescriptorSetLayout::Builder &VulDescriptorSetLayout::Builder::addBinding(
-        uint32_t binding,
-        VkDescriptorType descriptorType,
-        VkShaderStageFlags stageFlags,
-        uint32_t count) {
+                        uint32_t binding,
+                        VkDescriptorType descriptorType,
+                        VkShaderStageFlags stageFlags,
+                        const std::vector<VkSampler> &immutableSamplers,
+                        uint32_t count) {
     assert(bindings.count(binding) == 0 && "Binding already in use");
     VkDescriptorSetLayoutBinding layoutBinding{};
     layoutBinding.binding = binding;
     layoutBinding.descriptorType = descriptorType;
     layoutBinding.descriptorCount = count;
     layoutBinding.stageFlags = stageFlags;
+    if (immutableSamplers.size() != 0) layoutBinding.pImmutableSamplers = immutableSamplers.data();
     bindings[binding] = layoutBinding;
     return *this;
 }
@@ -275,17 +278,26 @@ void VulDescriptorSet::overwrite() {
 std::unique_ptr<VulDescriptorSet> VulDescriptorSet::createDescriptorSet(const std::vector<Descriptor> &descriptors, const VulDescriptorPool &pool)
 {
     VulDescriptorSetLayout::Builder layoutBuilder = VulDescriptorSetLayout::Builder(pool.vulDevice);
+    std::vector<VkSampler> immutableSamplers;
     for (size_t i = 0; i < descriptors.size(); i++){
         VkDescriptorType type{};
         if (descriptors[i].type == DescriptorType::uniformBuffer) type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
         else if (descriptors[i].type == DescriptorType::storageBuffer) type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         else if (descriptors[i].type == DescriptorType::combinedImgSampler ||
-            descriptors[i].type == DescriptorType::spCombinedImgSampler || descriptors[i].type == DescriptorType::upCombinedImgSampler)
+            descriptors[i].type == DescriptorType::spCombinedImgSampler || descriptors[i].type == DescriptorType::upCombinedImgSampler
+            || descriptors[i].type == DescriptorType::combinedImgImmutableSampler)
             type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         else if (descriptors[i].type == DescriptorType::rawImageInfo) type = static_cast<const RawImageDescriptorInfo *>(descriptors[i].content)->descriptorType;
         else if (descriptors[i].type == DescriptorType::storageImage) type = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
         else if (descriptors[i].type == DescriptorType::accelerationStructure) type = VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR;
-        layoutBuilder.addBinding(i, type, descriptors[i].stages, descriptors[i].count);
+        if (descriptors[i].type == DescriptorType::combinedImgImmutableSampler) {
+            const vul::VulImage *imgs = static_cast<const vul::VulImage *>(descriptors[i].content);
+            for (uint32_t j = 0; j < descriptors[i].count; j++) {
+                assert(imgs[j].vulSampler != nullptr);
+                immutableSamplers.push_back(imgs[j].vulSampler->getSampler());
+            }
+        }
+        layoutBuilder.addBinding(i, type, descriptors[i].stages, immutableSamplers, descriptors[i].count);
     }
     std::shared_ptr<VulDescriptorSetLayout> layout = layoutBuilder.build();
 
@@ -303,7 +315,7 @@ std::unique_ptr<VulDescriptorSet> VulDescriptorSet::createDescriptorSet(const st
             bufferInfosStorage.push_back(bufferInfos);
             set->writeBuffer(i, bufferInfosStorage[bufferInfosStorage.size() - 1].data(), desc.count);
         }
-        if (desc.type == DescriptorType::combinedImgSampler){
+        if (desc.type == DescriptorType::combinedImgSampler || desc.type == DescriptorType::combinedImgImmutableSampler){
             const VulImage *image = static_cast<const VulImage *>(desc.content);
             std::vector<VkDescriptorImageInfo> imageInfos(desc.count);
             for (uint32_t j = 0; j < desc.count; j++){

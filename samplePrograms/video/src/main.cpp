@@ -1,20 +1,17 @@
-#include "imgui.h"
-#include "vul_GUI.hpp"
 #include "vul_buffer.hpp"
 #include "vul_command_pool.hpp"
 #include "vul_descriptors.hpp"
-#include "vul_extensions.hpp"
 #include "vul_image.hpp"
+#include "vul_pipeline.hpp"
 #include "vul_renderer.hpp"
+#include "vul_scene.hpp"
 #include "vul_window.hpp"
 #include <GLFW/glfw3.h>
-#include <bit>
 #include <cassert>
 #include <chrono>
 #include <cstring>
 #include <fstream>
 #include <iterator>
-#include <limits>
 #include <stdexcept>
 #include <climits>
 #include <string>
@@ -193,7 +190,6 @@ int main() {
     vul::VulCmdPool cmdPool(vul::VulCmdPool::QueueType::main, 0, 0, vulDevice);
     std::unique_ptr<vul::VulDescriptorPool> descPool = vul::VulDescriptorPool::Builder(vulDevice).setMaxSets(2).setPoolFlags(VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT).build();
     vul::VulRenderer vulRenderer(vulWindow, vulDevice, nullptr);
-    vul::VulGUI vulGUi(vulWindow.getGLFWwindow(), descPool->getDescriptorPoolReference(), vulRenderer, vulDevice, cmdPool);
 
     VkVideoDecodeH264ProfileInfoKHR videoDecodeH264ProfileInfo{};
     videoDecodeH264ProfileInfo.sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_PROFILE_INFO_KHR;
@@ -309,8 +305,10 @@ int main() {
     srcBuffer.writeData(&inputData[blockOffsets[blockIdx]], blockSizes[blockIdx], 0, VK_NULL_HANDLE);
 
     vul::VulImage dstImg(vulDevice);
+    dstImg.vulSampler = vul::VulSampler::createCustomSampler(vulDevice, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE, 0.0f,
+            {}, {}, false, {}, 0.0f, 0.0f, 1.0f, true, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, videoFormatProperties[0].componentMapping);
     dstImg.keepEmpty(480, 360, 1, 1, 1, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM);
-    dstImg.createCustomImage(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, cmdBuf);
+    dstImg.createCustomImageYcbcr(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, dstImg.vulSampler->getYcbcrConversion(), cmdBuf);
  
     VkVideoPictureResourceInfoKHR referencePictureResourceInfo{};
     referencePictureResourceInfo.sType = VK_STRUCTURE_TYPE_VIDEO_PICTURE_RESOURCE_INFO_KHR;
@@ -320,7 +318,7 @@ int main() {
     referencePictureResourceInfo.imageViewBinding = dstImg.getImageView();
     VkVideoReferenceSlotInfoKHR referenceSlotInfo{};
     referenceSlotInfo.sType = VK_STRUCTURE_TYPE_VIDEO_REFERENCE_SLOT_INFO_KHR;
-    referenceSlotInfo.slotIndex = 0;
+    referenceSlotInfo.slotIndex = -1;
     referenceSlotInfo.pPictureResource = &referencePictureResourceInfo;
     VkVideoBeginCodingInfoKHR videoCodingBeginInfo{};
     videoCodingBeginInfo.sType = VK_STRUCTURE_TYPE_VIDEO_BEGIN_CODING_INFO_KHR;
@@ -379,22 +377,32 @@ int main() {
     cmdBuf = cmdPool.getPrimaryCommandBuffer();
     dstImg.transitionImageLayout(VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmdBuf, vulDevice.getQueueFamilies().videoDecodeFamily, vulDevice.getQueueFamilies().mainFamily);
     cmdPool.submit(cmdBuf, true);
-    dstImg.vulSampler = vul::VulSampler::createDefaultTexSampler(vulDevice);
     vul::VulDescriptorSet::Descriptor desc{};
-    desc.type = vul::VulDescriptorSet::DescriptorType::combinedImgSampler;
+    desc.type = vul::VulDescriptorSet::DescriptorType::combinedImgImmutableSampler;
     desc.stages = VK_SHADER_STAGE_FRAGMENT_BIT;
     desc.count = 1;
     desc.content = &dstImg;
     const std::unique_ptr<vul::VulDescriptorSet> descSet = vul::VulDescriptorSet::createDescriptorSet({desc}, *descPool);
+    
+    vul::VulPipeline::PipelineConfigInfo pipelineConfig{};
+    pipelineConfig.setLayouts = {descSet->getLayout()->getDescriptorSetLayout()};
+    pipelineConfig.bindingDescriptions = {{0, sizeof(glm::vec3), VK_VERTEX_INPUT_RATE_VERTEX}, {1, sizeof(glm::vec2), VK_VERTEX_INPUT_RATE_VERTEX}};
+    pipelineConfig.attributeDescriptions = {{0, 0, VK_FORMAT_R32G32B32_SFLOAT, 0}, {1, 1, VK_FORMAT_R32G32_SFLOAT, 0}};
+    pipelineConfig.colorAttachmentFormats = {vulRenderer.getSwapChainColorFormat()};
+    vul::VulPipeline pipeline(vulDevice, "display.vert.spv", "display.frag.spv", pipelineConfig);
+
+    vul::Scene scene(vulDevice);
+    scene.loadPlanes({{{-1.0f, 1.0f, 0.5f}, {1.0f, 1.0f, 0.5f}, {-1.0f, -1.0f, 0.5f}, {1.0f, -1.0f, 0.5f}, 0}}, {},
+            vul::Scene::WantedBuffers{.normal = false, .tangent = false, .material = false}, cmdPool);
+    vul::VulPipeline::DrawData drawData{};
+    drawData.indexCount = scene.indices.size();
+
     while (!vulWindow.shouldClose()) {
         glfwPollEvents();
         VkCommandBuffer cmdBuf = vulRenderer.beginFrame();
-        vulGUi.startFrame();
-        ImGui::Begin("Result img");
-        ImGui::Image(descSet->getSet(), {480, 360});
-        ImGui::End();
+        if (cmdBuf == VK_NULL_HANDLE) continue;
         vulRenderer.beginRendering(cmdBuf, vul::VulRenderer::SwapChainImageMode::clearPreviousStoreCurrent, vul::VulRenderer::DepthImageMode::noDepthImage, {}, {}, {1.0f, 1.0f, 1.0f, 1.0f}, {}, 0, 0, 1);
-        vulGUi.endFrame(cmdBuf);
+        pipeline.draw(cmdBuf, {descSet->getSet()}, {scene.vertexBuffer->getBuffer(), scene.uvBuffer->getBuffer()}, scene.indexBuffer->getBuffer(), {drawData});
         vulRenderer.stopRendering(cmdBuf);
         vulRenderer.endFrame();
         std::this_thread::sleep_for(std::chrono::milliseconds(10));

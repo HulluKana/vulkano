@@ -21,15 +21,19 @@ class VulSampler {
         static std::shared_ptr<VulSampler> createCustomSampler(const VulDevice &vulDevice, VkFilter filter,
                 VkSamplerAddressMode addressMode, float maxAnisotropy, VkBorderColor borderColor,
                 VkSamplerMipmapMode mipMapMode, bool enableSamplerReduction, VkSamplerReductionMode samplerReductionMode,
-                float mipLodBias, float mipMinLod, float mipMaxLod);
+                float mipLodBias, float mipMinLod, float mipMaxLod, bool enableYcbcr, VkFormat YcbcrFormat,
+                VkComponentMapping YcbcrComponentMapping);
 
         VkSampler getSampler() const {return m_sampler;}
+        VkSamplerYcbcrConversion getYcbcrConversion() const {return m_ycbcrConversion;}
     private:
         VulSampler(const VulDevice &vulDevice, VkFilter filter, VkSamplerAddressMode addressMode, float maxAnisotropy,
                 VkBorderColor borderColor, VkSamplerMipmapMode mipMapMode, bool enableSamplerReduction,
-                VkSamplerReductionMode samplerReductionMode, float mipLodBias, float mipMinLod, float mipMaxLod);
+                VkSamplerReductionMode samplerReductionMode, float mipLodBias, float mipMinLod, float mipMaxLod,
+                bool enableYcbcr, VkFormat YcbcrFormat, VkComponentMapping YcbcrComponentMapping);
         const VulDevice &m_vulDevice;
         VkSampler m_sampler = VK_NULL_HANDLE;
+        VkSamplerYcbcrConversion m_ycbcrConversion = VK_NULL_HANDLE;
 };
 
 
@@ -151,6 +155,9 @@ class VulImage {
         std::unique_ptr<OldVkImageStuff> createDefaultImage(ImageType type, VkCommandBuffer cmdBuf);
         std::unique_ptr<OldVkImageStuff> createCustomImage(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
                 VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf);
+        std::unique_ptr<OldVkImageStuff> createCustomImageYcbcr(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
+                VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect,
+                VkSamplerYcbcrConversion ycbcrConversion, VkCommandBuffer cmdBuf);
         std::unique_ptr<OldVkImageStuff> createCustomImageSparse(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
                 VkMemoryPropertyFlags memoryProperties, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf);
         void allocateSparseMemory(const std::vector<uint32_t> &blockCounts);
@@ -227,7 +234,7 @@ class VulImage {
                 VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect);
         void createVkImage(VkImageCreateFlags flags);
         void allocateVkMemory();
-        VkImageView createImageView(uint32_t baseMipLevel, uint32_t mipLevelCount);
+        VkImageView createImageView(uint32_t baseMipLevel, uint32_t mipLevelCount, VkSamplerYcbcrConversion ycbcrConversion);
         void copyBufferToImage(VkBuffer buffer, VkDeviceSize offset, uint32_t mipLevel, VkCommandBuffer cmdBuf);
 
         uint32_t alignUp(uint32_t alignee, uint32_t aligner);

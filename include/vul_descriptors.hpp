@@ -20,7 +20,8 @@ class VulDescriptorSetLayout {
                         uint32_t binding,
                         VkDescriptorType descriptorType,
                         VkShaderStageFlags stageFlags,
-                        uint32_t count = 1);
+                        const std::vector<VkSampler> &immutableSamplers,
+                        uint32_t count);
                 std::unique_ptr<VulDescriptorSetLayout> build() const;
 
             private:
@@ -95,6 +96,7 @@ class VulDescriptorSet{
             combinedImgSampler,
             spCombinedImgSampler,
             upCombinedImgSampler,
+            combinedImgImmutableSampler,
             rawImageInfo,
             storageImage,
             accelerationStructure 

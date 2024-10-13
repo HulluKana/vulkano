@@ -25,9 +25,27 @@ namespace vul {
 
 VulSampler::VulSampler(const VulDevice &vulDevice, VkFilter filter, VkSamplerAddressMode addressMode, float maxAnisotropy,
                 VkBorderColor borderColor, VkSamplerMipmapMode mipMapMode, bool enableSamplerReduction,
-                VkSamplerReductionMode samplerReductionMode, float mipLodBias, float mipMinLod, float mipMaxLod)
+                VkSamplerReductionMode samplerReductionMode, float mipLodBias, float mipMinLod, float mipMaxLod,
+                bool enableYcbcr, VkFormat YcbcrFormat, VkComponentMapping YcbcrComponentMapping)
     : m_vulDevice{vulDevice}
 {
+    VkSamplerYcbcrConversionInfo ycbcrConversionInfo{};
+    ycbcrConversionInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO;
+    if (enableYcbcr) {
+        VkSamplerYcbcrConversionCreateInfo ycbcrConversionCreateInfo{};
+        ycbcrConversionCreateInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_CREATE_INFO;
+        ycbcrConversionCreateInfo.ycbcrModel = VK_SAMPLER_YCBCR_MODEL_CONVERSION_YCBCR_IDENTITY;
+        ycbcrConversionCreateInfo.ycbcrRange = VK_SAMPLER_YCBCR_RANGE_ITU_FULL;
+        ycbcrConversionCreateInfo.xChromaOffset = VK_CHROMA_LOCATION_MIDPOINT;
+        ycbcrConversionCreateInfo.yChromaOffset = VK_CHROMA_LOCATION_MIDPOINT;
+        ycbcrConversionCreateInfo.forceExplicitReconstruction = VK_FALSE;
+        ycbcrConversionCreateInfo.chromaFilter = filter;
+        ycbcrConversionCreateInfo.format = YcbcrFormat;
+        ycbcrConversionCreateInfo.components = YcbcrComponentMapping;
+        vkCreateSamplerYcbcrConversion(m_vulDevice.device(), &ycbcrConversionCreateInfo, nullptr, &m_ycbcrConversion);
+        ycbcrConversionInfo.conversion = m_ycbcrConversion;
+    }
+
     VkSamplerReductionModeCreateInfo reductionModeInfo{};
     reductionModeInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_REDUCTION_MODE_CREATE_INFO;
     reductionModeInfo.reductionMode = samplerReductionMode;
@@ -35,6 +53,10 @@ VulSampler::VulSampler(const VulDevice &vulDevice, VkFilter filter, VkSamplerAdd
     VkSamplerCreateInfo samplerInfo{};
     samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
     if (enableSamplerReduction) samplerInfo.pNext = &reductionModeInfo;
+    if (enableYcbcr) {
+        if (enableSamplerReduction) reductionModeInfo.pNext = &ycbcrConversionInfo;
+        else samplerInfo.pNext = &ycbcrConversionInfo;
+    }
     samplerInfo.magFilter = filter;
     samplerInfo.minFilter = filter;
     samplerInfo.addressModeU = addressMode;
@@ -62,26 +84,28 @@ VulSampler::VulSampler(const VulDevice &vulDevice, VkFilter filter, VkSamplerAdd
 VulSampler::~VulSampler()
 {
     if (m_sampler != VK_NULL_HANDLE) vkDestroySampler(m_vulDevice.device(), m_sampler, nullptr);
+    if (m_ycbcrConversion != VK_NULL_HANDLE) vkDestroySamplerYcbcrConversion(m_vulDevice.device(), m_ycbcrConversion, nullptr);
 }
 
 std::shared_ptr<VulSampler> VulSampler::createDefaultTexSampler(const vul::VulDevice &vulDevice)
 {
     std::shared_ptr<VulSampler> sampler;
     sampler.reset(new VulSampler{vulDevice, VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_REPEAT,
-            vulDevice.properties.limits.maxSamplerAnisotropy, VK_BORDER_COLOR_INT_OPAQUE_BLACK,
-            VK_SAMPLER_MIPMAP_MODE_LINEAR, false, VK_SAMPLER_REDUCTION_MODE_WEIGHTED_AVERAGE,
-            0.0f, 0.0f, 69.0f});
+            vulDevice.properties.limits.maxSamplerAnisotropy, {}, VK_SAMPLER_MIPMAP_MODE_LINEAR,
+            false, {}, 0.0f, 0.0f, 69.0f, false, {}, {}});
     return sampler;
 }
 
 std::shared_ptr<VulSampler> VulSampler::createCustomSampler(const VulDevice &vulDevice, VkFilter filter,
-                VkSamplerAddressMode addressMode, float maxAnisotropy, VkBorderColor borderColor, VkSamplerMipmapMode mipMapMode,
-                bool enableSamplerReduction, VkSamplerReductionMode samplerReductionMode,
-                float mipLodBias, float mipMinLod, float mipMaxLod)
+                VkSamplerAddressMode addressMode, float maxAnisotropy, VkBorderColor borderColor,
+                VkSamplerMipmapMode mipMapMode, bool enableSamplerReduction, VkSamplerReductionMode samplerReductionMode,
+                float mipLodBias, float mipMinLod, float mipMaxLod, bool enableYcbcr, VkFormat YcbcrFormat,
+                VkComponentMapping YcbcrComponentMapping)
 {
     std::shared_ptr<VulSampler> sampler;
     sampler.reset(new VulSampler{vulDevice, filter, addressMode, maxAnisotropy, borderColor,
-            mipMapMode, enableSamplerReduction, samplerReductionMode, mipLodBias, mipMinLod, mipMaxLod});
+            mipMapMode, enableSamplerReduction, samplerReductionMode, mipLodBias, mipMinLod, mipMaxLod,
+            enableYcbcr, YcbcrFormat, YcbcrComponentMapping});
     return sampler;
 }
 
@@ -275,7 +299,7 @@ std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImage(VkImageVi
     std::unique_ptr<VulImage::OldVkImageStuff> oldVkImageStuff = prepareImageCreation(type, usage, memoryProperties, tiling, aspect);
     createVkImage((usage & (VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR)) ? VK_IMAGE_CREATE_VIDEO_PROFILE_INDEPENDENT_BIT_KHR : 0);
     allocateVkMemory();
-    m_imageView = createImageView(0, m_mipLevels.size());
+    m_imageView = createImageView(0, m_mipLevels.size(), VK_NULL_HANDLE);
 
     const bool isDeviceLocal = memoryProperties & VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
     bool containsData = false;
@@ -303,6 +327,19 @@ std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImage(VkImageVi
     return oldVkImageStuff;
 }
 
+std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImageYcbcr(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
+                VkMemoryPropertyFlags memoryProperties, VkImageTiling tiling, VkImageAspectFlags aspect,
+                VkSamplerYcbcrConversion ycbcrConversion, VkCommandBuffer cmdBuf)
+{
+    std::unique_ptr<VulImage::OldVkImageStuff> oldVkImageStuff = prepareImageCreation(type, usage, memoryProperties, tiling, aspect);
+    createVkImage((usage & (VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR)) ? VK_IMAGE_CREATE_VIDEO_PROFILE_INDEPENDENT_BIT_KHR : 0);
+    allocateVkMemory();
+    m_imageView = createImageView(0, m_mipLevels.size(), ycbcrConversion);
+    transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, layout, cmdBuf);
+
+    return oldVkImageStuff;
+}
+
 std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImageSparse(VkImageViewType type, VkImageLayout layout, VkImageUsageFlags usage,
         VkMemoryPropertyFlags memoryProperties, VkImageAspectFlags aspect, VkCommandBuffer cmdBuf)
 {
@@ -325,7 +362,7 @@ std::unique_ptr<VulImage::OldVkImageStuff> VulImage::createCustomImageSparse(VkI
     assert(propertyCount < MAX_PROPERTIES && propertyCount > 0);
     m_sparseBlockExtent = properties[0].properties.imageGranularity;
 
-    m_imageView = createImageView(0, m_mipLevels.size());
+    m_imageView = createImageView(0, m_mipLevels.size(), VK_NULL_HANDLE);
     transitionImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, layout, cmdBuf);
 
     return oldVkImageStuff;
@@ -394,14 +431,14 @@ void VulImage::createFromVkImage(VkImage image, VkImageViewType type, VkFormat f
     m_arrayLayersCount = arrayLayerCount;
     m_mipLevels.resize(1);
     m_aspect = aspect;
-    m_imageView = createImageView(0, m_mipLevels.size());
+    m_imageView = createImageView(0, m_mipLevels.size(), VK_NULL_HANDLE);
 }
 
 void VulImage::createImageViewsForMipMaps()
 {
     m_mipImageViews.resize(m_mipLevels.size());
     for (uint32_t i = 0; i < m_mipImageViews.size(); i++) {
-        m_mipImageViews[i] = createImageView(i, 1);
+        m_mipImageViews[i] = createImageView(i, 1, VK_NULL_HANDLE);
     }
 }
 
@@ -747,10 +784,15 @@ void VulImage::allocateVkMemory()
     if (name.length() == 0) VUL_NAME_VK(m_imageMemory)
 }
 
-VkImageView VulImage::createImageView(uint32_t baseMipLevel, uint32_t mipLevelCount)
+VkImageView VulImage::createImageView(uint32_t baseMipLevel, uint32_t mipLevelCount, VkSamplerYcbcrConversion ycbcrConversion)
 {
+    VkSamplerYcbcrConversionInfo ycbcrConversionInfo{};
+    ycbcrConversionInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_YCBCR_CONVERSION_INFO;
+    ycbcrConversionInfo.conversion = ycbcrConversion;
+
     VkImageViewCreateInfo viewInfo{};
     viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    if (ycbcrConversion != VK_NULL_HANDLE) viewInfo.pNext = &ycbcrConversionInfo;
     viewInfo.image = m_image;
     viewInfo.viewType = m_imageViewType;
     viewInfo.format = m_format;

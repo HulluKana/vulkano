@@ -3,6 +3,24 @@ cmake_minimum_required(VERSION "3.22.1")
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/../bin)
 
+add_custom_target(shaders)
+
+file(GLOB_RECURSE SHADERS_SRC "../Shaders/*.vert" "../Shaders/*.frag")
+foreach(FILE ${SHADERS_SRC})
+    get_filename_component(FILE_NAME ${FILE} NAME)
+    set(COMPILED_FILE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${FILE_NAME}.spv")
+    if (${FILE} IS_NEWER_THAN ${COMPILED_FILE})
+        add_custom_command( TARGET shaders
+                            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                            DEPENDS ${FILE}
+                            COMMAND glslc --target-env=vulkan1.3 ${FILE} -o ${COMPILED_FILE}
+                            COMMENT "Compiling ${FILE_NAME}"
+        )
+    endif()
+endforeach(FILE)
+
+
+
 project(vulkanoVideo)
 project(debugVulkanoVideo)
 
@@ -12,6 +30,8 @@ add_executable(vulkanoVideo "${SRC}" "${VUL_SRC}")
 add_executable(debugVulkanoVideo "${SRC}" "${VUL_SRC}")
 target_compile_options(vulkanoVideo PRIVATE "-Wall" "-std=c++20")
 target_compile_options(debugVulkanoVideo PRIVATE "-Wall" "-g" "-std=c++20")
+add_dependencies(vulkanoVideo shaders)
+add_dependencies(debugVulkanoVideo shaders)
 
 #add_compile_definitions(VUL_ENABLE_PROFILER)
 add_compile_definitions(VUL_ENABLE_DEBUG_NAMER)
