@@ -101,13 +101,14 @@ struct Block {
 };
 
 int main() {
-    std::ifstream inputFile("../badAppleVideo.mp4", std::ios::binary);
+    std::ifstream inputFile("../shortBadAppleVideo.mp4", std::ios::binary);
     if (!inputFile.is_open()) throw std::runtime_error("Failed to open video file\n");
     std::vector<uint8_t> inputData(std::istreambuf_iterator<char>(inputFile), {});
     size_t index = 0;
     index += checkBoxValidityAndReturnSize(inputData, index, "ftyp", "Not a valid mp4 file\n");
-    const size_t freeIndex = index + checkBoxValidityAndReturnSize(inputData, index, "moov", "Expected moov\n");
-    index += 8;
+    index += checkBoxValidityAndReturnSize(inputData, index, "free", "Expected free\n");
+    index += checkBoxValidityAndReturnSize(inputData, index, "mdat", "Expected mdat\n");
+    checkBoxValidityReturnSizeAndProceed(inputData, index, "moov", "Expected moov\n");
     index += checkBoxValidityAndReturnSize(inputData, index, "mvhd", "Expected mvhd\n");
     checkBoxValidityReturnSizeAndProceed(inputData, index, "trak", "Expected trak\n");
     index += checkBoxValidityAndReturnSize(inputData, index, "tkhd", "Expected tkhd\n");
@@ -178,9 +179,6 @@ int main() {
     if (blockSizeCount != blockOffsetCount + 1) throw std::runtime_error("Block offset count is not one less than block size count\n");
     std::vector<uint32_t> blockOffsets(blockOffsetCount);
     for (uint32_t i = 0; i < blockOffsetCount; i++) blockOffsets[i] = readValueAndProceed<uint32_t>(inputData, index);
-    index = freeIndex + checkBoxValidityAndReturnSize(inputData, freeIndex, "free", "Expected free\n");
-    size_t mdatSize = checkBoxValidityAndReturnSize(inputData, index, "mdat", "expected mdat\n");
-    if (mdatSize <= 1) throw std::runtime_error("mdat size is less than or equal 1\n");
 
 
 
@@ -269,12 +267,45 @@ int main() {
     result = vkBindVideoSessionMemoryKHR(vulDevice.device(), videoSession, videoMemReqCount, videoSessionMemoryBinds.data());
     assert(result == VK_SUCCESS);
 
+    StdVideoH264SequenceParameterSetVui h264SpsVui{};
+    h264SpsVui.flags.aspect_ratio_info_present_flag = 1;
+    h264SpsVui.flags.timing_info_present_flag = 1;
+    h264SpsVui.flags.bitstream_restriction_flag = 1;
+    h264SpsVui.aspect_ratio_idc = STD_VIDEO_H264_ASPECT_RATIO_IDC_SQUARE;
+    h264SpsVui.num_units_in_tick = 1;
+    h264SpsVui.time_scale = 60;
+    h264SpsVui.max_num_reorder_frames  = 2;
+    h264SpsVui.max_dec_frame_buffering = 4;
     StdVideoH264SequenceParameterSet h264sps{};
     h264sps.seq_parameter_set_id = 0;
-    h264sps.level_idc = videoDecodeH264Capabilities.maxLevelIdc;
+    h264sps.flags.frame_mbs_only_flag = 1;
+    h264sps.flags.direct_8x8_inference_flag = 1;
+    h264sps.flags.frame_cropping_flag = 1;
+    h264sps.flags.vui_parameters_present_flag = true;
+    h264sps.profile_idc = STD_VIDEO_H264_PROFILE_IDC_HIGH;
+    h264sps.level_idc = STD_VIDEO_H264_LEVEL_IDC_3_0;
+    h264sps.chroma_format_idc = STD_VIDEO_H264_CHROMA_FORMAT_IDC_420;
+    h264sps.pic_width_in_mbs_minus1 = 480 / 16 - 1;
+    h264sps.pic_height_in_map_units_minus1 = 360 / 16 - 1;
+    h264sps.frame_crop_bottom_offset = 4;
+    h264sps.log2_max_pic_order_cnt_lsb_minus4 = 2;
+    h264sps.max_num_ref_frames = 4;
+    h264sps.pSequenceParameterSetVui = &h264SpsVui;
+    h264sps.bit_depth_chroma_minus8 = 0;
+    h264sps.bit_depth_luma_minus8 = 0;
+
     StdVideoH264PictureParameterSet h264pps{};
     h264pps.seq_parameter_set_id = 0;
     h264pps.pic_parameter_set_id = 0;
+    h264pps.flags.entropy_coding_mode_flag = 1;
+    h264pps.flags.weighted_pred_flag = 1;
+    h264pps.flags.deblocking_filter_control_present_flag = 1;
+    h264pps.num_ref_idx_l0_default_active_minus1 = 2;
+    h264pps.weighted_bipred_idc = STD_VIDEO_H264_WEIGHTED_BIPRED_IDC_IMPLICIT;
+    h264pps.pic_init_qp_minus26 = -3;
+    h264pps.chroma_qp_index_offset = -2;
+    h264pps.second_chroma_qp_index_offset = -2;
+
     VkVideoDecodeH264SessionParametersAddInfoKHR h264DecodeParametersAddInfo{};
     h264DecodeParametersAddInfo.sType = VK_STRUCTURE_TYPE_VIDEO_DECODE_H264_SESSION_PARAMETERS_ADD_INFO_KHR;
     h264DecodeParametersAddInfo.pStdSPSs = &h264sps;
@@ -295,7 +326,7 @@ int main() {
     assert(result == VK_SUCCESS);
 
     VkCommandBuffer cmdBuf = decodeCmdPool.getPrimaryCommandBuffer();
-    uint32_t blockIdx = keyFrameIndices[keyFrameIndices.size() / 2];
+    const uint32_t blockIdx = 0;
     uint32_t maxBlockSize = 0;
     for (uint32_t blockSize : blockSizes) maxBlockSize = std::max(maxBlockSize, blockSize);
     maxBlockSize = alignUp(maxBlockSize, videoCapabilities.minBitstreamBufferSizeAlignment);
@@ -309,6 +340,15 @@ int main() {
             {}, {}, false, {}, 0.0f, 0.0f, 1.0f, true, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM, videoFormatProperties[0].componentMapping);
     dstImg.keepEmpty(480, 360, 1, 1, 1, VK_FORMAT_G8_B8R8_2PLANE_420_UNORM);
     dstImg.createCustomImageYcbcr(VK_IMAGE_VIEW_TYPE_2D, VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_USAGE_VIDEO_DECODE_DPB_BIT_KHR | VK_IMAGE_USAGE_VIDEO_DECODE_DST_BIT_KHR | VK_IMAGE_USAGE_SAMPLED_BIT, VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, VK_IMAGE_TILING_OPTIMAL, VK_IMAGE_ASPECT_COLOR_BIT, dstImg.vulSampler->getYcbcrConversion(), cmdBuf);
+
+    VkQueryPoolCreateInfo queryPoolCreateInfo{};
+    queryPoolCreateInfo.sType = VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO;
+    queryPoolCreateInfo.pNext = &videoProfileInfo;
+    queryPoolCreateInfo.queryType = VK_QUERY_TYPE_RESULT_STATUS_ONLY_KHR;
+    queryPoolCreateInfo.queryCount = 1;
+    VkQueryPool queryPool;
+    vkCreateQueryPool(vulDevice.device(), &queryPoolCreateInfo, nullptr, &queryPool);
+    vkResetQueryPool(vulDevice.device(), queryPool, 0, 1);
  
     VkVideoPictureResourceInfoKHR referencePictureResourceInfo{};
     referencePictureResourceInfo.sType = VK_STRUCTURE_TYPE_VIDEO_PICTURE_RESOURCE_INFO_KHR;
@@ -364,12 +404,19 @@ int main() {
     decodeInfo.srcBufferRange = alignedBlockSize;
     decodeInfo.dstPictureResource = dstPictureResourceInfo;
     decodeInfo.pSetupReferenceSlot = &setupReferenceSlotInfo;
+
+    vkCmdBeginQuery(cmdBuf, queryPool, 0, 0);
     vkCmdDecodeVideoKHR(cmdBuf, &decodeInfo);
+    vkCmdEndQuery(cmdBuf, queryPool, 0);
 
     VkVideoEndCodingInfoKHR videoCodingEndInfo{};
     videoCodingEndInfo.sType = VK_STRUCTURE_TYPE_VIDEO_END_CODING_INFO_KHR;
     vkCmdEndVideoCodingKHR(cmdBuf, &videoCodingEndInfo);
     decodeCmdPool.submit(cmdBuf, true);
+
+    int videoDecodeResult = 0;
+    vkGetQueryPoolResults(vulDevice.device(), queryPool, 0, 1, 4, &videoDecodeResult, 4, VK_QUERY_RESULT_WITH_STATUS_BIT_KHR);
+    std::cout << "Video decode result: " << videoDecodeResult << "\n";
 
     cmdBuf = decodeCmdPool.getPrimaryCommandBuffer();
     dstImg.transitionImageLayout(VK_IMAGE_LAYOUT_VIDEO_DECODE_DPB_KHR, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, cmdBuf, vulDevice.getQueueFamilies().videoDecodeFamily, vulDevice.getQueueFamilies().mainFamily);
@@ -409,6 +456,7 @@ int main() {
     }
  
     vulDevice.waitForIdle();
+    vkDestroyQueryPool(vulDevice.device(), queryPool, nullptr);
     vkDestroyVideoSessionParametersKHR(vulDevice.device(), sessionParameters, nullptr);
     for (const VkBindVideoSessionMemoryInfoKHR &bindInfo : videoSessionMemoryBinds) vkFreeMemory(vulDevice.device(), bindInfo.memory, nullptr);
     vkDestroyVideoSessionKHR(vulDevice.device(), videoSession, nullptr);
